@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
@@ -10,6 +9,7 @@ import {
   IdCard,
   User,
 } from 'lucide-react'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function VerifyPage({
   params,
@@ -17,7 +17,7 @@ export default async function VerifyPage({
   params: Promise<{ token: string }>
 }) {
   const { token } = await params
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: idData, error } = await supabase
     .from('guard_ids')
@@ -61,10 +61,9 @@ export default async function VerifyPage({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,148,224,0.08),transparent_35%)]" />
 
       <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
-        <div className="w-full max-w-xl rounded-[32px] border border-slate-200 bg-white  shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
-          {/* Top */}
-          <div className="flex flex-col items-center text-center bg-[#081a33]">
-            <div className=" px-4 ">
+        <div className="w-full max-w-xl rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-col items-center text-center">
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <Image
                 src={logo}
                 alt="SGC Security"
@@ -73,19 +72,24 @@ export default async function VerifyPage({
               />
             </div>
 
-           
+            <div className="mt-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0094e0]/10">
+              {isValid ? (
+                <ShieldCheck className="h-7 w-7 text-[#0094e0]" />
+              ) : (
+                <ShieldX className="h-7 w-7 text-red-500" />
+              )}
+            </div>
 
-            <h1 className="mt-1 text-4xl font-bold tracking-tight text-slate-100">
+            <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
               ID Verification
             </h1>
 
-            <p className="mt-2 text-sm leading-6 text-slate-100">
+            <p className="mt-2 text-sm leading-6 text-slate-500">
               Confirm the guard identity and digital ID status.
             </p>
           </div>
 
-          {/* Profile */}
-          <div className=" bg-[#f8fafc] p-6 ring-1 ring-slate-200/80">
+          <div className="mt-8 rounded-[28px] bg-[#f8fafc] p-6 ring-1 ring-slate-200/80">
             <div className="text-center">
               <h2 className="text-3xl font-bold text-slate-900">
                 {guard.full_name}
