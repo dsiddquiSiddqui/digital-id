@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import "tailwindcss";
+
+:root {
+  --brand: #0094e0;
+  --brand-light: rgba(0, 148, 224, 0.1);
+  --brand-hover: #007bb8;
+}
