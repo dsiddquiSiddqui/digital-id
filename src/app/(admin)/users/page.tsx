@@ -16,7 +16,7 @@ type Profile = {
   created_at?: string
 }
 
-type RoleFilter = 'all' | 'super_admin' | 'admin' | 'guard'
+type RoleFilter = 'all' | 'super_admin' | 'admin' | 'staff'
 type StatusFilter = 'all' | 'active' | 'inactive'
 
 export default function UsersPage() {
@@ -193,7 +193,7 @@ export default function UsersPage() {
               User Management
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Manage admin and guard accounts from the profiles table.
+              Manage admin and Staff accounts from the profiles table.
             </p>
           </div>
 
@@ -234,7 +234,7 @@ export default function UsersPage() {
             <option value="all">All Roles</option>
             <option value="super_admin">Super Admin</option>
             <option value="admin">Admin</option>
-            <option value="guard">Guard</option>
+            <option value="guard">Staff</option>
           </select>
 
           <select
@@ -432,7 +432,7 @@ export default function UsersPage() {
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                 >
                   <option value="admin">Admin</option>
-                  <option value="guard">Guard</option>
+                  <option value="staff">Staff</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
               </div>
@@ -503,7 +503,7 @@ function RoleBadge({ role }: { role: string }) {
 
   return (
     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      Guard
+      Staff
     </span>
   )
 }

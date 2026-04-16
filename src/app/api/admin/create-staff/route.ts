@@ -52,13 +52,13 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: existingGuard } = await adminSupabase
-      .from('guards')
+    const { data: existingStaff } = await adminSupabase
+      .from('staff')
       .select('id')
       .eq('employee_code', employee_code)
       .maybeSingle()
 
-    if (existingGuard) {
+    if (existingStaff) {
       return NextResponse.json(
         { error: 'Employee code already exists.' },
         { status: 400 }
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         password,
         email_confirm: true,
         user_metadata: {
-          role: 'guard',
+          role: 'staff',
           full_name,
         },
       })
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         .insert([
           {
             auth_user_id: authUserId,
-            role: 'guard',
+            role: 'staff',
             full_name,
             email,
             phone: phone || null,
@@ -123,8 +123,8 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: createdGuard, error: createdGuardError } = await adminSupabase
-      .from('guards')
+    const { data: createdStaff, error: createdStaffError } = await adminSupabase
+      .from('staff')
       .insert([
         {
           profile_id: createdProfile.id,
@@ -140,12 +140,12 @@ export async function POST(request: Request) {
       .select('id')
       .single()
 
-    if (createdGuardError || !createdGuard) {
+    if (createdStaffError || !createdStaff) {
       await adminSupabase.from('profiles').delete().eq('id', createdProfile.id)
       await adminSupabase.auth.admin.deleteUser(authUserId)
 
       return NextResponse.json(
-        { error: createdGuardError?.message || 'Failed to create guard record.' },
+        { error: createdStaffError?.message || 'Failed to create staff record.' },
         { status: 400 }
       )
     }
@@ -153,9 +153,9 @@ export async function POST(request: Request) {
     const { error: auditError } = await adminSupabase.from('audit_logs').insert([
       {
         actor_profile_id: currentProfile.id,
-        action_type: 'create_guard_account',
-        entity_type: 'guard',
-        entity_id: createdGuard.id,
+        action_type: 'create_staff_account',
+        entity_type: 'staff',
+        entity_id: createdStaff.id,
         metadata: {
           email,
           employee_code,
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      guard_id: createdGuard.id,
+      staff_id: createdStaff.id,
       auth_user_id: authUserId,
       profile_id: createdProfile.id,
     })

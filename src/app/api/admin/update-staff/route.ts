@@ -7,8 +7,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    const guard_id =
-      typeof body.guard_id === 'string' ? body.guard_id.trim() : ''
+    const staff_id =
+      typeof body.staff_id === 'string' ? body.staff_id.trim() : ''
     const full_name =
       typeof body.full_name === 'string' ? body.full_name.trim() : ''
     const employee_code =
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
         ? body.photo_url.trim()
         : null
 
-    if (!guard_id || !full_name || !employee_code || !company_name || !email || !status) {
+    if (!staff_id || !full_name || !employee_code || !company_name || !email || !status) {
       return NextResponse.json(
         { error: 'Missing required fields.' },
         { status: 400 }
@@ -42,21 +42,21 @@ export async function POST(req: Request) {
 
     const supabase = createAdminClient()
 
-    const { data: existingGuard, error: fetchGuardError } = await supabase
-      .from('guards')
+    const { data: existingStaff, error: fetchStaffError } = await supabase
+      .from('staff')
       .select('id')
-      .eq('id', guard_id)
+      .eq('id', staff_id)
       .single()
 
-    if (fetchGuardError || !existingGuard) {
+    if (fetchStaffError || !existingStaff) {
       return NextResponse.json(
-        { error: 'Guard not found.' },
+        { error: 'Staff member not found.' },
         { status: 404 }
       )
     }
 
-    const { error: updateGuardError } = await supabase
-      .from('guards')
+    const { error: updateStaffError } = await supabase
+      .from('staff')
       .update({
         full_name,
         employee_code,
@@ -66,11 +66,11 @@ export async function POST(req: Request) {
         status,
         photo_url,
       })
-      .eq('id', guard_id)
+      .eq('id', staff_id)
 
-    if (updateGuardError) {
+    if (updateStaffError) {
       return NextResponse.json(
-        { error: updateGuardError.message },
+        { error: updateStaffError.message },
         { status: 400 }
       )
     }
@@ -87,9 +87,9 @@ export async function POST(req: Request) {
         : 'inactive'
 
     const { error: updateIdsError } = await supabase
-      .from('guard_ids')
+      .from('staff_ids')
       .update({ status: idStatus })
-      .eq('guard_id', guard_id)
+      .eq('staff_id', staff_id)
       .eq('is_current', true)
 
     if (updateIdsError) {
@@ -101,9 +101,9 @@ export async function POST(req: Request) {
 
     const { error: auditError } = await supabase.from('audit_logs').insert([
       {
-        action_type: 'update_guard',
-        entity_type: 'guard',
-        entity_id: guard_id,
+        action_type: 'update_staff',
+        entity_type: 'staff',
+        entity_id: staff_id,
         metadata: {
           full_name,
           employee_code,
@@ -126,11 +126,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Guard updated successfully.',
+      message: 'Staff member updated successfully.',
     })
   } catch {
     return NextResponse.json(
-      { error: 'Failed to update guard.' },
+      { error: 'Failed to update staff member.' },
       { status: 500 }
     )
   }

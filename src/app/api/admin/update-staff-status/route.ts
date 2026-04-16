@@ -5,11 +5,11 @@ const ALLOWED_STATUSES = ['active', 'inactive', 'suspended', 'revoked', 'expired
 
 export async function POST(req: Request) {
   try {
-    const { guard_id, status } = await req.json()
+    const { staff_id, status } = await req.json()
 
-    if (!guard_id || !status) {
+    if (!staff_id || !status) {
       return NextResponse.json(
-        { error: 'Missing guard_id or status.' },
+        { error: 'Missing staff_id or status.' },
         { status: 400 }
       )
     }
@@ -23,18 +23,20 @@ export async function POST(req: Request) {
 
     const supabase = createAdminClient()
 
-    const { error: guardError } = await supabase
-      .from('guards')
+    // ✅ Update staff
+    const { error: staffError } = await supabase
+      .from('staff')
       .update({ status })
-      .eq('id', guard_id)
+      .eq('id', staff_id)
 
-    if (guardError) {
+    if (staffError) {
       return NextResponse.json(
-        { error: guardError.message, step: 'update guard' },
+        { error: staffError.message, step: 'update staff' },
         { status: 400 }
       )
     }
 
+    // ✅ Map ID status
     const idStatus =
       status === 'active'
         ? 'active'
@@ -46,42 +48,45 @@ export async function POST(req: Request) {
         ? 'expired'
         : 'inactive'
 
+    // ✅ Fetch existing staff IDs
     const { data: currentIds, error: currentIdsError } = await supabase
-      .from('guard_ids')
-      .select('id, guard_id, is_current, status')
-      .eq('guard_id', guard_id)
+      .from('staff_ids')
+      .select('id, staff_id, is_current, status')
+      .eq('staff_id', staff_id)
 
     if (currentIdsError) {
       return NextResponse.json(
-        { error: currentIdsError.message, step: 'fetch guard_ids' },
+        { error: currentIdsError.message, step: 'fetch staff_ids' },
         { status: 400 }
       )
     }
 
+    // ✅ Update current ID status
     const { data: updatedIds, error: idError } = await supabase
-      .from('guard_ids')
+      .from('staff_ids')
       .update({ status: idStatus })
-      .eq('guard_id', guard_id)
+      .eq('staff_id', staff_id)
       .eq('is_current', true)
-      .select('id, guard_id, is_current, status')
+      .select('id, staff_id, is_current, status')
 
     if (idError) {
       return NextResponse.json(
-        { error: idError.message, step: 'update guard_ids' },
+        { error: idError.message, step: 'update staff_ids' },
         { status: 400 }
       )
     }
 
+    // ✅ Audit log
     const { error: auditError } = await supabase.from('audit_logs').insert([
       {
-        action_type: 'update_guard_status',
-        entity_type: 'guard',
-        entity_id: guard_id,
+        action_type: 'update_staff_status',
+        entity_type: 'staff',
+        entity_id: staff_id,
         metadata: {
           status,
           id_status: idStatus,
-          guard_ids_before: currentIds,
-          guard_ids_updated: updatedIds,
+          staff_ids_before: currentIds,
+          staff_ids_updated: updatedIds,
         },
       },
     ])
@@ -96,12 +101,12 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       idStatus,
-      guardIdsBefore: currentIds,
-      guardIdsUpdated: updatedIds,
+      staffIdsBefore: currentIds,
+      staffIdsUpdated: updatedIds,
     })
   } catch (err) {
     return NextResponse.json(
-      { error: 'Failed to update guard status.' },
+      { error: 'Failed to update staff status.' },
       { status: 500 }
     )
   }

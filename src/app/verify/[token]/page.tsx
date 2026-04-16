@@ -20,7 +20,7 @@ export default async function VerifyPage({
   const supabase = createAdminClient()
 
   const { data: idData, error } = await supabase
-    .from('guard_ids')
+    .from('staff_ids')
     .select(`
       id,
       id_number,
@@ -30,10 +30,11 @@ export default async function VerifyPage({
       is_current,
       qr_token,
       status,
-      guards (
+      staff (
         full_name,
         employee_code,
         company_name,
+        photo_url,
         status
       )
     `)
@@ -44,16 +45,16 @@ export default async function VerifyPage({
     return notFound()
   }
 
-  const guard = Array.isArray(idData.guards) ? idData.guards[0] : idData.guards
+  const staff = Array.isArray(idData.staff) ? idData.staff[0] : idData.staff
 
-  if (!guard) {
+  if (!staff) {
     return notFound()
   }
 
   const isValid =
     idData.is_current &&
     idData.status === 'active' &&
-    guard.status === 'active' &&
+    staff.status === 'active' &&
     new Date(idData.expiry_date) > new Date()
 
   return (
@@ -81,18 +82,31 @@ export default async function VerifyPage({
             </div>
 
             <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
-              ID Verification
+              Staff ID Verification
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Confirm the guard identity and digital ID status.
+              Confirm the staff identity and digital ID status.
             </p>
           </div>
+
+          {staff.photo_url && (
+            <div className="mt-6 flex justify-center">
+              <div className="relative h-32 w-32 overflow-hidden rounded-2xl border border-slate-200">
+                <Image
+                  src={staff.photo_url}
+                  alt={staff.full_name}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="mt-8 rounded-[28px] bg-[#f8fafc] p-6 ring-1 ring-slate-200/80">
             <div className="text-center">
               <h2 className="text-3xl font-bold text-slate-900">
-                {guard.full_name}
+                {staff.full_name}
               </h2>
               <p className="mt-1 text-sm font-medium uppercase tracking-[0.16em] text-slate-500">
                 {idData.role_title}
@@ -103,7 +117,7 @@ export default async function VerifyPage({
               <DetailRow
                 icon={<User className="h-4 w-4 text-[#0094e0]" />}
                 label="Employee Code"
-                value={guard.employee_code}
+                value={staff.employee_code}
               />
               <DetailRow
                 icon={<IdCard className="h-4 w-4 text-[#0094e0]" />}

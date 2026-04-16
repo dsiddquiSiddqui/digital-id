@@ -5,14 +5,14 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-type Guard = {
+type Staff = {
   id: string
   full_name: string
   email: string | null
   profile_id?: string | null
 }
 
-export default function GuardPasswordPage() {
+export default function StaffPasswordPage() {
   const supabase = createClient()
   const router = useRouter()
   const params = useParams()
@@ -22,33 +22,33 @@ export default function GuardPasswordPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [guard, setGuard] = useState<Guard | null>(null)
+  const [staff, setStaff] = useState<Staff | null>(null)
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
   useEffect(() => {
-    const loadGuard = async () => {
+    const loadStaff = async () => {
       setLoading(true)
       setError('')
 
       const { data, error } = await supabase
-        .from('guards')
+        .from('staff')
         .select('id, full_name, email, profile_id')
         .eq('id', id)
         .single()
 
       if (error || !data) {
-        setError('Guard not found.')
+        setError('Staff member not found.')
         setLoading(false)
         return
       }
 
-      setGuard(data as Guard)
+      setStaff(data as Staff)
       setLoading(false)
     }
 
-    if (id) loadGuard()
+    if (id) loadStaff()
   }, [id, supabase])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -74,11 +74,11 @@ export default function GuardPasswordPage() {
     setSaving(true)
 
     try {
-      const response = await fetch('/api/admin/reset-guard-password', {
+      const response = await fetch('/api/admin/reset-staff-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          guard_id: id,
+          staff_id: id,
           password,
         }),
       })
@@ -91,12 +91,12 @@ export default function GuardPasswordPage() {
         return
       }
 
-      setSuccess('Guard password updated successfully.')
+      setSuccess('Staff password updated successfully.')
       setPassword('')
       setConfirmPassword('')
 
       setTimeout(() => {
-        router.push(`/guards/${id}`)
+        router.push(`/staff/${id}`)
         router.refresh()
       }, 700)
     } catch {
@@ -109,15 +109,15 @@ export default function GuardPasswordPage() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-        <p className="text-sm text-slate-600">Loading guard...</p>
+        <p className="text-sm text-slate-600">Loading staff member...</p>
       </div>
     )
   }
 
-  if (!guard) {
+  if (!staff) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
-        <p className="text-sm text-slate-600">Guard not found.</p>
+        <p className="text-sm text-slate-600">Staff member not found.</p>
       </div>
     )
   }
@@ -128,18 +128,18 @@ export default function GuardPasswordPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Reset Guard Password
+              Reset Staff Password
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Update the login password for <strong>{guard.full_name}</strong>.
+              Update the login password for <strong>{staff.full_name}</strong>.
             </p>
           </div>
 
           <Link
-            href={`/guards/${id}`}
+            href={`/staff/${id}`}
             className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
-            Back to Guard
+            Back to Staff
           </Link>
         </div>
       </section>
@@ -190,7 +190,7 @@ export default function GuardPasswordPage() {
               disabled={saving}
               className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {saving ? 'Updating...' : 'Reset Guard Password'}
+              {saving ? 'Updating...' : 'Reset Staff Password'}
             </button>
           </div>
         </form>

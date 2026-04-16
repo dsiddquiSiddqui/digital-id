@@ -1,32 +1,88 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Upload, UserPlus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Upload } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
-export default function NewGuardPage() {
+type Staff = {
+  id: string
+  full_name: string
+  employee_code: string
+  company_name: string
+  phone: string | null
+  email: string | null
+  status: string
+  photo_url?: string | null
+}
+
+export default function EditStaffPage() {
+  const supabase = createClient()
   const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [staff, setStaff] = useState<Staff | null>(null)
 
   const [fullName, setFullName] = useState('')
   const [employeeCode, setEmployeeCode] = useState('')
-  const [companyName, setCompanyName] = useState('H&D Security')
+  const [companyName, setCompanyName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [status, setStatus] = useState('active')
+  const [photoUrl, setPhotoUrl] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  useEffect(() => {
+    const loadStaff = async () => {
+      setLoading(true)
+      setError('')
 
-  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error || !data) {
+        setError('Staff member not found.')
+        setLoading(false)
+        return
+      }
+
+      const row = data as Staff
+      setStaff(row)
+      setFullName(row.full_name || '')
+      setEmployeeCode(row.employee_code || '')
+      setCompanyName(row.company_name || '')
+      setPhone(row.phone || '')
+      setEmail(row.email || '')
+      setStatus(row.status || 'active')
+      setPhotoUrl(row.photo_url || '')
+      setLoading(false)
+    }
+
+    if (id) loadStaff()
+  }, [id, supabase])
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
     setSuccess('')
+    setSaving(true)
 
-    let photoUrl: string | null = null
+    if (!fullName.trim() || !employeeCode.trim() || !companyName.trim() || !email.trim()) {
+      setError('Please fill in all required fields.')
+      setSaving(false)
+      return
+    }
+
+    let finalPhotoUrl = photoUrl || null
 
     try {
       if (photo) {
@@ -44,70 +100,89 @@ export default function NewGuardPage() {
 
         if (!uploadRes.ok) {
           setError(uploadData.error || 'Failed to upload photo.')
-          setLoading(false)
+          setSaving(false)
           return
         }
 
-        photoUrl = uploadData.url
+        finalPhotoUrl = uploadData.url
       }
 
-      const response = await fetch('/api/admin/create-guard', {
+      const response = await fetch('/api/admin/update-staff', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          full_name: fullName,
-          employee_code: employeeCode,
-          company_name: companyName,
-          phone,
-          email,
-          password,
+          staff_id: id,
+          full_name: fullName.trim(),
+          employee_code: employeeCode.trim(),
+          company_name: companyName.trim(),
+          phone: phone.trim() || null,
+          email: email.trim().toLowerCase(),
           status,
-          photo_url: photoUrl,
+          photo_url: finalPhotoUrl,
         }),
       })
 
       const result = await response.json()
-      setLoading(false)
 
       if (!response.ok) {
-        setError(result.error || 'Failed to create guard.')
+        setError(result.error || 'Failed to update staff member.')
+        setSaving(false)
         return
       }
 
-      setSuccess('Guard created successfully.')
+      setSuccess('Staff member updated successfully.')
 
       setTimeout(() => {
-        router.push('/guards')
+        router.push(`/staff/${id}`)
+        router.refresh()
       }, 700)
-    } catch (err) {
-      setLoading(false)
-      setError('Something went wrong while creating the guard.')
+    } catch {
+      setError('Something went wrong while updating the staff member.')
+    } finally {
+      setSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
+        <p className="text-sm text-slate-600">Loading staff member...</p>
+      </div>
+    )
+  }
+
+  if (!staff) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
+        <p className="text-sm text-slate-600">Staff member not found.</p>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-start gap-4">
-          <div className="rounded-2xl bg-slate-100 p-3">
-            <UserPlus className="h-6 w-6 text-slate-700" />
-          </div>
-
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Create Officers Account
+              Edit Staff
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Create a Officers record with login credentials and optional photo.
+              Update staff details and profile information.
             </p>
           </div>
+
+          <Link
+            href={`/staff/${id}`}
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Back to Staff
+          </Link>
         </div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <form onSubmit={handleCreate} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className="lg:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Full Name
@@ -116,7 +191,7 @@ export default function NewGuardPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Ali Raza"
+              placeholder="Full name"
               required
             />
           </div>
@@ -129,7 +204,7 @@ export default function NewGuardPage() {
               value={employeeCode}
               onChange={(e) => setEmployeeCode(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="HD-1001"
+              placeholder="Employee code"
               required
             />
           </div>
@@ -142,6 +217,7 @@ export default function NewGuardPage() {
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              placeholder="Company name"
               required
             />
           </div>
@@ -154,7 +230,7 @@ export default function NewGuardPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="+44 7700 900000"
+              placeholder="Phone number"
             />
           </div>
 
@@ -167,21 +243,7 @@ export default function NewGuardPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="guard@email.com"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Temporary Password
-            </label>
-            <input
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="TempPass123!"
+              placeholder="Email"
               required
             />
           </div>
@@ -205,12 +267,26 @@ export default function NewGuardPage() {
 
           <div className="lg:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-700">
-              Photo
+              Current Photo
             </label>
+
+            <div className="mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-slate-100">
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt={fullName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-lg font-bold text-slate-500">
+                  {fullName?.charAt(0) || 'S'}
+                </span>
+              )}
+            </div>
 
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 hover:bg-slate-100">
               <Upload className="h-4 w-4" />
-              <span>{photo ? photo.name : 'Upload guard photo'}</span>
+              <span>{photo ? photo.name : 'Upload new photo'}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -235,10 +311,10 @@ export default function NewGuardPage() {
           <div className="lg:col-span-2 flex justify-end">
             <button
               type="submit"
-              disabled={loading}
+              disabled={saving}
               className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? 'Creating account...' : 'Create Officers Account'}
+              {saving ? 'Saving...' : 'Update Staff'}
             </button>
           </div>
         </form>

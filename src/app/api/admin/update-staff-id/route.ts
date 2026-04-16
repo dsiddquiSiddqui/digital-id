@@ -69,8 +69,8 @@ export async function POST(req: Request) {
     const supabase = createAdminClient()
 
     const { data: existing, error: fetchError } = await supabase
-      .from('guard_ids')
-      .select('id, guard_id')
+      .from('staff_ids')
+      .select('id, staff_id')
       .eq('id', id)
       .single()
 
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     }
 
     const { error: updateIdError } = await supabase
-      .from('guard_ids')
+      .from('staff_ids')
       .update({
         id_number,
         role_title,
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const guardStatus =
+    const staffStatus =
       status === 'active'
         ? 'active'
         : status === 'suspended'
@@ -112,25 +112,25 @@ export async function POST(req: Request) {
         ? 'expired'
         : 'inactive'
 
-    const { error: updateGuardError } = await supabase
-      .from('guards')
-      .update({ status: guardStatus })
-      .eq('id', existing.guard_id)
+    const { error: updateStaffError } = await supabase
+      .from('staff')
+      .update({ status: staffStatus })
+      .eq('id', existing.staff_id)
 
-    if (updateGuardError) {
+    if (updateStaffError) {
       return NextResponse.json(
-        { error: updateGuardError.message },
+        { error: updateStaffError.message },
         { status: 400 }
       )
     }
 
     const { error: auditError } = await supabase.from('audit_logs').insert([
       {
-        action_type: 'update_guard_id',
-        entity_type: 'guard_id',
+        action_type: 'update_staff_id',
+        entity_type: 'staff_id',
         entity_id: id,
         metadata: {
-          guard_id: existing.guard_id,
+          staff_id: existing.staff_id,
           id_number,
           role_title,
           site_name,

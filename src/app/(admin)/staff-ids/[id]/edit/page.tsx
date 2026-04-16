@@ -3,21 +3,22 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-type Guard = {
+type StaffIdRecord = {
   id: string
-  full_name: string
-  employee_code: string
-  company_name: string
-  phone: string | null
-  email: string | null
-  status: string
-  photo_url?: string | null
+  staff_id: string
+  id_number: string
+  role_title: string
+  site_name: string | null
+  sia_number: string | null
+  issue_date: string
+  expiry_date: string
+  is_current: boolean
+  status: string | null
 }
 
-export default function EditGuardPage() {
+export default function EditDigitalIdPage() {
   const supabase = createClient()
   const router = useRouter()
   const params = useParams()
@@ -27,117 +28,101 @@ export default function EditGuardPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [guard, setGuard] = useState<Guard | null>(null)
+  const [record, setRecord] = useState<StaffIdRecord | null>(null)
 
-  const [fullName, setFullName] = useState('')
-  const [employeeCode, setEmployeeCode] = useState('')
-  const [companyName, setCompanyName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
+  const [idNumber, setIdNumber] = useState('')
+  const [roleTitle, setRoleTitle] = useState('')
+  const [siteName, setSiteName] = useState('')
+  const [siaNumber, setSiaNumber] = useState('')
+  const [issueDate, setIssueDate] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
   const [status, setStatus] = useState('active')
-  const [photoUrl, setPhotoUrl] = useState('')
-  const [photo, setPhoto] = useState<File | null>(null)
 
   useEffect(() => {
-    const loadGuard = async () => {
+    const loadRecord = async () => {
       setLoading(true)
       setError('')
 
       const { data, error } = await supabase
-        .from('guards')
+        .from('staff_ids')
         .select('*')
         .eq('id', id)
         .single()
 
       if (error || !data) {
-        setError('Guard not found.')
+        setError('Digital ID not found.')
         setLoading(false)
         return
       }
 
-      const row = data as Guard
-      setGuard(row)
-      setFullName(row.full_name || '')
-      setEmployeeCode(row.employee_code || '')
-      setCompanyName(row.company_name || '')
-      setPhone(row.phone || '')
-      setEmail(row.email || '')
+      const row = data as StaffIdRecord
+
+      setRecord(row)
+      setIdNumber(row.id_number || '')
+      setRoleTitle(row.role_title || '')
+      setSiteName(row.site_name || '')
+      setSiaNumber(row.sia_number || '')
+      setIssueDate(row.issue_date || '')
+      setExpiryDate(row.expiry_date || '')
       setStatus(row.status || 'active')
-      setPhotoUrl(row.photo_url || '')
+
       setLoading(false)
     }
 
-    if (id) loadGuard()
+    if (id) {
+      loadRecord()
+    }
   }, [id, supabase])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setSuccess('')
-    setSaving(true)
 
-    if (!fullName.trim() || !employeeCode.trim() || !companyName.trim() || !email.trim()) {
+    if (!idNumber.trim() || !roleTitle.trim() || !issueDate || !expiryDate || !status) {
       setError('Please fill in all required fields.')
-      setSaving(false)
       return
     }
 
-    let finalPhotoUrl = photoUrl || null
+    if (expiryDate <= issueDate) {
+      setError('Expiry date must be later than issue date.')
+      return
+    }
+
+    setSaving(true)
 
     try {
-      if (photo) {
-        const fileName = `${Date.now()}-${photo.name}`
-
-        const uploadRes = await fetch('/api/admin/upload-photo', {
-          method: 'POST',
-          body: photo,
-          headers: {
-            'x-filename': fileName,
-          },
-        })
-
-        const uploadData = await uploadRes.json()
-
-        if (!uploadRes.ok) {
-          setError(uploadData.error || 'Failed to upload photo.')
-          setSaving(false)
-          return
-        }
-
-        finalPhotoUrl = uploadData.url
-      }
-
-      const response = await fetch('/api/admin/update-guard', {
+      const response = await fetch('/api/admin/update-staff-id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          guard_id: id,
-          full_name: fullName.trim(),
-          employee_code: employeeCode.trim(),
-          company_name: companyName.trim(),
-          phone: phone.trim() || null,
-          email: email.trim().toLowerCase(),
+          id,
+          id_number: idNumber.trim(),
+          role_title: roleTitle.trim(),
+          site_name: siteName.trim() || null,
+          sia_number: siaNumber.trim() || null,
+          issue_date: issueDate,
+          expiry_date: expiryDate,
           status,
-          photo_url: finalPhotoUrl,
         }),
       })
 
       const result = await response.json()
 
       if (!response.ok) {
-        setError(result.error || 'Failed to update guard.')
+        setError(result.error || 'Failed to update digital ID.')
         setSaving(false)
         return
       }
 
-      setSuccess('Guard updated successfully.')
+      setSuccess('Digital ID updated successfully.')
 
       setTimeout(() => {
-        router.push(`/guards/${id}`)
+        router.push(`/staff/${record?.staff_id}`)
         router.refresh()
       }, 700)
-    } catch {
-      setError('Something went wrong while updating the guard.')
+    } catch (err) {
+      setError('Something went wrong while updating the digital ID.')
     } finally {
       setSaving(false)
     }
@@ -146,15 +131,15 @@ export default function EditGuardPage() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-        <p className="text-sm text-slate-600">Loading guard...</p>
+        <p className="text-sm text-slate-600">Loading digital ID...</p>
       </div>
     )
   }
 
-  if (!guard) {
+  if (!record) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
-        <p className="text-sm text-slate-600">Guard not found.</p>
+        <p className="text-sm text-slate-600">Digital ID not found.</p>
       </div>
     )
   }
@@ -165,92 +150,103 @@ export default function EditGuardPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Edit Guard
+              Edit Digital ID
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Update guard details and profile information.
+              Update the current digital ID details for this staff member.
             </p>
           </div>
 
           <Link
-            href={`/guards/${id}`}
+            href={`/staff/${record.staff_id}`}
             className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
-            Back to Guard
+            Back to Staff
           </Link>
         </div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              ID Number
+            </label>
+            <input
+              value={idNumber}
+              onChange={(e) => setIdNumber(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              placeholder="ID-1001"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Role Title
+            </label>
+            <input
+              value={roleTitle}
+              onChange={(e) => setRoleTitle(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              placeholder="Door Supervisor"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Site Name
+            </label>
+            <input
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              placeholder="Canary Wharf"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              SIA Number
+            </label>
+            <input
+              value={siaNumber}
+              onChange={(e) => setSiaNumber(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              placeholder="SIA-874221"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Issue Date
+            </label>
+            <input
+              type="date"
+              value={issueDate}
+              onChange={(e) => setIssueDate(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Expiry Date
+            </label>
+            <input
+              type="date"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              required
+            />
+          </div>
+
           <div className="lg:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-700">
-              Full Name
-            </label>
-            <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Full name"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Employee Code
-            </label>
-            <input
-              value={employeeCode}
-              onChange={(e) => setEmployeeCode(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Employee code"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Company Name
-            </label>
-            <input
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Company name"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Phone
-            </label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Phone number"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Email"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Status
+              ID Status
             </label>
             <select
               value={status}
@@ -263,37 +259,6 @@ export default function EditGuardPage() {
               <option value="revoked">revoked</option>
               <option value="expired">expired</option>
             </select>
-          </div>
-
-          <div className="lg:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Current Photo
-            </label>
-
-            <div className="mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-slate-100">
-              {photoUrl ? (
-                <img
-                  src={photoUrl}
-                  alt={fullName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="text-lg font-bold text-slate-500">
-                  {fullName?.charAt(0) || 'G'}
-                </span>
-              )}
-            </div>
-
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 hover:bg-slate-100">
-              <Upload className="h-4 w-4" />
-              <span>{photo ? photo.name : 'Upload new photo'}</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
-                className="hidden"
-              />
-            </label>
           </div>
 
           {error ? (
@@ -314,7 +279,7 @@ export default function EditGuardPage() {
               disabled={saving}
               className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Update Guard'}
+              {saving ? 'Saving...' : 'Update Digital ID'}
             </button>
           </div>
         </form>

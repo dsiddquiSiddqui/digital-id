@@ -199,7 +199,7 @@ export default function EditUserPage() {
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
             >
               <option value="admin">Admin</option>
-              <option value="guard">Guard</option>
+              <option value="staff">Staff</option>
               <option value="super_admin">Super Admin</option>
             </select>
           </div>

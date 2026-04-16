@@ -59,10 +59,10 @@ export default function IssueIdPage() {
     }
 
     const { error: updateOldIdsError } = await supabase
-      .from('guard_ids')
+      .from('staff_ids')
       .update({ is_current: false, status: 'revoked' })
-  .eq('guard_id', id)
-  .eq('is_current', true)
+      .eq('staff_id', id)
+      .eq('is_current', true)
 
     if (updateOldIdsError) {
       setError(updateOldIdsError.message)
@@ -70,20 +70,20 @@ export default function IssueIdPage() {
       return
     }
 
-    const { error: insertError } = await supabase.from('guard_ids').insert([
+    const { error: insertError } = await supabase.from('staff_ids').insert([
       {
-     guard_id: id,
-    id_number: idNumber,
-    issue_date: issueDate,
-    expiry_date: expiryDate,
-    site_name: siteName || null,
-    role_title: roleTitle,
-    sia_number: siaNumber || null,
-    qr_token: generateQrToken(),
-    watermark_text: 'Internal Digital ID',
-    is_current: true,
-    status: 'active',
-    created_by: profile.id,
+        staff_id: id,
+        id_number: idNumber,
+        issue_date: issueDate,
+        expiry_date: expiryDate,
+        site_name: siteName || null,
+        role_title: roleTitle,
+        sia_number: siaNumber || null,
+        qr_token: generateQrToken(),
+        watermark_text: 'Internal Digital ID',
+        is_current: true,
+        status: 'active',
+        created_by: profile.id,
       },
     ])
 
@@ -94,7 +94,7 @@ export default function IssueIdPage() {
       return
     }
 
-    router.push(`/guards/${id}`)
+    router.push(`/staff/${id}`)
     router.refresh()
   }
 
@@ -106,7 +106,7 @@ export default function IssueIdPage() {
             Issue Digital ID
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Create a new digital ID for this guard. Previous IDs will automatically be marked as non-current.
+            Create a new digital ID for this staff member. Previous IDs will automatically be marked as non-current.
           </p>
         </div>
       </section>

@@ -10,8 +10,8 @@ export default function MyIdPage() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
-  const [guard, setGuard] = useState<any>(null)
-  const [guardId, setGuardId] = useState<any>(null)
+  const [staff, setStaff] = useState<any>(null)
+  const [staffId, setStaffId] = useState<any>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -20,7 +20,7 @@ export default function MyIdPage() {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        router.push('/guard-login')
+        router.push('/staff-login')
         return
       }
 
@@ -30,26 +30,31 @@ export default function MyIdPage() {
         .eq('auth_user_id', user.id)
         .single()
 
-      if (!profile || profile.role !== 'guard') {
+      if (!profile || profile.role !== 'staff') {
         router.push('/')
         return
       }
 
-      const { data: guardData } = await supabase
-        .from('guards')
+      const { data: staffData } = await supabase
+        .from('staff')
         .select('*')
         .eq('profile_id', profile.id)
         .single()
 
+      if (!staffData) {
+        setLoading(false)
+        return
+      }
+
       const { data: idData } = await supabase
-        .from('guard_ids')
+        .from('staff_ids')
         .select('*')
-        .eq('guard_id', guardData.id)
+        .eq('staff_id', staffData.id)
         .eq('is_current', true)
         .single()
 
-      setGuard(guardData)
-      setGuardId(idData)
+      setStaff(staffData)
+      setStaffId(idData)
       setLoading(false)
     }
 
@@ -58,12 +63,12 @@ export default function MyIdPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/guard-login')
+    router.push('/staff-login')
   }
 
   if (loading) return <p className="p-6">Loading your ID...</p>
 
-  if (!guardId) {
+  if (!staffId) {
     return (
       <main className="min-h-screen bg-slate-100 p-6">
         <div className="mx-auto max-w-xl rounded-2xl bg-white p-6 shadow">
@@ -95,18 +100,16 @@ export default function MyIdPage() {
         </div>
 
         <IdCard
-          fullName={guard.full_name}
-          employeeCode={guard.employee_code}
-          roleTitle={guardId.role_title}
-          idNumber={guardId.id_number}
-          qrToken={guardId.qr_token}
-          photoUrl={guard.photo_url}
-          issueDate={guardId.issue_date}
-          expiryDate={guardId.expiry_date}
-          idStatus={guardId.status}
+          fullName={staff.full_name}
+          employeeCode={staff.employee_code}
+          roleTitle={staffId.role_title}
+          idNumber={staffId.id_number}
+          qrToken={staffId.qr_token}
+          photoUrl={staff.photo_url}
+          issueDate={staffId.issue_date}
+          expiryDate={staffId.expiry_date}
+          idStatus={staffId.status}
         />
-
-        
       </div>
     </main>
   )

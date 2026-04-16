@@ -7,7 +7,7 @@ import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
 import { createClient } from '@/lib/supabase/client'
 
-type GuardProfile = {
+type StaffProfile = {
   id: string
   auth_user_id: string
   role: string
@@ -16,7 +16,7 @@ type GuardProfile = {
   is_active: boolean
 }
 
-export default function GuardLoginPage() {
+export default function staffLoginPage() {
   const supabase = createClient()
   const router = useRouter()
 
@@ -60,25 +60,25 @@ export default function GuardLoginPage() {
       .from('profiles')
       .select('id, auth_user_id, role, full_name, email, is_active')
       .eq('auth_user_id', user.id)
-      .single<GuardProfile>()
+      .single<StaffProfile>()
 
     if (profileError || !profile) {
       await supabase.auth.signOut()
-      setError('Access denied. No guard profile found.')
+      setError('Access denied. No staff profile found.')
       setLoading(false)
       return
     }
 
-    if (profile.role !== 'guard') {
+    if (profile.role !== 'staff') {
       await supabase.auth.signOut()
-      setError('Access denied. This login is only for guards.')
+      setError('Access denied. This login is only for staff.')
       setLoading(false)
       return
     }
 
     if (!profile.is_active) {
       await supabase.auth.signOut()
-      setError('Your guard account is inactive. Please contact admin.')
+      setError('Your staff account is inactive. Please contact admin.')
       setLoading(false)
       return
     }
@@ -107,21 +107,21 @@ export default function GuardLoginPage() {
 
               <div className="mt-12 max-w-sm">
                 <span className="inline-flex rounded-full bg-[#0094e0]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#7dd3fc]">
-                  Officer Access
+                  Staff Access
                 </span>
 
                 <h1 className="mt-5 text-4xl font-bold leading-tight">
-                  Secure Officer Login
+                  Secure Staff Login
                 </h1>
 
                 <p className="mt-4 text-sm leading-7 text-white/70">
-                  Access your digital ID securely and verify your active Officer profile.
+                  Access your digital ID securely and verify your active Staff profile.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <MiniPill text="Officer only" />
+              <MiniPill text="Staff only" />
               <MiniPill text="QR verified" />
             </div>
           </section>
@@ -146,10 +146,10 @@ export default function GuardLoginPage() {
                 </div>
 
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                  Officer Login
+                  Staff Login
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Sign in to view your digital Officer ID.
+                  Sign in to view your digital Staff ID.
                 </p>
               </div>
 
@@ -164,7 +164,7 @@ export default function GuardLoginPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="guard@email.com"
+                      placeholder="staff@email.com"
                       className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
                       required
                     />

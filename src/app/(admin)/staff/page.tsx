@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Search, Plus, ChevronRight } from 'lucide-react'
 import { createClient } from '../../../lib/supabase/client'
 
-type Guard = {
+type Staff = {
   id: string
   full_name: string
   employee_code: string
@@ -14,44 +14,44 @@ type Guard = {
   created_at: string
 }
 
-export default function GuardsPage() {
+export default function StaffPage() {
   const supabase = createClient()
 
-  const [guards, setGuards] = useState<Guard[]>([])
+  const [staff, setStaff] = useState<Staff[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    const fetchGuards = async () => {
+    const fetchStaff = async () => {
       const { data, error } = await supabase
-        .from('guards')
+        .from('staff')
         .select('id, full_name, employee_code, company_name, status, created_at')
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        setGuards(data)
+        setStaff(data)
       }
 
       setLoading(false)
     }
 
-    fetchGuards()
+    fetchStaff()
   }, [supabase])
 
-  const filteredGuards = useMemo(() => {
+  const filteredStaff = useMemo(() => {
     const query = search.trim().toLowerCase()
 
-    if (!query) return guards
+    if (!query) return staff
 
-    return guards.filter((guard) => {
+    return staff.filter((member) => {
       return (
-        guard.full_name?.toLowerCase().includes(query) ||
-        guard.employee_code?.toLowerCase().includes(query) ||
-        guard.company_name?.toLowerCase().includes(query) ||
-        guard.status?.toLowerCase().includes(query)
+        member.full_name?.toLowerCase().includes(query) ||
+        member.employee_code?.toLowerCase().includes(query) ||
+        member.company_name?.toLowerCase().includes(query) ||
+        member.status?.toLowerCase().includes(query)
       )
     })
-  }, [guards, search])
+  }, [staff, search])
 
   return (
     <div className="space-y-6">
@@ -59,7 +59,7 @@ export default function GuardsPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Officers
+              Staff
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               View and manage your staff records.
@@ -73,39 +73,39 @@ export default function GuardsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Officers..."
+                placeholder="Search Staff..."
                 className="w-full min-w-[220px] bg-transparent px-3 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
 
             <Link
-              href="/guards/new"
+              href="/staff/new"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               <Plus className="h-4 w-4" />
-              Add Officers
+              Add Staff
             </Link>
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryCard title="Total Officers" value={guards.length} />
+        <SummaryCard title="Total Staff" value={staff.length} />
         <SummaryCard
-          title="Active Officers"
-          value={guards.filter((g) => g.status?.toLowerCase() === 'active').length}
+          title="Active Staff"
+          value={staff.filter((member) => member.status?.toLowerCase() === 'active').length}
         />
         <SummaryCard
-          title="Inactive Officers"
-          value={guards.filter((g) => g.status?.toLowerCase() !== 'active').length}
+          title="Inactive Staff"
+          value={staff.filter((member) => member.status?.toLowerCase() !== 'active').length}
         />
       </section>
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-6 py-4">
-          <h3 className="text-lg font-semibold text-slate-900">Officers Records</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Staff Records</h3>
           <p className="mt-1 text-sm text-slate-500">
-            {filteredGuards.length} result{filteredGuards.length === 1 ? '' : 's'}
+            {filteredStaff.length} result{filteredStaff.length === 1 ? '' : 's'}
           </p>
         </div>
 
@@ -135,42 +135,42 @@ export default function GuardsPage() {
               {loading ? (
                 <tr>
                   <td className="px-6 py-6 text-sm text-slate-500" colSpan={5}>
-                    Loading Officers...
+                    Loading Staff...
                   </td>
                 </tr>
-              ) : filteredGuards.length === 0 ? (
+              ) : filteredStaff.length === 0 ? (
                 <tr>
                   <td className="px-6 py-10 text-sm text-slate-500" colSpan={5}>
-                    No Officers found.
+                    No staff found.
                   </td>
                 </tr>
               ) : (
-                filteredGuards.map((guard) => (
-                  <tr key={guard.id} className="border-b border-slate-200 last:border-b-0">
+                filteredStaff.map((member) => (
+                  <tr key={member.id} className="border-b border-slate-200 last:border-b-0">
                     <td className="px-6 py-4">
                       <Link
-                        href={`/guards/${guard.id}`}
+                        href={`/staff/${member.id}`}
                         className="font-medium text-slate-900 transition hover:text-slate-700 hover:underline"
                       >
-                        {guard.full_name}
+                        {member.full_name}
                       </Link>
                     </td>
 
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {guard.employee_code}
+                      {member.employee_code}
                     </td>
 
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {guard.company_name}
+                      {member.company_name}
                     </td>
 
                     <td className="px-6 py-4">
-                      <StatusBadge status={guard.status} />
+                      <StatusBadge status={member.status} />
                     </td>
 
                     <td className="px-6 py-4 text-right">
                       <Link
-                        href={`/guards/${guard.id}`}
+                        href={`/staff/${member.id}`}
                         className="inline-flex items-center gap-1 text-sm font-medium text-slate-700 transition hover:text-slate-900"
                       >
                         View

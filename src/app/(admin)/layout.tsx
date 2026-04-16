@@ -93,19 +93,19 @@ export default function AdminLayout({
 
   const pageTitle = useMemo(() => {
     if (pathname === '/dashboard') return 'Dashboard'
-    if (pathname === '/guards') return 'Guards'
-    if (pathname === '/guards/new') return 'Create Guard'
-    if (pathname.startsWith('/guards/') && pathname.endsWith('/edit')) return 'Edit Guard'
-    if (pathname.startsWith('/guards/') && pathname.endsWith('/password')) return 'Reset Guard Password'
-    if (pathname.startsWith('/guards/') && pathname.endsWith('/issue-id')) return 'Issue Digital ID'
-    if (pathname.startsWith('/guards/')) return 'Guard Details'
+    if (pathname === '/staff') return 'Staff'
+    if (pathname === '/staff/new') return 'Create Staff'
+    if (pathname.startsWith('/staff/') && pathname.endsWith('/edit')) return 'Edit Staff'
+    if (pathname.startsWith('/staff/') && pathname.endsWith('/password')) return 'Reset Staff Password'
+    if (pathname.startsWith('/staff/') && pathname.endsWith('/issue-id')) return 'Issue Digital ID'
+    if (pathname.startsWith('/staff/')) return 'Staff Details'
     if (pathname === '/alerts') return 'Alerts'
     if (pathname === '/audit-logs') return 'Audit Logs'
     if (pathname === '/profile') return 'My Profile'
     if (pathname === '/users') return 'Users'
     if (pathname.startsWith('/users/') && pathname.endsWith('/edit')) return 'Edit User'
     if (pathname.startsWith('/users/') && pathname.endsWith('/password')) return 'Reset User Password'
-    if (pathname.startsWith('/guard-ids/') && pathname.endsWith('/edit')) return 'Edit Digital ID'
+    if (pathname.startsWith('/staff-ids/') && pathname.endsWith('/edit')) return 'Edit Digital ID'
     return 'Admin Panel'
   }, [pathname])
 
@@ -171,16 +171,16 @@ export default function AdminLayout({
                 active={pathname === '/dashboard'}
               />
               <SidebarLink
-                href="/guards"
-                label="Officers"
+                href="/staff"
+                label="Staff"
                 icon={<Shield className="h-4 w-4" />}
-                active={pathname === '/guards' || pathname.startsWith('/guards/')}
+                active={pathname === '/staff' || pathname.startsWith('/staff/')}
               />
               <SidebarLink
-                href="/guards/new"
-                label="Create Officers"
+                href="/staff/new"
+                label="Create Staff"
                 icon={<Plus className="h-4 w-4" />}
-                active={pathname === '/guards/new'}
+                active={pathname === '/staff/new'}
               />
               <SidebarLink
                 href="/alerts"

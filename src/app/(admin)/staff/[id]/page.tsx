@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import IdCard from '@/components/IdCard'
 
-type Guard = {
+type Staff = {
   id: string
   full_name: string
   employee_code: string
@@ -17,7 +17,7 @@ type Guard = {
   photo_url?: string | null
 }
 
-type GuardId = {
+type StaffId = {
   id: string
   id_number: string
   role_title: string
@@ -30,33 +30,33 @@ type GuardId = {
   qr_token: string
 }
 
-export default function GuardDetailPage() {
+export default function StaffDetailPage() {
   const supabase = createClient()
   const params = useParams()
   const id = params.id as string
 
-  const [guard, setGuard] = useState<Guard | null>(null)
-  const [guardIds, setGuardIds] = useState<GuardId[]>([])
+  const [staff, setStaff] = useState<Staff | null>(null)
+  const [staffIds, setStaffIds] = useState<StaffId[]>([])
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
   const fetchData = async () => {
-    const { data: guardData } = await supabase
-      .from('guards')
+    const { data: staffData } = await supabase
+      .from('staff')
       .select('*')
       .eq('id', id)
       .single()
 
     const { data: idData } = await supabase
-      .from('guard_ids')
+      .from('staff_ids')
       .select('*')
-      .eq('guard_id', id)
+      .eq('staff_id', id)
       .order('created_at', { ascending: false })
 
-    if (guardData) setGuard(guardData)
-    if (idData) setGuardIds(idData)
+    if (staffData) setStaff(staffData)
+    if (idData) setStaffIds(idData)
     setLoading(false)
   }
 
@@ -65,18 +65,18 @@ export default function GuardDetailPage() {
   }, [id])
 
   const updateStatus = async (newStatus: string) => {
-    if (!guard) return
+    if (!staff) return
 
     setStatusLoading(newStatus)
     setError('')
     setMessage('')
 
     try {
-      const response = await fetch('/api/admin/update-guard-status', {
+      const response = await fetch('/api/admin/update-staff-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          guard_id: guard.id,
+          staff_id: staff.id,
           status: newStatus,
         }),
       })
@@ -89,8 +89,8 @@ export default function GuardDetailPage() {
         return
       }
 
-      setGuard((prev) => (prev ? { ...prev, status: newStatus } : prev))
-      setMessage(`Guard status updated to ${newStatus}.`)
+      setStaff((prev) => (prev ? { ...prev, status: newStatus } : prev))
+      setMessage(`Staff status updated to ${newStatus}.`)
     } catch (err) {
       setError('Something went wrong while updating status.')
     } finally {
@@ -99,71 +99,71 @@ export default function GuardDetailPage() {
   }
 
   const currentId = useMemo(
-    () => guardIds.find((item) => item.is_current) || null,
-    [guardIds]
+    () => staffIds.find((item) => item.is_current) || null,
+    [staffIds]
   )
 
   if (loading) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-        <p className="text-sm text-slate-600">Loading Officer...</p>
+        <p className="text-sm text-slate-600">Loading staff member...</p>
       </div>
     )
   }
 
-  if (!guard) {
+  if (!staff) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
-        <p className="text-sm text-slate-600">Officer not found.</p>
+        <p className="text-sm text-slate-600">Staff member not found.</p>
       </div>
     )
   }
 
   function IdStatusBadge({
-  status,
-}: {
-  status: string
-}) {
-  const normalized = status?.toLowerCase()
+    status,
+  }: {
+    status: string
+  }) {
+    const normalized = status?.toLowerCase()
 
-  if (normalized === 'active') {
+    if (normalized === 'active') {
+      return (
+        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+          ID Active
+        </span>
+      )
+    }
+
+    if (normalized === 'suspended') {
+      return (
+        <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">
+          ID Suspended
+        </span>
+      )
+    }
+
+    if (normalized === 'revoked') {
+      return (
+        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+          ID Revoked
+        </span>
+      )
+    }
+
+    if (normalized === 'expired') {
+      return (
+        <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
+          ID Expired
+        </span>
+      )
+    }
+
     return (
-      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-        ID Active
+      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+        {status || 'Unknown'}
       </span>
     )
   }
-
-  if (normalized === 'suspended') {
-    return (
-      <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">
-        ID Suspended
-      </span>
-    )
-  }
-
-  if (normalized === 'revoked') {
-    return (
-      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
-        ID Revoked
-      </span>
-    )
-  }
-
-  if (normalized === 'expired') {
-    return (
-      <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
-        ID Expired
-      </span>
-    )
-  }
-
-  return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      {status || 'Unknown'}
-    </span>
-  )
-}
 
   return (
     <div className="space-y-6">
@@ -171,64 +171,63 @@ export default function GuardDetailPage() {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-slate-100">
-              {guard.photo_url ? (
+              {staff.photo_url ? (
                 <img
-                  src={guard.photo_url}
-                  alt={guard.full_name}
+                  src={staff.photo_url}
+                  alt={staff.full_name}
                   className="h-full w-full object-cover"
                 />
               ) : (
                 <span className="text-xl font-bold text-slate-500">
-                  {guard.full_name.charAt(0)}
+                  {staff.full_name.charAt(0)}
                 </span>
               )}
             </div>
 
             <div>
               <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                {guard.full_name}
+                {staff.full_name}
               </h2>
               <p className="mt-2 text-sm text-slate-500">
-                Employee Code: {guard.employee_code}
+                Employee Code: {staff.employee_code}
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Company: {guard.company_name}
+                Company: {staff.company_name}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/staff/${staff.id}/password`}
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Reset Password
+            </Link>
 
-<Link
-  href={`/guards/${guard.id}/password`}
-  className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
->
-  Reset Password
-</Link>
+            <Link
+              href={`/staff/${staff.id}/edit`}
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Edit Staff
+            </Link>
 
-<Link
-    href={`/guards/${guard.id}/edit`}
-    className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-  >
-    Edit Guard
-  </Link>
-
- {currentId ? (
-  <Link
-    href={`/guard-ids/${currentId.id}/edit`}
-    className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
-  >
-    Edit Digital ID
-  </Link>
-) : (
-  <Link
-    href={`/guards/${guard.id}/issue-id`}
-    className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
-  >
-    Issue Digital ID
-  </Link>
-)}
-</div>
+            {currentId ? (
+              <Link
+                href={`/staff-ids/${currentId.id}/edit`}
+                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Edit Digital ID
+              </Link>
+            ) : (
+              <Link
+                href={`/staff/${staff.id}/issue-id`}
+                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Issue Digital ID
+              </Link>
+            )}
+          </div>
         </div>
       </section>
 
@@ -245,17 +244,17 @@ export default function GuardDetailPage() {
       ) : null}
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2 space-y-6">
+        <div className="space-y-6 xl:col-span-2">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Officer Details</h3>
+            <h3 className="text-lg font-semibold text-slate-900">Staff Details</h3>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <InfoBox label="Full Name" value={guard.full_name} />
-              <InfoBox label="Employee Code" value={guard.employee_code} />
-              <InfoBox label="Company" value={guard.company_name} />
-              <InfoBox label="Phone" value={guard.phone || '—'} />
-              <InfoBox label="Email" value={guard.email || '—'} />
-              <InfoBox label="Status" value={guard.status} />
+              <InfoBox label="Full Name" value={staff.full_name} />
+              <InfoBox label="Employee Code" value={staff.employee_code} />
+              <InfoBox label="Company" value={staff.company_name} />
+              <InfoBox label="Phone" value={staff.phone || '—'} />
+              <InfoBox label="Email" value={staff.email || '—'} />
+              <InfoBox label="Status" value={staff.status} />
             </div>
           </div>
 
@@ -264,39 +263,39 @@ export default function GuardDetailPage() {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Issued IDs</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Current and historical digital IDs for this Officer
+                  Current and historical digital IDs for this staff member
                 </p>
               </div>
             </div>
 
             <div className="mt-5 space-y-4">
-              {guardIds.length === 0 ? (
+              {staffIds.length === 0 ? (
                 <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
                   No digital IDs issued yet.
                 </div>
               ) : (
-                guardIds.map((item) => (
+                staffIds.map((item) => (
                   <div
                     key={item.id}
                     className="rounded-2xl border border-slate-200 p-4"
                   >
                     <div className="mb-4 flex flex-wrap items-center gap-2">
-  {item.is_current ? (
-    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-      Current
-    </span>
-  ) : (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      Previous
-    </span>
-  )}
+                      {item.is_current ? (
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                          Current
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                          Previous
+                        </span>
+                      )}
 
-  <IdStatusBadge status={item.status} />
+                      <IdStatusBadge status={item.status} />
 
-  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-    {item.role_title}
-  </span>
-</div>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                        {item.role_title}
+                      </span>
+                    </div>
 
                     <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                       <InfoBox label="ID Number" value={item.id_number} />
@@ -307,16 +306,16 @@ export default function GuardDetailPage() {
                     </div>
 
                     <IdCard
-  fullName={guard.full_name}
-  employeeCode={guard.employee_code}
-  roleTitle={item.role_title}
-  idNumber={item.id_number}
-  qrToken={item.qr_token}
-  photoUrl={guard.photo_url}
-  issueDate={item.issue_date}
-  expiryDate={item.expiry_date}
-  idStatus={item.status}
-/>
+                      fullName={staff.full_name}
+                      employeeCode={staff.employee_code}
+                      roleTitle={item.role_title}
+                      idNumber={item.id_number}
+                      qrToken={item.qr_token}
+                      photoUrl={staff.photo_url}
+                      issueDate={item.issue_date}
+                      expiryDate={item.expiry_date}
+                      idStatus={item.status}
+                    />
                   </div>
                 ))
               )}
@@ -359,11 +358,11 @@ export default function GuardDetailPage() {
             <h3 className="text-lg font-semibold text-slate-900">Current ID Summary</h3>
 
             <div className="mt-4 space-y-4">
-  <InfoBox label="Current ID" value={currentId?.id_number || 'No current ID'} />
-  <InfoBox label="Role Title" value={currentId?.role_title || '—'} />
-  <InfoBox label="ID Status" value={currentId?.status || '—'} />
-  <InfoBox label="Expiry Date" value={currentId?.expiry_date || '—'} />
-</div>
+              <InfoBox label="Current ID" value={currentId?.id_number || 'No current ID'} />
+              <InfoBox label="Role Title" value={currentId?.role_title || '—'} />
+              <InfoBox label="ID Status" value={currentId?.status || '—'} />
+              <InfoBox label="Expiry Date" value={currentId?.expiry_date || '—'} />
+            </div>
           </div>
         </div>
       </section>
