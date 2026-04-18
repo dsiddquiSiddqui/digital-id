@@ -16,8 +16,25 @@ type Profile = {
   created_at?: string
 }
 
-type RoleFilter = 'all' | 'super_admin' | 'admin' | 'staff'
+type RoleFilter =
+  | 'all'
+  | 'super_admin'
+  | 'admin'
+  | 'operation_manager'
+  | 'operation_team'
+  | 'hr_manager'
+  | 'hr'
+
 type StatusFilter = 'all' | 'active' | 'inactive'
+
+const USER_ROLES = [
+  'super_admin',
+  'admin',
+  'operation_manager',
+  'operation_team',
+  'hr_manager',
+  'hr',
+]
 
 export default function UsersPage() {
   const supabase = createClient()
@@ -46,22 +63,23 @@ export default function UsersPage() {
 
   const loadUsers = async () => {
     setLoading(true)
-     setError('')
+    setError('')
 
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
+      .in('role', USER_ROLES)
       .order('created_at', { ascending: false })
 
     if (error) {
-    console.error('Failed to load users:', error)
-    setError(error.message)
-    setLoading(false)
-    return
-  }
+      console.error('Failed to load users:', error)
+      setError(error.message)
+      setLoading(false)
+      return
+    }
 
     setUsers((data || []) as Profile[])
-  setLoading(false)
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -175,7 +193,9 @@ export default function UsersPage() {
         return
       }
 
-      setMessage(user.is_active ? 'User deactivated successfully.' : 'User activated successfully.')
+      setMessage(
+        user.is_active ? 'User deactivated successfully.' : 'User activated successfully.'
+      )
       await loadUsers()
     } catch {
       setError('Something went wrong while updating the user.')
@@ -193,7 +213,7 @@ export default function UsersPage() {
               User Management
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Manage admin and Staff accounts from the profiles table.
+              Manage system users only. Staff and guards are excluded from this list.
             </p>
           </div>
 
@@ -208,9 +228,21 @@ export default function UsersPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryCard title="Total Users" value={stats.total} icon={<Users className="h-5 w-5 text-slate-700" />} />
-        <SummaryCard title="Active Users" value={stats.active} icon={<UserCheck className="h-5 w-5 text-emerald-700" />} />
-        <SummaryCard title="Inactive Users" value={stats.inactive} icon={<UserX className="h-5 w-5 text-amber-700" />} />
+        <SummaryCard
+          title="Total Users"
+          value={stats.total}
+          icon={<Users className="h-5 w-5 text-slate-700" />}
+        />
+        <SummaryCard
+          title="Active Users"
+          value={stats.active}
+          icon={<UserCheck className="h-5 w-5 text-emerald-700" />}
+        />
+        <SummaryCard
+          title="Inactive Users"
+          value={stats.inactive}
+          icon={<UserX className="h-5 w-5 text-amber-700" />}
+        />
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -234,7 +266,10 @@ export default function UsersPage() {
             <option value="all">All Roles</option>
             <option value="super_admin">Super Admin</option>
             <option value="admin">Admin</option>
-            <option value="guard">Staff</option>
+            <option value="operation_manager">Operation Manager</option>
+            <option value="operation_team">Operation Team</option>
+            <option value="hr_manager">HR Manager</option>
+            <option value="hr">HR</option>
           </select>
 
           <select
@@ -278,7 +313,9 @@ export default function UsersPage() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Phone</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Role</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Status</th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">Action</th>
+                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-700">
+                  Action
+                </th>
               </tr>
             </thead>
 
@@ -298,7 +335,9 @@ export default function UsersPage() {
               ) : (
                 filteredUsers.map((user) => (
                   <tr key={user.id} className="border-b border-slate-200 last:border-b-0">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{user.full_name}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                      {user.full_name}
+                    </td>
                     <td className="px-6 py-4 text-sm text-slate-700">{user.email}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{user.phone || '—'}</td>
                     <td className="px-6 py-4">
@@ -308,37 +347,37 @@ export default function UsersPage() {
                       <StatusBadge isActive={user.is_active} />
                     </td>
                     <td className="px-6 py-4 text-right">
-  <div className="flex justify-end gap-2">
-    <Link
-      href={`/users/${user.id}/edit`}
-      className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-    >
-      Edit
-    </Link>
-    <Link
-  href={`/users/${user.id}/password`}
-  className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
->
-  Reset Password
-</Link>
+                      <div className="flex justify-end gap-2">
+                        <Link
+                          href={`/users/${user.id}/edit`}
+                          className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Edit
+                        </Link>
+                        <Link
+                          href={`/users/${user.id}/password`}
+                          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                        >
+                          Reset Password
+                        </Link>
 
-    <button
-      onClick={() => handleToggleStatus(user)}
-      disabled={togglingId === user.id}
-      className={`rounded-xl px-4 py-2 text-xs font-semibold transition ${
-        user.is_active
-          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-      } disabled:opacity-60`}
-    >
-      {togglingId === user.id
-        ? 'Updating...'
-        : user.is_active
-        ? 'Deactivate'
-        : 'Activate'}
-    </button>
-  </div>
-</td>
+                        <button
+                          onClick={() => handleToggleStatus(user)}
+                          disabled={togglingId === user.id}
+                          className={`rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                            user.is_active
+                              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                              : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                          } disabled:opacity-60`}
+                        >
+                          {togglingId === user.id
+                            ? 'Updating...'
+                            : user.is_active
+                            ? 'Deactivate'
+                            : 'Activate'}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -354,7 +393,7 @@ export default function UsersPage() {
               <div>
                 <h3 className="text-xl font-semibold text-slate-900">Create User</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Create a new auth user and matching profile record.
+                  Create a new system user and matching profile record.
                 </p>
               </div>
 
@@ -432,7 +471,10 @@ export default function UsersPage() {
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                 >
                   <option value="admin">Admin</option>
-                  <option value="staff">Staff</option>
+                  <option value="operation_team">Operation Team</option>
+                  <option value="operation_manager">Operation Manager</option>
+                  <option value="hr_manager">HR Manager</option>
+                  <option value="hr">HR</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
               </div>
@@ -485,25 +527,31 @@ function SummaryCard({
 }
 
 function RoleBadge({ role }: { role: string }) {
-  if (role === 'super_admin') {
-    return (
-      <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700">
-        Super Admin
-      </span>
-    )
+  const styles: Record<string, string> = {
+    super_admin: 'bg-purple-100 text-purple-700',
+    admin: 'bg-blue-100 text-blue-700',
+    operation_manager: 'bg-indigo-100 text-indigo-700',
+    operation_team: 'bg-cyan-100 text-cyan-700',
+    hr_manager: 'bg-pink-100 text-pink-700',
+    hr: 'bg-rose-100 text-rose-700',
   }
 
-  if (role === 'admin') {
-    return (
-      <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
-        Admin
-      </span>
-    )
+  const labels: Record<string, string> = {
+    super_admin: 'Super Admin',
+    admin: 'Admin',
+    operation_manager: 'Operation Manager',
+    operation_team: 'Operation Team',
+    hr_manager: 'HR Manager',
+    hr: 'HR',
   }
 
   return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      Staff
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-medium ${
+        styles[role] || 'bg-slate-100 text-slate-700'
+      }`}
+    >
+      {labels[role] || role}
     </span>
   )
 }

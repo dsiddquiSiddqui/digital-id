@@ -18,6 +18,55 @@ type StaffIdRecord = {
   status: string | null
 }
 
+const ROLE_OPTIONS = {
+  security: [
+    'Door Supervisor',
+    'Security Officer',
+    'CCTV Operator',
+    'Close Protection Officer',
+    'Event Security Officer',
+    'Event Steward',
+    'Crowd Safety Steward',
+    'Event Response Officer',
+    'Emergency Response Officer',
+    'Festival Security Staff',
+    'Mobile Patrol Officer',
+    'Key Holding Response Officer',
+    'Alarm Response Officer',
+    'Rapid Response Officer',
+    'Loss Prevention Officer',
+    'Retail Security Officer',
+    'Reception Security Officer',
+    'Gatehouse Security Officer',
+    'Security Supervisor',
+    'Event Security Supervisor',
+    'Control Room Supervisor',
+  ],
+  warehouse: [
+    'Warehouse Operative',
+    'Picker Packer',
+    'Forklift Driver',
+    'Warehouse Supervisor',
+    'Goods In Operative',
+    'Goods Out Operative',
+    'Inventory Controller',
+    'Loading Bay Operative',
+  ],
+  hospitality: [
+    'Waiter / Waitress',
+    'Bartender',
+    'Bar Back',
+    'Kitchen Porter',
+    'Chef',
+    'Front of House',
+    'Housekeeping Staff',
+    'Event Staff',
+  ],
+} as const
+
+type StaffCategory = 'security' | 'warehouse' | 'hospitality' | ''
+const CUSTOM_ROLE_VALUE = '__custom__'
+
 export default function EditDigitalIdPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -31,12 +80,22 @@ export default function EditDigitalIdPage() {
   const [record, setRecord] = useState<StaffIdRecord | null>(null)
 
   const [idNumber, setIdNumber] = useState('')
-  const [roleTitle, setRoleTitle] = useState('')
-  const [siteName, setSiteName] = useState('')
-  const [siaNumber, setSiaNumber] = useState('')
   const [issueDate, setIssueDate] = useState('')
   const [expiryDate, setExpiryDate] = useState('')
   const [status, setStatus] = useState('active')
+
+  const [staffCategory, setStaffCategory] = useState<StaffCategory>('')
+  const [selectedRole, setSelectedRole] = useState('')
+  const [customRoleTitle, setCustomRoleTitle] = useState('')
+  const [roleTitle, setRoleTitle] = useState('')
+
+  const [requiresSia, setRequiresSia] = useState(false)
+  const [siaNumber, setSiaNumber] = useState('')
+
+  const roleOptions =
+    staffCategory && staffCategory in ROLE_OPTIONS
+      ? ROLE_OPTIONS[staffCategory as keyof typeof ROLE_OPTIONS]
+      : []
 
   useEffect(() => {
     const loadRecord = async () => {
@@ -56,15 +115,38 @@ export default function EditDigitalIdPage() {
       }
 
       const row = data as StaffIdRecord
+      const savedRole = row.role_title || ''
 
       setRecord(row)
       setIdNumber(row.id_number || '')
-      setRoleTitle(row.role_title || '')
-      setSiteName(row.site_name || '')
+      setRoleTitle(savedRole)
       setSiaNumber(row.sia_number || '')
       setIssueDate(row.issue_date || '')
       setExpiryDate(row.expiry_date || '')
       setStatus(row.status || 'active')
+      setRequiresSia(Boolean(row.sia_number))
+
+      if (ROLE_OPTIONS.security.includes(savedRole as (typeof ROLE_OPTIONS.security)[number])) {
+        setStaffCategory('security')
+        setSelectedRole(savedRole)
+      } else if (
+        ROLE_OPTIONS.warehouse.includes(savedRole as (typeof ROLE_OPTIONS.warehouse)[number])
+      ) {
+        setStaffCategory('warehouse')
+        setSelectedRole(savedRole)
+      } else if (
+        ROLE_OPTIONS.hospitality.includes(savedRole as (typeof ROLE_OPTIONS.hospitality)[number])
+      ) {
+        setStaffCategory('hospitality')
+        setSelectedRole(savedRole)
+      } else if (savedRole) {
+        setSelectedRole(CUSTOM_ROLE_VALUE)
+        setCustomRoleTitle(savedRole)
+      } else {
+        setStaffCategory('')
+        setSelectedRole('')
+        setCustomRoleTitle('')
+      }
 
       setLoading(false)
     }
@@ -84,6 +166,11 @@ export default function EditDigitalIdPage() {
       return
     }
 
+    if (requiresSia && !siaNumber.trim()) {
+      setError('SIA Number is required when SIA is enabled.')
+      return
+    }
+
     if (expiryDate <= issueDate) {
       setError('Expiry date must be later than issue date.')
       return
@@ -99,8 +186,8 @@ export default function EditDigitalIdPage() {
           id,
           id_number: idNumber.trim(),
           role_title: roleTitle.trim(),
-          site_name: siteName.trim() || null,
-          sia_number: siaNumber.trim() || null,
+          site_name: null,
+          sia_number: requiresSia ? siaNumber.trim() || null : null,
           issue_date: issueDate,
           expiry_date: expiryDate,
           status,
@@ -121,7 +208,7 @@ export default function EditDigitalIdPage() {
         router.push(`/staff/${record?.staff_id}`)
         router.refresh()
       }, 700)
-    } catch (err) {
+    } catch {
       setError('Something went wrong while updating the digital ID.')
     } finally {
       setSaving(false)
@@ -176,47 +263,137 @@ export default function EditDigitalIdPage() {
               value={idNumber}
               onChange={(e) => setIdNumber(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="ID-1001"
+              placeholder="ID Number"
               required
             />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Staff Category
+            </label>
+            <select
+              value={staffCategory}
+              onChange={(e) => {
+                const value = e.target.value as StaffCategory
+                setStaffCategory(value)
+                setSelectedRole('')
+                setCustomRoleTitle('')
+                setRoleTitle('')
+
+                if (value === 'security') {
+                  setRequiresSia(true)
+                } else {
+                  setRequiresSia(false)
+                  setSiaNumber('')
+                }
+              }}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+              required
+            >
+              <option value="">Select category</option>
+              <option value="security">Security</option>
+              <option value="warehouse">Warehouse</option>
+              <option value="hospitality">Hospitality</option>
+            </select>
           </div>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Role Title
             </label>
-            <input
-              value={roleTitle}
-              onChange={(e) => setRoleTitle(e.target.value)}
+            <select
+              value={selectedRole}
+              onChange={(e) => {
+                const value = e.target.value
+                setSelectedRole(value)
+
+                if (value === CUSTOM_ROLE_VALUE) {
+                  setRoleTitle(customRoleTitle.trim())
+                } else {
+                  setCustomRoleTitle('')
+                  setRoleTitle(value)
+                }
+              }}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Door Supervisor"
+              disabled={!staffCategory}
               required
-            />
+            >
+              <option value="">
+                {staffCategory ? 'Select role' : 'Select category first'}
+              </option>
+
+              {roleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+
+              <option value={CUSTOM_ROLE_VALUE}>Other / Enter manually</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Choose a role from the dropdown, or select Other to enter your own.
+            </p>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Site Name
+          {selectedRole === CUSTOM_ROLE_VALUE ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Custom Role Title
+              </label>
+              <input
+                value={customRoleTitle}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setCustomRoleTitle(value)
+                  setRoleTitle(value)
+                }}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+                placeholder="Enter custom role title"
+                required
+              />
+            </div>
+          ) : null}
+
+          <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={requiresSia}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setRequiresSia(checked)
+                  if (!checked) {
+                    setSiaNumber('')
+                  }
+                }}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+              />
+              <div>
+                <span className="block text-sm font-medium text-slate-800">
+                  This staff member requires an SIA number
+                </span>
+                <span className="block text-xs text-slate-500">
+                  Tick this for security staff. Leave unticked for hospitality or warehouse staff.
+                </span>
+              </div>
             </label>
-            <input
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Canary Wharf"
-            />
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              SIA Number
-            </label>
-            <input
-              value={siaNumber}
-              onChange={(e) => setSiaNumber(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="SIA-874221"
-            />
-          </div>
+          {requiresSia ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                SIA Number
+              </label>
+              <input
+                value={siaNumber}
+                onChange={(e) => setSiaNumber(e.target.value)}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
+                placeholder="Enter SIA number"
+                required={requiresSia}
+              />
+            </div>
+          ) : null}
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">

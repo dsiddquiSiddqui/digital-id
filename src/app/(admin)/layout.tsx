@@ -171,16 +171,16 @@ export default function AdminLayout({
                 active={pathname === '/dashboard'}
               />
               <SidebarLink
-                href="/staff"
+                href="/v2/staff"
                 label="Staff"
                 icon={<Shield className="h-4 w-4" />}
                 active={pathname === '/staff' || pathname.startsWith('/staff/')}
               />
               <SidebarLink
-                href="/staff/new"
-                label="Create Staff"
+                href="/v2/staff/bulk-upload"
+                label="Bulk Upload Staff"
                 icon={<Plus className="h-4 w-4" />}
-                active={pathname === '/staff/new'}
+                active={pathname === '/v2/staff/bulk-upload'}
               />
               <SidebarLink
                 href="/alerts"
