@@ -7,12 +7,12 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    const guard_id =
-      typeof body.guard_id === 'string' ? body.guard_id.trim() : ''
+    const staff_id =
+      typeof body.staff_id === 'string' ? body.staff_id.trim() : ''
     const password =
       typeof body.password === 'string' ? body.password : ''
 
-    if (!guard_id || !password) {
+    if (!staff_id || !password) {
       return NextResponse.json(
         { error: 'Missing required fields.' },
         { status: 400 }
@@ -48,10 +48,7 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized.' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
 
     const { data: currentProfile, error: currentProfileError } = await supabase
@@ -69,7 +66,7 @@ export async function POST(req: Request) {
 
     if (!['admin', 'super_admin'].includes(currentProfile.role)) {
       return NextResponse.json(
-        { error: 'Only admin and super_admin can reset guard passwords.' },
+        { error: 'Only admin and super_admin can reset staff passwords.' },
         { status: 403 }
       )
     }
@@ -83,22 +80,22 @@ export async function POST(req: Request) {
 
     const adminSupabase = createAdminClient()
 
-    const { data: guard, error: guardError } = await adminSupabase
-      .from('guards')
+    const { data: staff, error: staffError } = await adminSupabase
+      .from('staff')
       .select('id, full_name, email, profile_id')
-      .eq('id', guard_id)
+      .eq('id', staff_id)
       .single()
 
-    if (guardError || !guard) {
+    if (staffError || !staff) {
       return NextResponse.json(
-        { error: 'Guard not found.' },
+        { error: 'Staff member not found.' },
         { status: 404 }
       )
     }
 
-    if (!guard.profile_id) {
+    if (!staff.profile_id) {
       return NextResponse.json(
-        { error: 'This guard is not linked to a login profile.' },
+        { error: 'This staff member is not linked to a login profile.' },
         { status: 400 }
       )
     }
@@ -106,7 +103,7 @@ export async function POST(req: Request) {
     const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
       .select('id, auth_user_id, role')
-      .eq('id', guard.profile_id)
+      .eq('id', staff.profile_id)
       .single()
 
     if (profileError || !profile) {
@@ -116,17 +113,10 @@ export async function POST(req: Request) {
       )
     }
 
-    if (profile.role !== 'guard') {
-      return NextResponse.json(
-        { error: 'Linked profile is not a guard account.' },
-        { status: 400 }
-      )
-    }
-
-    const { error: passwordError } = await adminSupabase.auth.admin.updateUserById(
-      profile.auth_user_id,
-      { password }
-    )
+    const { error: passwordError } =
+      await adminSupabase.auth.admin.updateUserById(profile.auth_user_id, {
+        password,
+      })
 
     if (passwordError) {
       return NextResponse.json(
@@ -135,22 +125,20 @@ export async function POST(req: Request) {
       )
     }
 
-    const { error: auditError } = await adminSupabase
-      .from('audit_logs')
-      .insert([
-        {
-          action_type: 'reset_guard_password',
-          entity_type: 'guard',
-          entity_id: guard_id,
-          metadata: {
-            reset_by_profile_id: currentProfile.id,
-            guard_name: guard.full_name,
-            guard_email: guard.email,
-            profile_id: profile.id,
-            auth_user_id: profile.auth_user_id,
-          },
+    const { error: auditError } = await adminSupabase.from('audit_logs').insert([
+      {
+        action_type: 'reset_staff_password',
+        entity_type: 'staff',
+        entity_id: staff_id,
+        metadata: {
+          reset_by_profile_id: currentProfile.id,
+          staff_name: staff.full_name,
+          staff_email: staff.email,
+          profile_id: profile.id,
+          auth_user_id: profile.auth_user_id,
         },
-      ])
+      },
+    ])
 
     if (auditError) {
       return NextResponse.json(
@@ -161,11 +149,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Guard password updated successfully.',
+      message: 'Staff password updated successfully.',
     })
-  } catch {
+  } catch (error) {
+    console.error('RESET STAFF PASSWORD ERROR:', error)
+
     return NextResponse.json(
-      { error: 'Failed to reset guard password.' },
+      { error: 'Failed to reset staff password.' },
       { status: 500 }
     )
   }
