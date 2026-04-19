@@ -118,6 +118,12 @@ type StaffDocument = {
   } | null
 }
 
+type StatusAction = {
+  key: string
+  label: string
+  className: string
+}
+
 export default function V2StaffDetailPage() {
   const params = useParams()
   const id = params.id as string
@@ -134,7 +140,6 @@ export default function V2StaffDetailPage() {
   const [bankDetails, setBankDetails] = useState<StaffBankDetails | null>(null)
   const [currentId, setCurrentId] = useState<StaffIdRecord | null>(null)
   const [documents, setDocuments] = useState<StaffDocument[]>([])
-  
 
   useEffect(() => {
     const loadData = async () => {
@@ -250,6 +255,81 @@ export default function V2StaffDetailPage() {
     return Math.round((complete / checks.length) * 100)
   }, [staff, employment, address, emergencyContact, bankDetails, currentId, documents])
 
+  const statusActions = useMemo<StatusAction[]>(() => {
+    if (!staff?.status) return []
+
+    const currentStatus = staff.status.toLowerCase()
+
+    const actionMap: Record<string, StatusAction[]> = {
+      active: [
+        {
+          key: 'suspended',
+          label: 'Suspend',
+          className:
+            'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
+        },
+        {
+          key: 'revoked',
+          label: 'Revoke',
+          className:
+            'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
+        },
+      ],
+      suspended: [
+        {
+          key: 'active',
+          label: 'Activate',
+          className:
+            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+        },
+        {
+          key: 'revoked',
+          label: 'Revoke',
+          className:
+            'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
+        },
+      ],
+      revoked: [
+        {
+          key: 'active',
+          label: 'Activate',
+          className:
+            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+        },
+      ],
+      inactive: [
+        {
+          key: 'active',
+          label: 'Activate',
+          className:
+            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+        },
+        {
+          key: 'suspended',
+          label: 'Suspend',
+          className:
+            'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
+        },
+        {
+          key: 'revoked',
+          label: 'Revoke',
+          className:
+            'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
+        },
+      ],
+      archived: [
+        {
+          key: 'active',
+          label: 'Activate',
+          className:
+            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+        },
+      ],
+    }
+
+    return actionMap[currentStatus] || []
+  }, [staff?.status])
+
   const validDocuments = documents.filter((doc) => doc.status?.toLowerCase() === 'valid').length
   const problemDocuments = documents.filter((doc) =>
     ['expired', 'rejected', 'missing'].includes(doc.status?.toLowerCase())
@@ -334,14 +414,14 @@ export default function V2StaffDetailPage() {
           <div className="flex flex-wrap gap-3">
             <Link
               href={`/staff/${staff.id}/password`}
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             >
               Reset Password
             </Link>
 
             <Link
               href={`/v2/staff/${staff.id}/edit`}
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             >
               Edit Staff
             </Link>
@@ -349,20 +429,18 @@ export default function V2StaffDetailPage() {
             {currentId ? (
               <Link
                 href={`/staff-ids/${currentId.id}/edit`}
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+                className="inline-flex cursor-pointer items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
               >
                 Edit Digital ID
               </Link>
             ) : (
               <Link
                 href={`/staff/${staff.id}/issue-id`}
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+                className="inline-flex cursor-pointer items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
               >
                 Issue Digital ID
               </Link>
             )}
-
-            
           </div>
         </div>
       </section>
@@ -394,7 +472,7 @@ export default function V2StaffDetailPage() {
             action={
               <Link
                 href={`/v2/staff/${staff.id}/edit`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
                 <ChevronRight className="h-4 w-4" />
@@ -422,7 +500,7 @@ export default function V2StaffDetailPage() {
             action={
               <Link
                 href={`/v2/staff/${staff.id}/employment`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
                 <ChevronRight className="h-4 w-4" />
@@ -451,7 +529,7 @@ export default function V2StaffDetailPage() {
             action={
               <Link
                 href={`/v2/staff/${staff.id}/documents`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
                 <ChevronRight className="h-4 w-4" />
@@ -502,7 +580,7 @@ export default function V2StaffDetailPage() {
             action={
               <Link
                 href={currentId ? `/staff-ids/${currentId.id}/edit` : `/staff/${staff.id}/issue-id`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
                 <ChevronRight className="h-4 w-4" />
@@ -526,17 +604,17 @@ export default function V2StaffDetailPage() {
                   </p>
 
                   <IdCard
-  fullName={staff.full_name}
-  employeeCode={staff.employee_code}
-  roleTitle={currentId.role_title}
-  idNumber={currentId.id_number}
-  siaNumber={currentId.sia_number}
-  qrToken={currentId.qr_token}
-  photoUrl={staff.photo_url}
-  issueDate={currentId.issue_date}
-  expiryDate={currentId.expiry_date}
-  idStatus={currentId.status}
-/>
+                    fullName={staff.full_name}
+                    employeeCode={staff.employee_code}
+                    roleTitle={currentId.role_title}
+                    idNumber={currentId.id_number}
+                    siaNumber={currentId.sia_number}
+                    qrToken={currentId.qr_token}
+                    photoUrl={staff.photo_url}
+                    issueDate={currentId.issue_date}
+                    expiryDate={currentId.expiry_date}
+                    idStatus={currentId.status}
+                  />
                 </div>
               </div>
             ) : (
@@ -548,29 +626,23 @@ export default function V2StaffDetailPage() {
         <div className="space-y-6">
           <Card title="Status Actions">
             <div className="space-y-3">
-              <button
-                onClick={() => updateStatus('active')}
-                disabled={statusLoading !== null}
-                className="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {statusLoading === 'active' ? 'Updating...' : 'Activate'}
-              </button>
-
-              <button
-                onClick={() => updateStatus('suspended')}
-                disabled={statusLoading !== null}
-                className="w-full rounded-2xl bg-yellow-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {statusLoading === 'suspended' ? 'Updating...' : 'Suspend'}
-              </button>
-
-              <button
-                onClick={() => updateStatus('revoked')}
-                disabled={statusLoading !== null}
-                className="w-full rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {statusLoading === 'revoked' ? 'Updating...' : 'Revoke'}
-              </button>
+              {statusActions.length > 0 ? (
+                statusActions.map((action) => (
+                  <button
+                    key={action.key}
+                    type="button"
+                    onClick={() => updateStatus(action.key)}
+                    disabled={statusLoading !== null}
+                    className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60 ${action.className}`}
+                  >
+                    {statusLoading === action.key ? 'Updating...' : action.label}
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                  No other status actions available.
+                </div>
+              )}
             </div>
           </Card>
 
@@ -578,35 +650,35 @@ export default function V2StaffDetailPage() {
             <div className="grid grid-cols-1 gap-3">
               <Link
                 href={`/v2/staff/${staff.id}/documents`}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Manage Documents
               </Link>
 
               <Link
                 href={`/v2/staff/${staff.id}/employment`}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Manage Employment
               </Link>
 
               <Link
                 href={`/v2/staff/${staff.id}/address`}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Manage Address
               </Link>
 
               <Link
                 href={`/v2/staff/${staff.id}/contacts`}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Manage Emergency Contact
               </Link>
 
               <Link
                 href={`/v2/staff/${staff.id}/bank-details`}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Manage Bank Details
               </Link>
@@ -614,14 +686,14 @@ export default function V2StaffDetailPage() {
               {currentId ? (
                 <Link
                   href={`/staff-ids/${currentId.id}/edit`}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
                 >
                   Manage Digital ID
                 </Link>
               ) : (
                 <Link
                   href={`/staff/${staff.id}/issue-id`}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
                 >
                   Issue Digital ID
                 </Link>
@@ -635,7 +707,7 @@ export default function V2StaffDetailPage() {
             action={
               <Link
                 href={`/v2/staff/${staff.id}/address`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
                 <ChevronRight className="h-4 w-4" />
@@ -660,7 +732,7 @@ export default function V2StaffDetailPage() {
             action={
               <Link
                 href={`/v2/staff/${staff.id}/contacts`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
                 <ChevronRight className="h-4 w-4" />
@@ -685,7 +757,7 @@ export default function V2StaffDetailPage() {
             action={
               <Link
                 href={`/v2/staff/${staff.id}/bank-details`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
                 <ChevronRight className="h-4 w-4" />
@@ -804,6 +876,13 @@ function StatusBadge({ status }: { status: string }) {
     return (
       <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
         Revoked
+      </span>
+    )
+  }
+  if (normalized === 'archived') {
+    return (
+      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+        Archived
       </span>
     )
   }

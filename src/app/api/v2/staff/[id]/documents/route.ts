@@ -131,6 +131,11 @@ export async function POST(
         ? body.notes.trim()
         : null
 
+    const show_on_staff_panel =
+      typeof body.show_on_staff_panel === 'boolean'
+        ? body.show_on_staff_panel
+        : false
+
     const isCustomDocument = !document_type_id
 
     if (!document_type_id && !custom_document_name) {
@@ -143,6 +148,13 @@ export async function POST(
     if (issue_date && expiry_date && expiry_date <= issue_date) {
       return NextResponse.json(
         { error: 'Expiry date must be later than issue date.' },
+        { status: 400 }
+      )
+    }
+
+    if (show_on_staff_panel && status !== 'valid') {
+      return NextResponse.json(
+        { error: 'Only valid documents can be shown on the staff panel.' },
         { status: 400 }
       )
     }
@@ -187,6 +199,7 @@ export async function POST(
       status,
       file_url,
       notes,
+      show_on_staff_panel,
     }
 
     const { data, error } = await adminSupabase
@@ -218,6 +231,7 @@ export async function POST(
           document_type_id,
           custom_document_name,
           status,
+          show_on_staff_panel,
         },
       },
     ])
@@ -305,6 +319,11 @@ export async function PUT(
         ? body.notes.trim()
         : null
 
+    const show_on_staff_panel =
+      typeof body.show_on_staff_panel === 'boolean'
+        ? body.show_on_staff_panel
+        : false
+
     const isCustomDocument = !document_type_id
 
     if (!document_id) {
@@ -321,6 +340,13 @@ export async function PUT(
     if (issue_date && expiry_date && expiry_date <= issue_date) {
       return NextResponse.json(
         { error: 'Expiry date must be later than issue date.' },
+        { status: 400 }
+      )
+    }
+
+    if (show_on_staff_panel && status !== 'valid') {
+      return NextResponse.json(
+        { error: 'Only valid documents can be shown on the staff panel.' },
         { status: 400 }
       )
     }
@@ -365,6 +391,7 @@ export async function PUT(
       status,
       file_url,
       notes,
+      show_on_staff_panel,
     }
 
     const { data, error } = await adminSupabase
@@ -398,6 +425,7 @@ export async function PUT(
           document_type_id,
           custom_document_name,
           status,
+          show_on_staff_panel,
         },
       },
     ])

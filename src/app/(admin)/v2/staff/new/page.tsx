@@ -1,9 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Upload, UserPlus, ChevronLeft, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import {
+  Upload,
+  UserPlus,
+  ChevronLeft,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  X,
+} from 'lucide-react'
 
 export default function V2NewStaffPage() {
   const router = useRouter()
@@ -29,12 +38,27 @@ export default function V2NewStaffPage() {
   const [driverLicence, setDriverLicence] = useState(false)
   const [notes, setNotes] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   const [createLogin, setCreateLogin] = useState(true)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview(null)
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(photo)
+    setPhotoPreview(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [photo])
 
   const resetMessages = () => {
     setError('')
@@ -153,6 +177,16 @@ export default function V2NewStaffPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0] || null
+    setPhoto(selectedFile)
+  }
+
+  const clearPhoto = () => {
+    setPhoto(null)
+    setPhotoPreview(null)
   }
 
   return (
@@ -503,16 +537,49 @@ export default function V2NewStaffPage() {
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Profile Photo
             </label>
+
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 hover:bg-slate-100">
               <Upload className="h-4 w-4" />
               <span>{photo ? photo.name : 'Upload staff photo'}</span>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                onChange={handlePhotoChange}
                 className="hidden"
               />
             </label>
+
+            {photoPreview ? (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Image Preview</p>
+                    <p className="text-xs text-slate-500">
+                      This lets you confirm the correct image was selected before saving.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={clearPhoto}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <X className="h-4 w-4" />
+                    Remove
+                  </button>
+                </div>
+
+                <div className="relative h-56 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <Image
+                    src={photoPreview}
+                    alt="Selected profile preview"
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="lg:col-span-2">

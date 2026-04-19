@@ -71,6 +71,11 @@ const ROLE_OPTIONS = {
 type StaffCategory = 'security' | 'warehouse' | 'hospitality' | ''
 const CUSTOM_ROLE_VALUE = '__custom__'
 
+type StaffRow = {
+  parim_staff_id?: string | number | null
+  parim_person_id?: string | number | null
+}
+
 export default function IssueIdPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -113,7 +118,7 @@ export default function IssueIdPage() {
         await Promise.all([
           supabase
             .from('staff')
-            .select('parim_person_id')
+            .select('parim_staff_id, parim_person_id')
             .eq('id', id)
             .single(),
           supabase
@@ -139,8 +144,14 @@ export default function IssueIdPage() {
         return
       }
 
+      const staffRow = (staff as StaffRow | null) ?? null
       const currentId = currentIds?.[0] ?? null
-      const parimId = staff?.parim_person_id ?? ''
+
+      const parimId =
+        staffRow?.parim_staff_id ??
+        staffRow?.parim_person_id ??
+        ''
+
       const existingRoleTitle = currentId?.role_title ?? ''
       const existingSia = currentId?.sia_number ?? ''
 
@@ -155,7 +166,9 @@ export default function IssueIdPage() {
       } else if (ROLE_OPTIONS.warehouse.includes(role as (typeof ROLE_OPTIONS.warehouse)[number])) {
         setStaffCategory('warehouse')
         setSelectedRole(role)
-      } else if (ROLE_OPTIONS.hospitality.includes(role as (typeof ROLE_OPTIONS.hospitality)[number])) {
+      } else if (
+        ROLE_OPTIONS.hospitality.includes(role as (typeof ROLE_OPTIONS.hospitality)[number])
+      ) {
         setStaffCategory('hospitality')
         setSelectedRole(role)
       } else if (role) {
@@ -310,7 +323,7 @@ export default function IssueIdPage() {
               required
             />
             <p className="mt-1 text-xs text-slate-500">
-              Auto-filled from staff.parim_person_id, but you can still edit it.
+              Auto-filled from staff parim ID, but you can still edit it.
             </p>
           </div>
 

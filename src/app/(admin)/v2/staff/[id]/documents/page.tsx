@@ -40,6 +40,7 @@ type StaffDocument = {
   custom_document_name?: string | null
   custom_document_code?: string | null
   has_expiry?: boolean | null
+  show_on_staff_panel?: boolean
   document_types?: {
     id: string
     code: string
@@ -62,6 +63,7 @@ type DocumentFormState = {
   notes: string
   file: File | null
   existingFileUrl: string | null
+  showOnStaffPanel: boolean
 }
 
 const getInitialFormState = (): DocumentFormState => ({
@@ -76,6 +78,7 @@ const getInitialFormState = (): DocumentFormState => ({
   notes: '',
   file: null,
   existingFileUrl: null,
+  showOnStaffPanel: false,
 })
 
 async function readJsonSafely(response: Response) {
@@ -206,6 +209,7 @@ export default function V2StaffDocumentsPage() {
         notes: doc.notes || '',
         file: null,
         existingFileUrl: doc.file_url || null,
+        showOnStaffPanel: Boolean(doc.show_on_staff_panel),
       })
     } else {
       setEditForm({
@@ -220,6 +224,7 @@ export default function V2StaffDocumentsPage() {
         notes: doc.notes || '',
         file: null,
         existingFileUrl: doc.file_url || null,
+        showOnStaffPanel: Boolean(doc.show_on_staff_panel),
       })
     }
 
@@ -275,6 +280,12 @@ export default function V2StaffDocumentsPage() {
       return
     }
 
+    if (addForm.showOnStaffPanel && addForm.status !== 'valid') {
+      setError('Only valid documents can be shown on the staff panel.')
+      setSaving(false)
+      return
+    }
+
     let fileUrl: string | null = null
 
     try {
@@ -296,6 +307,7 @@ export default function V2StaffDocumentsPage() {
           status: addForm.status,
           file_url: fileUrl,
           notes: addForm.notes.trim() || null,
+          show_on_staff_panel: addForm.showOnStaffPanel,
         }),
       })
 
@@ -352,6 +364,12 @@ export default function V2StaffDocumentsPage() {
       return
     }
 
+    if (editForm.showOnStaffPanel && editForm.status !== 'valid') {
+      setError('Only valid documents can be shown on the staff panel.')
+      setEditSaving(false)
+      return
+    }
+
     let fileUrl: string | null = editForm.existingFileUrl
 
     try {
@@ -374,6 +392,7 @@ export default function V2StaffDocumentsPage() {
           status: editForm.status,
           file_url: fileUrl,
           notes: editForm.notes.trim() || null,
+          show_on_staff_panel: editForm.showOnStaffPanel,
         }),
       })
 
@@ -515,6 +534,7 @@ export default function V2StaffDocumentsPage() {
                               'Document'}
                           </h3>
                           <DocumentStatusBadge status={doc.status} />
+                          <VisibilityBadge show={Boolean(doc.show_on_staff_panel)} />
                         </div>
 
                         <div className="grid grid-cols-1 gap-2 text-sm text-slate-600 md:grid-cols-2">
@@ -744,6 +764,8 @@ export default function V2StaffDocumentsPage() {
                     setAddForm((prev) => ({
                       ...prev,
                       status: e.target.value,
+                      showOnStaffPanel:
+                        e.target.value === 'valid' ? prev.showOnStaffPanel : false,
                     }))
                   }
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
@@ -755,6 +777,29 @@ export default function V2StaffDocumentsPage() {
                   <option value="missing">missing</option>
                 </select>
               </div>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <input
+                  type="checkbox"
+                  checked={addForm.showOnStaffPanel}
+                  disabled={addForm.status !== 'valid'}
+                  onChange={(e) =>
+                    setAddForm((prev) => ({
+                      ...prev,
+                      showOnStaffPanel: e.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                />
+                <div>
+                  <span className="block text-sm font-medium text-slate-800">
+                    Show on staff panel
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    Only valid documents can be shown to staff users.
+                  </span>
+                </div>
+              </label>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -991,6 +1036,8 @@ export default function V2StaffDocumentsPage() {
                     setEditForm((prev) => ({
                       ...prev,
                       status: e.target.value,
+                      showOnStaffPanel:
+                        e.target.value === 'valid' ? prev.showOnStaffPanel : false,
                     }))
                   }
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
@@ -1002,6 +1049,29 @@ export default function V2StaffDocumentsPage() {
                   <option value="missing">missing</option>
                 </select>
               </div>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <input
+                  type="checkbox"
+                  checked={editForm.showOnStaffPanel}
+                  disabled={editForm.status !== 'valid'}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      showOnStaffPanel: e.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                />
+                <div>
+                  <span className="block text-sm font-medium text-slate-800">
+                    Show on staff panel
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    Only valid documents can be shown to staff users.
+                  </span>
+                </div>
+              </label>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -1115,6 +1185,22 @@ function DocumentStatusBadge({ status }: { status: string }) {
   return (
     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
       Pending
+    </span>
+  )
+}
+
+function VisibilityBadge({ show }: { show: boolean }) {
+  if (show) {
+    return (
+      <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
+        Staff Visible
+      </span>
+    )
+  }
+
+  return (
+    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+      Hidden from Staff
     </span>
   )
 }

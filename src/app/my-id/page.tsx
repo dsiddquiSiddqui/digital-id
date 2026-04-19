@@ -186,8 +186,10 @@ export default function MyIdPage() {
           has_expiry
         `)
         .eq('staff_id', staffData.id)
-        .order('created_at', { ascending: false })
-
+          .eq('status', 'valid')
+  .eq('show_on_staff_panel', true)
+  .order('created_at', { ascending: false })
+  
       console.log('staffData.id:', staffData.id)
       console.log('docsRaw:', docsRaw)
       console.log('docsError:', docsError)
