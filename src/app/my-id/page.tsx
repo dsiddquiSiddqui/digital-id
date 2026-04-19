@@ -324,9 +324,7 @@ setDocuments(validDocs)
                 <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
                   Welcome, {staffDisplayName}
                 </h1>
-                <p className="mt-2 text-sm text-white/75">
-                  Manage your digital ID, documents, and account password.
-                </p>
+                
               </div>
             </div>
 
