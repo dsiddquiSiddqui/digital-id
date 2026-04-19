@@ -1,9 +1,18 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react'
 import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
 import { createClient } from '@/lib/supabase/client'
 
@@ -83,6 +92,7 @@ export default function LoginPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-50">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,148,224,0.08),transparent_35%)]" />
+
       <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
         <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_25px_70px_rgba(15,23,42,0.08)] lg:grid-cols-2">
           {/* Left side */}
@@ -112,9 +122,27 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <MiniPill text="Admin only" />
-              <MiniPill text="Role protected" />
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                <MiniPill text="Admin only" />
+                <MiniPill text="Role protected" />
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <p className="text-sm font-semibold text-white">Staff member?</p>
+                <p className="mt-1 text-sm text-white/70">
+                  If you are trying to access your staff dashboard, use the staff
+                  login page.
+                </p>
+
+                <Link
+                  href="/staff-login"
+                  className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  Go to Staff Login
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
           </section>
 
@@ -180,7 +208,7 @@ export default function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="text-slate-500 transition hover:text-slate-800"
+                      className="cursor-pointer text-slate-500 transition hover:text-slate-800"
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5" />
@@ -200,11 +228,36 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-2xl bg-[#0094e0] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#007bb8] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full cursor-pointer rounded-2xl bg-[#0094e0] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#007bb8] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? 'Signing in...' : 'Login to Dashboard'}
                 </button>
               </form>
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:hidden">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm">
+                    <UserRound className="h-5 w-5 text-slate-700" />
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Staff Dashboard
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                      Staff members should use the dedicated staff login page.
+                    </p>
+
+                    <Link
+                      href="/staff-login"
+                      className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                    >
+                      Go to Staff Login
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         </div>
