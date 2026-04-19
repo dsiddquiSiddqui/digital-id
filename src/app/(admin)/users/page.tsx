@@ -16,8 +16,7 @@ type Profile = {
   created_at?: string
 }
 
-type RoleFilter =
-  | 'all'
+type Role =
   | 'super_admin'
   | 'admin'
   | 'operation_manager'
@@ -25,9 +24,10 @@ type RoleFilter =
   | 'hr_manager'
   | 'hr'
 
+type RoleFilter = 'all' | Role
 type StatusFilter = 'all' | 'active' | 'inactive'
 
-const USER_ROLES = [
+const USER_ROLES: Role[] = [
   'super_admin',
   'admin',
   'operation_manager',
@@ -36,9 +36,116 @@ const USER_ROLES = [
   'hr',
 ]
 
+const ROLE_LABELS: Record<Role, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+  operation_manager: 'Operation Manager',
+  operation_team: 'Operation Team',
+  hr_manager: 'HR Manager',
+  hr: 'HR',
+}
+
+const ROLE_STYLES: Record<Role, string> = {
+  super_admin: 'bg-purple-100 text-purple-700',
+  admin: 'bg-blue-100 text-blue-700',
+  operation_manager: 'bg-indigo-100 text-indigo-700',
+  operation_team: 'bg-cyan-100 text-cyan-700',
+  hr_manager: 'bg-pink-100 text-pink-700',
+  hr: 'bg-rose-100 text-rose-700',
+}
+
+function getVisibleRoles(currentUserRole: Role | null): Role[] {
+  switch (currentUserRole) {
+    case 'super_admin':
+      return [
+        'super_admin',
+        'admin',
+        'hr_manager',
+        'hr',
+        'operation_manager',
+        'operation_team',
+      ]
+
+    case 'admin':
+      return ['admin', 'hr_manager', 'hr', 'operation_manager', 'operation_team']
+
+    case 'hr_manager':
+      return ['admin', 'hr_manager', 'hr', 'operation_manager', 'operation_team']
+
+    case 'hr':
+      return ['hr', 'operation_manager', 'operation_team']
+
+    case 'operation_manager':
+      return ['operation_manager', 'operation_team']
+
+    case 'operation_team':
+      return ['operation_team']
+
+    default:
+      return []
+  }
+}
+
+function getCreatableRoles(currentUserRole: Role | null): Role[] {
+  switch (currentUserRole) {
+    case 'super_admin':
+      return [
+        'super_admin',
+        'admin',
+        'hr_manager',
+        'hr',
+        'operation_manager',
+        'operation_team',
+      ]
+
+    case 'admin':
+      return ['admin', 'hr_manager', 'hr', 'operation_manager', 'operation_team']
+
+    case 'hr_manager':
+      return ['hr', 'operation_manager', 'operation_team']
+
+    case 'hr':
+      return ['operation_manager', 'operation_team']
+
+    case 'operation_manager':
+      return ['operation_team']
+
+    default:
+      return []
+  }
+}
+
+function canEditTarget(currentUserRole: Role | null, targetRole: Role): boolean {
+  if (!currentUserRole) return false
+
+  switch (currentUserRole) {
+    case 'super_admin':
+      return true
+
+    case 'admin':
+      return targetRole !== 'super_admin'
+
+    case 'hr_manager':
+      return ['hr', 'operation_manager', 'operation_team'].includes(targetRole)
+
+    case 'hr':
+      return ['operation_manager', 'operation_team'].includes(targetRole)
+
+    case 'operation_manager':
+      return targetRole === 'operation_team'
+
+    case 'operation_team':
+      return false
+
+    default:
+      return false
+  }
+}
+
 export default function UsersPage() {
   const supabase = createClient()
 
+  const [currentUserRole, setCurrentUserRole] = useState<Role | null>(null)
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -53,38 +160,100 @@ export default function UsersPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    full_name: string
+    email: string
+    phone: string
+    password: string
+    role: Role
+  }>({
     full_name: '',
     email: '',
     phone: '',
     password: '',
-    role: 'admin',
+    role: 'operation_team',
   })
 
   const loadUsers = async () => {
     setLoading(true)
     setError('')
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .in('role', USER_ROLES)
-      .order('created_at', { ascending: false })
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
 
-    if (error) {
-      console.error('Failed to load users:', error)
-      setError(error.message)
+      if (authError || !user) {
+        setError('Unable to load current user.')
+        setLoading(false)
+        return
+      }
+
+      const { data: myProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      if (profileError || !myProfile?.role) {
+        setError('Unable to load your profile role.')
+        setLoading(false)
+        return
+      }
+
+      const myRole = myProfile.role as Role
+      setCurrentUserRole(myRole)
+
+      const visibleRoles = getVisibleRoles(myRole)
+
+      if (visibleRoles.length === 0) {
+        setUsers([])
+        setLoading(false)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('role', visibleRoles)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Failed to load users:', error)
+        setError(error.message)
+        setLoading(false)
+        return
+      }
+
+      setUsers((data || []) as Profile[])
+    } catch (err) {
+      console.error(err)
+      setError('Something went wrong while loading users.')
+    } finally {
       setLoading(false)
-      return
     }
-
-    setUsers((data || []) as Profile[])
-    setLoading(false)
   }
 
   useEffect(() => {
     loadUsers()
   }, [])
+
+  const visibleRoles = useMemo(
+    () => getVisibleRoles(currentUserRole),
+    [currentUserRole]
+  )
+
+  const creatableRoles = useMemo(
+    () => getCreatableRoles(currentUserRole),
+    [currentUserRole]
+  )
+
+  useEffect(() => {
+    if (creatableRoles.length > 0 && !creatableRoles.includes(form.role)) {
+      setForm((prev) => ({ ...prev, role: creatableRoles[0] }))
+    }
+  }, [creatableRoles, form.role])
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -132,6 +301,11 @@ export default function UsersPage() {
       return
     }
 
+    if (!creatableRoles.includes(form.role)) {
+      setError('You are not allowed to create this role.')
+      return
+    }
+
     try {
       setCreating(true)
 
@@ -160,7 +334,7 @@ export default function UsersPage() {
         email: '',
         phone: '',
         password: '',
-        role: 'admin',
+        role: creatableRoles[0] || 'operation_team',
       })
       setCreateOpen(false)
       await loadUsers()
@@ -174,6 +348,12 @@ export default function UsersPage() {
   const handleToggleStatus = async (user: Profile) => {
     setError('')
     setMessage('')
+
+    if (!canEditTarget(currentUserRole, user.role as Role)) {
+      setError('You are not allowed to update this user.')
+      return
+    }
+
     setTogglingId(user.id)
 
     try {
@@ -213,23 +393,25 @@ export default function UsersPage() {
               User Management
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Manage system users only. Staff and guards are excluded from this list.
+              Manage system users only. Visibility is based on role hierarchy.
             </p>
           </div>
 
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
-            <Plus className="h-4 w-4" />
-            Create User
-          </button>
+          {creatableRoles.length > 0 ? (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              <Plus className="h-4 w-4" />
+              Create User
+            </button>
+          ) : null}
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <SummaryCard
-          title="Total Users"
+          title="Visible Users"
           value={stats.total}
           icon={<Users className="h-5 w-5 text-slate-700" />}
         />
@@ -264,12 +446,11 @@ export default function UsersPage() {
             className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none"
           >
             <option value="all">All Roles</option>
-            <option value="super_admin">Super Admin</option>
-            <option value="admin">Admin</option>
-            <option value="operation_manager">Operation Manager</option>
-            <option value="operation_team">Operation Team</option>
-            <option value="hr_manager">HR Manager</option>
-            <option value="hr">HR</option>
+            {visibleRoles.map((role) => (
+              <option key={role} value={role}>
+                {ROLE_LABELS[role]}
+              </option>
+            ))}
           </select>
 
           <select
@@ -282,6 +463,12 @@ export default function UsersPage() {
             <option value="inactive">Inactive Only</option>
           </select>
         </div>
+
+        {currentUserRole ? (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Logged in as <span className="font-semibold">{ROLE_LABELS[currentUserRole]}</span>
+          </div>
+        ) : null}
 
         {error ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -333,53 +520,62 @@ export default function UsersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-slate-200 last:border-b-0">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                      {user.full_name}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{user.email}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{user.phone || '—'}</td>
-                    <td className="px-6 py-4">
-                      <RoleBadge role={user.role} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge isActive={user.is_active} />
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Link
-                          href={`/users/${user.id}/edit`}
-                          className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          Edit
-                        </Link>
-                        <Link
-                          href={`/users/${user.id}/password`}
-                          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-                        >
-                          Reset Password
-                        </Link>
+                filteredUsers.map((user) => {
+                  const canManage = canEditTarget(currentUserRole, user.role as Role)
 
-                        <button
-                          onClick={() => handleToggleStatus(user)}
-                          disabled={togglingId === user.id}
-                          className={`rounded-xl px-4 py-2 text-xs font-semibold transition ${
-                            user.is_active
-                              ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                              : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                          } disabled:opacity-60`}
-                        >
-                          {togglingId === user.id
-                            ? 'Updating...'
-                            : user.is_active
-                            ? 'Deactivate'
-                            : 'Activate'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                  return (
+                    <tr key={user.id} className="border-b border-slate-200 last:border-b-0">
+                      <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                        {user.full_name}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{user.email}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{user.phone || '—'}</td>
+                      <td className="px-6 py-4">
+                        <RoleBadge role={user.role as Role} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge isActive={user.is_active} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {canManage ? (
+                          <div className="flex justify-end gap-2">
+                            <Link
+                              href={`/users/${user.id}/edit`}
+                              className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              Edit
+                            </Link>
+
+                            <Link
+                              href={`/users/${user.id}/password`}
+                              className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                            >
+                              Reset Password
+                            </Link>
+
+                            <button
+                              onClick={() => handleToggleStatus(user)}
+                              disabled={togglingId === user.id}
+                              className={`rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                                user.is_active
+                                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                  : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                              } disabled:opacity-60`}
+                            >
+                              {togglingId === user.id
+                                ? 'Updating...'
+                                : user.is_active
+                                ? 'Deactivate'
+                                : 'Activate'}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-400">No access</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -393,7 +589,7 @@ export default function UsersPage() {
               <div>
                 <h3 className="text-xl font-semibold text-slate-900">Create User</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Create a new system user and matching profile record.
+                  You can only create roles below or allowed by your level.
                 </p>
               </div>
 
@@ -467,15 +663,14 @@ export default function UsersPage() {
                 </label>
                 <select
                   value={form.role}
-                  onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
+                  onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as Role }))}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                 >
-                  <option value="admin">Admin</option>
-                  <option value="operation_team">Operation Team</option>
-                  <option value="operation_manager">Operation Manager</option>
-                  <option value="hr_manager">HR Manager</option>
-                  <option value="hr">HR</option>
-                  <option value="super_admin">Super Admin</option>
+                  {creatableRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {ROLE_LABELS[role]}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -526,32 +721,14 @@ function SummaryCard({
   )
 }
 
-function RoleBadge({ role }: { role: string }) {
-  const styles: Record<string, string> = {
-    super_admin: 'bg-purple-100 text-purple-700',
-    admin: 'bg-blue-100 text-blue-700',
-    operation_manager: 'bg-indigo-100 text-indigo-700',
-    operation_team: 'bg-cyan-100 text-cyan-700',
-    hr_manager: 'bg-pink-100 text-pink-700',
-    hr: 'bg-rose-100 text-rose-700',
-  }
-
-  const labels: Record<string, string> = {
-    super_admin: 'Super Admin',
-    admin: 'Admin',
-    operation_manager: 'Operation Manager',
-    operation_team: 'Operation Team',
-    hr_manager: 'HR Manager',
-    hr: 'HR',
-  }
-
+function RoleBadge({ role }: { role: Role }) {
   return (
     <span
       className={`rounded-full px-3 py-1 text-xs font-medium ${
-        styles[role] || 'bg-slate-100 text-slate-700'
+        ROLE_STYLES[role] || 'bg-slate-100 text-slate-700'
       }`}
     >
-      {labels[role] || role}
+      {ROLE_LABELS[role] || role}
     </span>
   )
 }
