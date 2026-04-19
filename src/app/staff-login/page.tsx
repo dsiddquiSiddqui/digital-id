@@ -27,13 +27,13 @@ export default function staffLoginPage() {
   const [error, setError] = useState('')
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  e.preventDefault()
+  setLoading(true)
+  setError('')
 
+  try {
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password.')
-      setLoading(false)
       return
     }
 
@@ -44,7 +44,6 @@ export default function staffLoginPage() {
 
     if (loginError) {
       setError(loginError.message)
-      setLoading(false)
       return
     }
 
@@ -52,7 +51,6 @@ export default function staffLoginPage() {
 
     if (!user) {
       setError('Login failed. User not found.')
-      setLoading(false)
       return
     }
 
@@ -65,28 +63,32 @@ export default function staffLoginPage() {
     if (profileError || !profile) {
       await supabase.auth.signOut()
       setError('Access denied. No staff profile found.')
-      setLoading(false)
       return
     }
 
     if (profile.role !== 'staff') {
       await supabase.auth.signOut()
       setError('Access denied. This login is only for staff.')
-      setLoading(false)
       return
     }
 
     if (!profile.is_active) {
       await supabase.auth.signOut()
       setError('Your staff account is inactive. Please contact admin.')
-      setLoading(false)
       return
     }
 
+    // 🔥 IMPORTANT FIX FOR WEBVIEW
+    await new Promise((res) => setTimeout(res, 500))
+
+    router.replace('/my-id')
+  } catch (err: any) {
+    console.error('Login error:', err)
+    setError('Something went wrong. Please try again.')
+  } finally {
     setLoading(false)
-    router.push('/my-id')
-    router.refresh()
   }
+}
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-50">
