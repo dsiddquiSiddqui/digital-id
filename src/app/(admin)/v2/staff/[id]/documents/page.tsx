@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -93,6 +94,67 @@ async function readJsonSafely(response: Response) {
   }
 }
 
+function formatFileSize(bytes: number) {
+  if (!bytes) return '0 Bytes'
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${sizes[i]}`
+}
+
+function FilePreview({
+  file,
+  previewUrl,
+  title = 'Selected File Preview',
+}: {
+  file: File | null
+  previewUrl: string | null
+  title?: string
+}) {
+  if (!file) return null
+
+  const isImage = file.type.startsWith('image/')
+  const isPdf = file.type === 'application/pdf'
+
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="mb-3">
+        <p className="text-sm font-semibold text-slate-800">{title}</p>
+        <p className="text-xs text-slate-500">
+          {file.name} • {file.type || 'Unknown type'} • {formatFileSize(file.size)}
+        </p>
+      </div>
+
+      {isImage && previewUrl ? (
+        <div className="relative h-64 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <Image
+            src={previewUrl}
+            alt="Selected document preview"
+            fill
+            unoptimized
+            className="object-contain"
+          />
+        </div>
+      ) : null}
+
+      {isPdf && previewUrl ? (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <iframe
+            src={previewUrl}
+            title="PDF Preview"
+            className="h-[500px] w-full"
+          />
+        </div>
+      ) : null}
+
+      {!isImage && !isPdf ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-600">
+          Preview is not available for this file type, but the file is selected and ready to upload.
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function V2StaffDocumentsPage() {
   const params = useParams()
   const id = params.id as string
@@ -108,11 +170,13 @@ export default function V2StaffDocumentsPage() {
   const [documents, setDocuments] = useState<StaffDocument[]>([])
 
   const [addForm, setAddForm] = useState<DocumentFormState>(getInitialFormState())
+  const [addFilePreview, setAddFilePreview] = useState<string | null>(null)
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editForm, setEditForm] = useState<DocumentFormState>(getInitialFormState())
+  const [editFilePreview, setEditFilePreview] = useState<string | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -156,6 +220,34 @@ export default function V2StaffDocumentsPage() {
     if (id) loadData()
   }, [id])
 
+  useEffect(() => {
+    if (!addForm.file) {
+      setAddFilePreview(null)
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(addForm.file)
+    setAddFilePreview(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [addForm.file])
+
+  useEffect(() => {
+    if (!editForm.file) {
+      setEditFilePreview(null)
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(editForm.file)
+    setEditFilePreview(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [editForm.file])
+
   const addIsCustomDocument = addForm.documentTypeId === CUSTOM_DOCUMENT_VALUE
   const addSelectedType = useMemo(
     () => documentTypes.find((type) => type.id === addForm.documentTypeId),
@@ -179,18 +271,21 @@ export default function V2StaffDocumentsPage() {
       ...getInitialFormState(),
       documentTypeId: documentTypes[0]?.id || '',
     })
+    setAddFilePreview(null)
   }
 
   const closeEditModal = () => {
     setIsEditModalOpen(false)
     setEditingId(null)
     setEditForm(getInitialFormState())
+    setEditFilePreview(null)
   }
 
   const openEditModal = (doc: StaffDocument) => {
     setError('')
     setSuccess('')
     setEditingId(doc.id)
+    setEditFilePreview(null)
 
     const hasMappedType =
       !!doc.document_type_id &&
@@ -819,6 +914,28 @@ export default function V2StaffDocumentsPage() {
                     className="hidden"
                   />
                 </label>
+
+                <FilePreview
+                  file={addForm.file}
+                  previewUrl={addFilePreview}
+                  title="New Document Preview"
+                />
+
+                {addForm.file ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAddForm((prev) => ({
+                        ...prev,
+                        file: null,
+                      }))
+                    }
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <X className="h-4 w-4" />
+                    Remove Selected File
+                  </button>
+                ) : null}
               </div>
 
               <div>
@@ -1091,6 +1208,28 @@ export default function V2StaffDocumentsPage() {
                     className="hidden"
                   />
                 </label>
+
+                <FilePreview
+                  file={editForm.file}
+                  previewUrl={editFilePreview}
+                  title="Updated Document Preview"
+                />
+
+                {editForm.file ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        file: null,
+                      }))
+                    }
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <X className="h-4 w-4" />
+                    Remove Selected File
+                  </button>
+                ) : null}
 
                 {editForm.existingFileUrl && !editForm.file ? (
                   <a

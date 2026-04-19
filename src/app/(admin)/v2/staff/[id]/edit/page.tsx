@@ -1,9 +1,10 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Upload, ChevronLeft } from 'lucide-react'
+import { Upload, ChevronLeft, X } from 'lucide-react'
 
 type Staff = {
   id: string
@@ -54,6 +55,7 @@ export default function V2EditStaffPage() {
   const [notes, setNotes] = useState('')
   const [photoUrl, setPhotoUrl] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   useEffect(() => {
     const loadStaff = async () => {
@@ -98,6 +100,30 @@ export default function V2EditStaffPage() {
 
     if (id) loadStaff()
   }, [id])
+
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview(null)
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(photo)
+    setPhotoPreview(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [photo])
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0] || null
+    setPhoto(selectedFile)
+  }
+
+  const clearSelectedPhoto = () => {
+    setPhoto(null)
+    setPhotoPreview(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -460,10 +486,42 @@ export default function V2EditStaffPage() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                onChange={handlePhotoChange}
                 className="hidden"
               />
             </label>
+
+            {photoPreview ? (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">New Photo Preview</p>
+                    <p className="text-xs text-slate-500">
+                      This is the image that will replace the current photo after saving.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={clearSelectedPhoto}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <X className="h-4 w-4" />
+                    Remove
+                  </button>
+                </div>
+
+                <div className="relative h-56 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <Image
+                    src={photoPreview}
+                    alt="Selected new photo preview"
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="lg:col-span-2">

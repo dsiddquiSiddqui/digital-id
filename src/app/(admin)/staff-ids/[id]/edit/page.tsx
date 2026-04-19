@@ -205,7 +205,7 @@ export default function EditDigitalIdPage() {
       setSuccess('Digital ID updated successfully.')
 
       setTimeout(() => {
-        router.push(`/staff/${record?.staff_id}`)
+        router.push(`/v2/staff/${record?.staff_id}`)
         router.refresh()
       }, 700)
     } catch {
