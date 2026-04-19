@@ -5,6 +5,9 @@ import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
+const ALLOWED_STATUSES = ['active', 'inactive', 'suspended', 'revoked', 'archived']
+const ALLOWED_TYPES = ['security', 'warehouse', 'event', 'admin', 'contractor', 'other']
+
 function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -30,8 +33,10 @@ function normalize(value: any): string | null {
 function toBoolean(value: any, fallback = false): boolean {
   if (typeof value === 'boolean') return value
   if (typeof value === 'number') return value === 1
+
   const text = String(value ?? '').trim().toLowerCase()
   if (!text) return fallback
+
   return ['true', '1', 'yes', 'y'].includes(text)
 }
 
@@ -73,39 +78,34 @@ function buildFullName(row: Record<string, any>) {
   return joined || null
 }
 
-async function findStaffByParimOrEmployeeCode(
-  supabase: any,
-  parimStaffId: string | null,
-  employeeCode: string | null
-) {
-  if (parimStaffId) {
-    const { data, error } = await supabase
-      .from('staff')
-      .select('id, employee_code, parim_staff_id, full_name')
-      .eq('parim_staff_id', parimStaffId)
-      .maybeSingle()
+function cleanRows(rows: any[]) {
+  return Array.isArray(rows)
+    ? rows.filter((row) =>
+        Object.values(row).some((v) => String(v ?? '').trim() !== '')
+      )
+    : []
+}
 
-    if (error) throw error
-    if (data) return data
+function generateQrToken() {
+  return crypto.randomBytes(24).toString('hex')
+}
+
+function generateTempPassword(length = 12) {
+  const chars =
+    'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)]
   }
-
-  if (employeeCode) {
-    const { data, error } = await supabase
-      .from('staff')
-      .select('id, employee_code, parim_staff_id, full_name')
-      .eq('employee_code', employeeCode)
-      .maybeSingle()
-
-    if (error) throw error
-    if (data) return data
-  }
-
-  return null
+  return result
 }
 
 async function generateEmployeeCode(supabase: any): Promise<string> {
   for (let attempt = 0; attempt < 8; attempt++) {
-    const code = `HD-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`
+    const code = `HD-${Date.now().toString().slice(-6)}-${crypto
+      .randomBytes(2)
+      .toString('hex')
+      .toUpperCase()}`
 
     const { data, error } = await supabase
       .from('staff')
@@ -120,12 +120,112 @@ async function generateEmployeeCode(supabase: any): Promise<string> {
   throw new Error('Unable to generate a unique employee_code')
 }
 
-function generateQrToken() {
-  return crypto.randomBytes(24).toString('hex')
+async function findStaffByParimOrEmployeeCode(
+  supabase: any,
+  parimStaffId: string | null,
+  employeeCode: string | null
+) {
+  if (parimStaffId) {
+    const { data, error } = await supabase
+      .from('staff')
+      .select('id, profile_id, employee_code, parim_staff_id, full_name, email')
+      .eq('parim_staff_id', parimStaffId)
+      .maybeSingle()
+
+    if (error) throw error
+    if (data) return data
+  }
+
+  if (employeeCode) {
+    const { data, error } = await supabase
+      .from('staff')
+      .select('id, profile_id, employee_code, parim_staff_id, full_name, email')
+      .eq('employee_code', employeeCode)
+      .maybeSingle()
+
+    if (error) throw error
+    if (data) return data
+  }
+
+  return null
 }
 
-function cleanRows(rows: any[]) {
-  return Array.isArray(rows) ? rows.filter((row) => Object.values(row).some((v) => String(v ?? '').trim() !== '')) : []
+async function getExistingProfileByEmail(supabase: any, email: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, auth_user_id, email, role')
+    .eq('email', email.toLowerCase())
+    .maybeSingle()
+
+  if (error) throw error
+  return data || null
+}
+
+async function createProfileAndLoginForBulk(params: {
+  supabase: any
+  fullName: string
+  email: string
+  password: string
+  status: string
+}) {
+  const { supabase, fullName, email, password, status } = params
+
+  const existingProfile = await getExistingProfileByEmail(supabase, email)
+  if (existingProfile?.id) {
+    return {
+      created: false,
+      linked: true,
+      profileId: existingProfile.id,
+      authUserId: existingProfile.auth_user_id ?? null,
+      tempPassword: null,
+      message: 'Existing profile linked',
+    }
+  }
+
+  const { data: authResult, error: authError } =
+    await supabase.auth.admin.createUser({
+      email: email.toLowerCase(),
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        role: 'staff',
+      },
+    })
+
+  if (authError || !authResult.user) {
+    throw new Error(authError?.message || 'Failed to create auth user.')
+  }
+
+  const createdAuthUserId = authResult.user.id
+
+  const { data: createdProfile, error: createdProfileError } = await supabase
+    .from('profiles')
+    .insert([
+      {
+        auth_user_id: createdAuthUserId,
+        role: 'staff',
+        full_name: fullName,
+        email: email.toLowerCase(),
+        is_active: status === 'active',
+      },
+    ])
+    .select('id')
+    .single()
+
+  if (createdProfileError || !createdProfile) {
+    await supabase.auth.admin.deleteUser(createdAuthUserId)
+    throw new Error(createdProfileError?.message || 'Failed to create staff profile.')
+  }
+
+  return {
+    created: true,
+    linked: false,
+    profileId: createdProfile.id,
+    authUserId: createdAuthUserId,
+    tempPassword: password,
+    message: 'New auth user and profile created',
+  }
 }
 
 export async function POST(request: Request) {
@@ -134,6 +234,8 @@ export async function POST(request: Request) {
   const stats = {
     staffCreated: 0,
     staffUpdated: 0,
+    loginCreated: 0,
+    loginLinked: 0,
     employmentInserted: 0,
     employmentUpdated: 0,
     addressInserted: 0,
@@ -157,6 +259,13 @@ export async function POST(request: Request) {
     message: string
   }> = []
 
+  const generatedPasswords: Array<{
+    parim_staff_id: string
+    full_name: string
+    email: string
+    temp_password: string
+  }> = []
+
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -170,7 +279,9 @@ export async function POST(request: Request) {
 
     const getSheetRows = (sheetName: string) =>
       workbook.SheetNames.includes(sheetName)
-        ? cleanRows(XLSX.utils.sheet_to_json<any>(workbook.Sheets[sheetName], { defval: '' }))
+        ? cleanRows(
+            XLSX.utils.sheet_to_json<any>(workbook.Sheets[sheetName], { defval: '' })
+          )
         : []
 
     const staffRows = getSheetRows('Staff')
@@ -211,6 +322,9 @@ export async function POST(request: Request) {
       let employeeCode = normalize(row.employee_code)
       const fullName = buildFullName(row)
 
+      let createdAuthUserId: string | null = null
+      let createdProfileId: string | null = null
+
       try {
         if (!parimStaffId) {
           stats.failed++
@@ -233,25 +347,91 @@ export async function POST(request: Request) {
           continue
         }
 
+        const email = normalize(row.email)?.toLowerCase() || null
+        const createLogin = toBoolean(row.create_login, false)
+        let password = normalize(row.password)
+
         if (!employeeCode) {
           employeeCode = await generateEmployeeCode(supabase)
         }
 
-        const existing = await findStaffByParimOrEmployeeCode(supabase, parimStaffId, employeeCode)
+        const staffType = normalize(row.staff_type) || 'security'
+        const status = normalize(row.status) || 'active'
+
+        if (!ALLOWED_STATUSES.includes(status)) {
+          throw new Error(`Invalid status value: ${status}`)
+        }
+
+        if (!ALLOWED_TYPES.includes(staffType)) {
+          throw new Error(`Invalid staff_type value: ${staffType}`)
+        }
+
+        if (createLogin) {
+          if (!email) {
+            throw new Error('Email is required when creating a login account')
+          }
+
+          if (password && password.length < 8) {
+            throw new Error('Password must be at least 8 characters long')
+          }
+
+          if (!password) {
+            password = generateTempPassword()
+          }
+        }
+
+        const existing = await findStaffByParimOrEmployeeCode(
+          supabase,
+          parimStaffId,
+          employeeCode
+        )
+
+        let profileId = existing?.profile_id || null
+
+        if (createLogin) {
+          if (profileId) {
+            stats.loginLinked++
+          } else {
+            const loginResult = await createProfileAndLoginForBulk({
+              supabase,
+              fullName,
+              email: email!,
+              password: password!,
+              status,
+            })
+
+            profileId = loginResult.profileId
+            createdProfileId = loginResult.profileId
+            createdAuthUserId = loginResult.authUserId
+
+            if (loginResult.created) stats.loginCreated++
+            if (loginResult.linked) stats.loginLinked++
+
+            if (loginResult.created && row.password === '' && email) {
+              generatedPasswords.push({
+                parim_staff_id: parimStaffId,
+                full_name: fullName,
+                email,
+                temp_password: password!,
+              })
+            }
+          }
+        }
 
         const payload = {
+          profile_id: profileId,
           parim_staff_id: parimStaffId,
           employee_code: employeeCode,
           full_name: fullName,
           first_name: normalize(row.first_name),
           last_name: normalize(row.last_name),
           parim_person_id: normalize(row.parim_person_id),
-          company_name: normalize(row.company_name) || 'H&D Security',
-          email: normalize(row.email),
+          company_name: normalize(row.company_name) || 'SGC Security Services',
+          email,
           phone: normalize(row.phone),
           second_phone: normalize(row.second_phone),
-          staff_type: normalize(row.staff_type) || 'security',
-          status: normalize(row.status) || 'active',
+          staff_type: staffType,
+          status,
           nationality: normalize(row.nationality),
           country_of_birth: normalize(row.country_of_birth),
           gender: normalize(row.gender),
@@ -263,11 +443,17 @@ export async function POST(request: Request) {
           import_source: 'bulk_excel',
         }
 
+        let staffId: string
+
         if (existing?.id) {
-          const { error } = await supabase.from('staff').update(payload).eq('id', existing.id)
+          const { error } = await supabase
+            .from('staff')
+            .update(payload)
+            .eq('id', existing.id)
+
           if (error) throw error
 
-          staffIdByParim.set(parimStaffId, existing.id)
+          staffId = existing.id
           stats.staffUpdated++
         } else {
           const { data, error } = await supabase
@@ -278,10 +464,20 @@ export async function POST(request: Request) {
 
           if (error) throw error
 
-          staffIdByParim.set(parimStaffId, data.id)
+          staffId = data.id
           stats.staffCreated++
         }
+
+        staffIdByParim.set(parimStaffId, staffId)
       } catch (error: any) {
+        if (createdProfileId) {
+          await supabase.from('profiles').delete().eq('id', createdProfileId)
+        }
+
+        if (createdAuthUserId) {
+          await supabase.auth.admin.deleteUser(createdAuthUserId)
+        }
+
         stats.failed++
         errors.push({
           sheet: 'Staff',
@@ -329,7 +525,6 @@ export async function POST(request: Request) {
           continue
         }
 
-        const isCurrent = toBoolean(row.is_current, true)
         const payload = {
           staff_id: staffId,
           employment_type: normalize(row.employment_type),
@@ -343,33 +538,18 @@ export async function POST(request: Request) {
           personal_pay_rate: toNumber(row.personal_pay_rate),
           contracted_hours: toNumber(row.contracted_hours),
           holiday_entitlement: normalize(row.holiday_entitlement),
-          is_current: isCurrent,
+          is_current: true,
           notes: normalize(row.notes),
         }
 
-        let existing: any = null
+        const { data: existing, error: lookupError } = await supabase
+          .from('staff_employment')
+          .select('id')
+          .eq('staff_id', staffId)
+          .eq('is_current', true)
+          .maybeSingle()
 
-        if (isCurrent) {
-          const result = await supabase
-            .from('staff_employment')
-            .select('id')
-            .eq('staff_id', staffId)
-            .eq('is_current', true)
-            .maybeSingle()
-
-          if (result.error) throw result.error
-          existing = result.data
-        } else if (payload.contract_number) {
-          const result = await supabase
-            .from('staff_employment')
-            .select('id')
-            .eq('staff_id', staffId)
-            .eq('contract_number', payload.contract_number)
-            .maybeSingle()
-
-          if (result.error) throw result.error
-          existing = result.data
-        }
+        if (lookupError) throw lookupError
 
         if (existing?.id) {
           const { error } = await supabase
@@ -413,7 +593,6 @@ export async function POST(request: Request) {
           continue
         }
 
-        const isCurrent = toBoolean(row.is_current, true)
         const payload = {
           staff_id: staffId,
           street_address: normalize(row.street_address),
@@ -423,22 +602,17 @@ export async function POST(request: Request) {
           county: normalize(row.county),
           post_code: normalize(row.post_code),
           country: normalize(row.country),
-          is_current: isCurrent,
+          is_current: true,
         }
 
-        let existing: any = null
+        const { data: existing, error: lookupError } = await supabase
+          .from('staff_addresses')
+          .select('id')
+          .eq('staff_id', staffId)
+          .eq('is_current', true)
+          .maybeSingle()
 
-        if (isCurrent) {
-          const result = await supabase
-            .from('staff_addresses')
-            .select('id')
-            .eq('staff_id', staffId)
-            .eq('is_current', true)
-            .maybeSingle()
-
-          if (result.error) throw result.error
-          existing = result.data
-        }
+        if (lookupError) throw lookupError
 
         if (existing?.id) {
           const { error } = await supabase
@@ -555,7 +729,6 @@ export async function POST(request: Request) {
           continue
         }
 
-        const isCurrent = toBoolean(row.is_current, true)
         const payload = {
           staff_id: staffId,
           account_holder_name: normalize(row.account_holder_name),
@@ -564,22 +737,17 @@ export async function POST(request: Request) {
           reference_number: normalize(row.reference_number),
           bank_name: normalize(row.bank_name),
           country: normalize(row.country),
-          is_current: isCurrent,
+          is_current: true,
         }
 
-        let existing: any = null
+        const { data: existing, error: lookupError } = await supabase
+          .from('staff_bank_details')
+          .select('id')
+          .eq('staff_id', staffId)
+          .eq('is_current', true)
+          .maybeSingle()
 
-        if (isCurrent) {
-          const result = await supabase
-            .from('staff_bank_details')
-            .select('id')
-            .eq('staff_id', staffId)
-            .eq('is_current', true)
-            .maybeSingle()
-
-          if (result.error) throw result.error
-          existing = result.data
-        }
+        if (lookupError) throw lookupError
 
         if (existing?.id) {
           const { error } = await supabase
@@ -628,7 +796,6 @@ export async function POST(request: Request) {
         const expiryDate = excelDateToISO(row.expiry_date)
         const roleTitle = normalize(row.role_title)
         const qrToken = normalize(row.qr_token) || generateQrToken()
-        const isCurrent = toBoolean(row.is_current, true)
 
         if (!idNumber || !issueDate || !expiryDate || !roleTitle) {
           stats.failed++
@@ -650,37 +817,26 @@ export async function POST(request: Request) {
           role_title: roleTitle,
           sia_number: normalize(row.sia_number),
           qr_token: qrToken,
-          watermark_text: normalize(row.watermark_text),
-          is_current: isCurrent,
+          watermark_text: normalize(row.watermark_text) || 'SGC Security Services',
+          is_current: true,
           status: normalize(row.status) || 'active',
         }
 
-        let existing: any = null
+        const { data: existing, error: lookupError } = await supabase
+          .from('staff_ids')
+          .select('id')
+          .eq('staff_id', staffId)
+          .eq('is_current', true)
+          .maybeSingle()
 
-        if (isCurrent) {
-          const result = await supabase
-            .from('staff_ids')
-            .select('id')
-            .eq('staff_id', staffId)
-            .eq('is_current', true)
-            .maybeSingle()
-
-          if (result.error) throw result.error
-          existing = result.data
-        } else {
-          const result = await supabase
-            .from('staff_ids')
-            .select('id')
-            .eq('staff_id', staffId)
-            .eq('id_number', idNumber)
-            .maybeSingle()
-
-          if (result.error) throw result.error
-          existing = result.data
-        }
+        if (lookupError) throw lookupError
 
         if (existing?.id) {
-          const { error } = await supabase.from('staff_ids').update(payload).eq('id', existing.id)
+          const { error } = await supabase
+            .from('staff_ids')
+            .update(payload)
+            .eq('id', existing.id)
+
           if (error) throw error
           stats.digitalIdUpdated++
         } else {
@@ -758,14 +914,24 @@ export async function POST(request: Request) {
           has_expiry: hasExpiry,
         }
 
-        const { data: existing, error: lookupError } = await supabase
+        let query = supabase
           .from('staff_documents')
           .select('id')
           .eq('staff_id', staffId)
-          .eq('document_type_id', matchedType?.id || null)
-          .eq('custom_document_name', customDocumentName)
-          .eq('document_number', payload.document_number)
-          .maybeSingle()
+
+        if (matchedType?.id) {
+          query = query.eq('document_type_id', matchedType.id)
+        } else {
+          query = query
+            .is('document_type_id', null)
+            .eq('custom_document_name', customDocumentName)
+        }
+
+        if (payload.document_number) {
+          query = query.eq('document_number', payload.document_number)
+        }
+
+        const { data: existing, error: lookupError } = await query.maybeSingle()
 
         if (lookupError) throw lookupError
 
@@ -796,6 +962,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       stats,
+      generatedPasswords,
       errors,
     })
   } catch (error: any) {

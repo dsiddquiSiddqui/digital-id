@@ -14,6 +14,7 @@ type Props = {
   issueDate?: string | null
   expiryDate?: string | null
   idStatus?: string | null
+  siaNumber?: string | null
 }
 
 export default function IdCard({
@@ -26,6 +27,7 @@ export default function IdCard({
   issueDate,
   expiryDate,
   idStatus = 'active',
+  siaNumber,
 }: Props) {
   const verifyUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/verify/${qrToken}`
 
@@ -42,26 +44,26 @@ export default function IdCard({
       ? 'bg-slate-500 text-white'
       : 'bg-emerald-600 text-white'
 
+  const cleanSiaNumber = siaNumber?.trim()
+
   return (
     <div className="w-[360px] overflow-hidden rounded-[26px] border border-slate-300 bg-white shadow-[0_20px_45px_rgba(15,23,42,0.12)]">
       {/* Header */}
       <div className="bg-[#081a33] px-6 py-5 text-white">
-  <div className="flex items-center justify-center">
-    <div className="">
-      <div className="flex items-center justify-center">
-        <Image
-          src={logo}
-          alt="SGC Security Logo"
-          className="h-auto w-[180px] object-contain"
-          priority
-        />
+        <div className="flex items-center justify-center">
+          <Image
+            src={logo}
+            alt="SGC Security Logo"
+            className="h-auto w-[180px] object-contain"
+            priority
+          />
+        </div>
       </div>
-    </div>
-  </div>
-</div>
 
       {/* Status strip */}
-      
+      <div className={`px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide ${statusClasses}`}>
+        {normalizedStatus || 'active'}
+      </div>
 
       {/* Body */}
       <div className="px-6 py-6">
@@ -84,15 +86,18 @@ export default function IdCard({
           </p>
         </div>
 
-        {/* Details */}
         <div className="mt-6 space-y-3 text-sm">
-          <DetailRow label="Employee Code" value={employeeCode} />
-          <DetailRow label="SIA Number" value={idNumber} />
+          <DetailRow label="Employee Code" value={employeeCode || '—'} />
+          <DetailRow label="ID Number" value={idNumber || '—'} />
+
+          {cleanSiaNumber ? (
+            <DetailRow label="SIA Number" value={cleanSiaNumber} />
+          ) : null}
+
           <DetailRow label="Issue Date" value={issueDate || '—'} />
           <DetailRow label="Expiry Date" value={expiryDate || '—'} />
         </div>
 
-        {/* QR */}
         <div className="mt-6 flex flex-col items-center">
           <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
             <QRCodeCanvas value={verifyUrl} size={140} />
@@ -101,7 +106,6 @@ export default function IdCard({
         </div>
       </div>
 
-      {/* Footer */}
       <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center">
         <p className="text-xs font-semibold text-[#081a33]">
           Verified Digital Identity

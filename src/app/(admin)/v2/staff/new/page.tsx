@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Upload, UserPlus, ChevronLeft } from 'lucide-react'
+import { Upload, UserPlus, ChevronLeft, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 
 export default function V2NewStaffPage() {
   const router = useRouter()
@@ -30,16 +30,52 @@ export default function V2NewStaffPage() {
   const [notes, setNotes] = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
 
+  const [createLogin, setCreateLogin] = useState(true)
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const resetMessages = () => {
+    setError('')
+    setSuccess('')
+  }
+
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
-    setSuccess('')
+    resetMessages()
 
     if (!fullName.trim() || !employeeCode.trim()) {
       setError('Full name and employee code are required.')
       setLoading(false)
       return
+    }
+
+    if (createLogin) {
+      if (!email.trim()) {
+        setError('Email is required when creating a login account.')
+        setLoading(false)
+        return
+      }
+
+      if (!password.trim()) {
+        setError('Temporary password is required when creating a login account.')
+        setLoading(false)
+        return
+      }
+
+      if (password.trim().length < 8) {
+        setError('Password must be at least 8 characters long.')
+        setLoading(false)
+        return
+      }
+
+      if (password !== confirmPassword) {
+        setError('Password and confirm password do not match.')
+        setLoading(false)
+        return
+      }
     }
 
     let photoUrl: string | null = null
@@ -78,6 +114,8 @@ export default function V2NewStaffPage() {
           employee_code: employeeCode.trim(),
           company_name: companyName.trim() || null,
           email: email.trim().toLowerCase() || null,
+          password: createLogin ? password.trim() : null,
+          create_login: createLogin,
           phone: phone.trim() || null,
           second_phone: secondPhone.trim() || null,
           staff_type: staffType,
@@ -101,7 +139,11 @@ export default function V2NewStaffPage() {
         return
       }
 
-      setSuccess('Staff member created successfully.')
+      setSuccess(
+        createLogin
+          ? 'Staff member and login account created successfully.'
+          : 'Staff member created successfully.'
+      )
 
       setTimeout(() => {
         router.push(`/v2/staff/${result.staff_id}`)
@@ -200,7 +242,7 @@ export default function V2NewStaffPage() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
-              Email
+              Email {createLogin ? '*' : ''}
             </label>
             <input
               type="email"
@@ -269,6 +311,95 @@ export default function V2NewStaffPage() {
               <option value="archived">archived</option>
             </select>
           </div>
+
+          <div className="lg:col-span-2 pt-2">
+            <h2 className="text-lg font-semibold text-slate-900">Staff Login Account</h2>
+          </div>
+
+          <div className="lg:col-span-2 rounded-2xl border border-slate-300 px-4 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-slate-100 p-2">
+                  <ShieldCheck className="h-5 w-5 text-slate-700" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-800">
+                    Create login account
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Enable this if the staff member should be able to log in to the staff portal.
+                  </p>
+                </div>
+              </div>
+
+              <input
+                type="checkbox"
+                checked={createLogin}
+                onChange={(e) => setCreateLogin(e.target.checked)}
+                className="h-5 w-5"
+              />
+            </div>
+          </div>
+
+          {createLogin ? (
+            <>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Temporary Password *
+                </label>
+                <div className="flex items-center rounded-2xl border border-slate-300 px-4">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full py-3 outline-none"
+                    placeholder="TempPass123!"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="text-slate-500 hover:text-slate-800"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Confirm Password *
+                </label>
+                <div className="flex items-center rounded-2xl border border-slate-300 px-4">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full py-3 outline-none"
+                    placeholder="TempPass123!"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    className="text-slate-500 hover:text-slate-800"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                A staff portal login will be created using the email and temporary password above.
+              </div>
+            </>
+          ) : (
+            <div className="lg:col-span-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Login account creation is disabled. This will create only the staff record.
+            </div>
+          )}
 
           <div className="lg:col-span-2 pt-2">
             <h2 className="text-lg font-semibold text-slate-900">Personal Details</h2>
@@ -415,7 +546,13 @@ export default function V2NewStaffPage() {
               disabled={loading}
               className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {loading ? 'Creating staff...' : 'Create Staff'}
+              {loading
+                ? createLogin
+                  ? 'Creating staff and login...'
+                  : 'Creating staff...'
+                : createLogin
+                ? 'Create Staff & Login'
+                : 'Create Staff'}
             </button>
           </div>
         </form>

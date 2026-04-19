@@ -9,25 +9,33 @@ export async function GET() {
   const instructions = XLSX.utils.aoa_to_sheet([
     ['Bulk Upload Template Instructions'],
     ['Use parim_staff_id as the master key on every sheet.'],
-    ['Only the Staff sheet is required. Other sheets are optional.'],
+    ['Only the Staff sheet is required. All other sheets are optional.'],
+    ['Do not add is_current columns. The importer handles current records automatically.'],
+    ['To create login accounts in bulk, set create_login to true and provide email.'],
+    ['If password is blank and create_login is true, the system will auto-generate a temporary password.'],
+    ['If the staff already exists and already has a linked login/profile, the importer will not create a duplicate login.'],
     ['For standard documents, use document_type_code values such as passport, contract, sia_badge, right_to_work, visa, driving_licence, act_certificate, induction_certificate.'],
     ['For custom documents, leave document_type_code and document_type_name blank and fill custom_document_name.'],
     ['DigitalIDs requires id_number, issue_date, expiry_date, and role_title. qr_token is optional because the API auto-generates it.'],
+    ['watermark_text is optional. If blank, the system uses SGC Security Services.'],
     ['Dates should be in YYYY-MM-DD format.'],
+    ['For document files, use file_url if you already uploaded the file somewhere.'],
   ])
 
   const staff = XLSX.utils.json_to_sheet([
     {
       parim_staff_id: 'PARIM-1001',
-      employee_code: 'HD-0001',
+      employee_code: '',
       full_name: 'Ali Raza',
       first_name: 'Ali',
       last_name: 'Raza',
       parim_person_id: 'PERSON-1001',
-      company_name: 'H&D Security',
+      company_name: 'SGC Security Services',
       email: 'ali.raza@example.com',
+      password: '',
+      create_login: 'true',
       phone: '+447700900001',
-      second_phone: '+447700900011',
+      second_phone: '',
       staff_type: 'security',
       status: 'active',
       nationality: 'British',
@@ -36,18 +44,20 @@ export async function GET() {
       date_of_birth: '1990-01-15',
       access_to_car: 'true',
       driver_licence: 'true',
-      notes: 'Sample imported row',
+      notes: 'Password left blank so system can generate one',
       photo_url: '',
     },
     {
       parim_staff_id: 'PARIM-1002',
-      employee_code: 'HD-0002',
+      employee_code: '',
       full_name: 'Sarah Khan',
       first_name: 'Sarah',
       last_name: 'Khan',
       parim_person_id: 'PERSON-1002',
-      company_name: 'H&D Security',
+      company_name: 'SGC Security Services',
       email: 'sarah.khan@example.com',
+      password: 'Welcome@123',
+      create_login: 'true',
       phone: '+447700900002',
       second_phone: '',
       staff_type: 'security',
@@ -58,18 +68,20 @@ export async function GET() {
       date_of_birth: '1993-07-20',
       access_to_car: 'false',
       driver_licence: 'true',
-      notes: 'Second sample row',
+      notes: 'Example with manual password',
       photo_url: '',
     },
     {
       parim_staff_id: 'PARIM-1003',
-      employee_code: 'HD-0003',
+      employee_code: '',
       full_name: 'John Mensah',
       first_name: 'John',
       last_name: 'Mensah',
       parim_person_id: 'PERSON-1003',
-      company_name: 'H&D Security',
-      email: 'john.mensah@example.com',
+      company_name: 'SGC Security Services',
+      email: '',
+      password: '',
+      create_login: 'false',
       phone: '+447700900003',
       second_phone: '',
       staff_type: 'security',
@@ -80,7 +92,7 @@ export async function GET() {
       date_of_birth: '1988-11-09',
       access_to_car: 'true',
       driver_licence: 'true',
-      notes: 'Third sample row',
+      notes: 'Example without login account',
       photo_url: '',
     },
   ])
@@ -99,7 +111,6 @@ export async function GET() {
       personal_pay_rate: 13.5,
       contracted_hours: 40,
       holiday_entitlement: '28 days',
-      is_current: 'true',
       notes: 'Current contract',
     },
     {
@@ -115,7 +126,6 @@ export async function GET() {
       personal_pay_rate: 12.25,
       contracted_hours: 24,
       holiday_entitlement: 'pro rata',
-      is_current: 'true',
       notes: '',
     },
     {
@@ -131,7 +141,6 @@ export async function GET() {
       personal_pay_rate: 14,
       contracted_hours: 42,
       holiday_entitlement: '28 days',
-      is_current: 'true',
       notes: '',
     },
   ])
@@ -146,7 +155,6 @@ export async function GET() {
       county: 'Greater London',
       post_code: 'SW1A 1AA',
       country: 'United Kingdom',
-      is_current: 'true',
     },
     {
       parim_staff_id: 'PARIM-1002',
@@ -157,7 +165,6 @@ export async function GET() {
       county: 'West Midlands',
       post_code: 'B1 1AA',
       country: 'United Kingdom',
-      is_current: 'true',
     },
     {
       parim_staff_id: 'PARIM-1003',
@@ -168,7 +175,6 @@ export async function GET() {
       county: 'Greater Manchester',
       post_code: 'M1 1AE',
       country: 'United Kingdom',
-      is_current: 'true',
     },
   ])
 
@@ -208,7 +214,6 @@ export async function GET() {
       reference_number: 'BANK-1001',
       bank_name: 'Barclays',
       country: 'United Kingdom',
-      is_current: 'true',
     },
     {
       parim_staff_id: 'PARIM-1002',
@@ -218,7 +223,6 @@ export async function GET() {
       reference_number: 'BANK-1002',
       bank_name: 'HSBC',
       country: 'United Kingdom',
-      is_current: 'true',
     },
     {
       parim_staff_id: 'PARIM-1003',
@@ -228,7 +232,6 @@ export async function GET() {
       reference_number: 'BANK-1003',
       bank_name: 'Lloyds',
       country: 'United Kingdom',
-      is_current: 'true',
     },
   ])
 
@@ -242,8 +245,7 @@ export async function GET() {
       role_title: 'Door Supervisor',
       sia_number: 'SIA-100001',
       qr_token: '',
-      watermark_text: 'H&D Security',
-      is_current: 'true',
+      watermark_text: '',
       status: 'active',
     },
     {
@@ -255,8 +257,7 @@ export async function GET() {
       role_title: 'Security Officer',
       sia_number: 'SIA-100002',
       qr_token: '',
-      watermark_text: 'H&D Security',
-      is_current: 'true',
+      watermark_text: '',
       status: 'active',
     },
     {
@@ -268,8 +269,7 @@ export async function GET() {
       role_title: 'CCTV Operator',
       sia_number: 'SIA-100003',
       qr_token: '',
-      watermark_text: 'H&D Security',
-      is_current: 'true',
+      watermark_text: '',
       status: 'active',
     },
   ])
@@ -287,7 +287,7 @@ export async function GET() {
       status: 'pending',
       verified: 'false',
       file_url: '',
-      notes: 'Sample passport document',
+      notes: 'Standard document example',
       has_expiry: 'true',
     },
     {
@@ -339,8 +339,10 @@ export async function GET() {
   return new NextResponse(buffer, {
     status: 200,
     headers: {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename=\"staff-bulk-upload-template.xlsx\"',
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition':
+        'attachment; filename="staff-bulk-upload-template.xlsx"',
     },
   })
 }

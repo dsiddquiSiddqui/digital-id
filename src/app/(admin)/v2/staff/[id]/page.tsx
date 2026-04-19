@@ -134,6 +134,7 @@ export default function V2StaffDetailPage() {
   const [bankDetails, setBankDetails] = useState<StaffBankDetails | null>(null)
   const [currentId, setCurrentId] = useState<StaffIdRecord | null>(null)
   const [documents, setDocuments] = useState<StaffDocument[]>([])
+  
 
   useEffect(() => {
     const loadData = async () => {
@@ -525,16 +526,17 @@ export default function V2StaffDetailPage() {
                   </p>
 
                   <IdCard
-                    fullName={staff.full_name}
-                    employeeCode={staff.employee_code}
-                    roleTitle={currentId.role_title}
-                    idNumber={currentId.id_number}
-                    qrToken={currentId.qr_token}
-                    photoUrl={staff.photo_url}
-                    issueDate={currentId.issue_date}
-                    expiryDate={currentId.expiry_date}
-                    idStatus={currentId.status}
-                  />
+  fullName={staff.full_name}
+  employeeCode={staff.employee_code}
+  roleTitle={currentId.role_title}
+  idNumber={currentId.id_number}
+  siaNumber={currentId.sia_number}
+  qrToken={currentId.qr_token}
+  photoUrl={staff.photo_url}
+  issueDate={currentId.issue_date}
+  expiryDate={currentId.expiry_date}
+  idStatus={currentId.status}
+/>
                 </div>
               </div>
             ) : (

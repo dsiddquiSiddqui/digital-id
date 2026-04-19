@@ -38,6 +38,7 @@ type StaffId = {
   staff_id: string
   role_title: string | null
   id_number: string
+  sia_number: string | null
   qr_token: string | null
   issue_date: string | null
   expiry_date: string | null
@@ -149,14 +150,14 @@ export default function MyIdPage() {
 
       setStaff(staffData)
 
-      const { data: idData, error: idError } = await supabase
-        .from('staff_ids')
-        .select(
-          'id, staff_id, role_title, id_number, qr_token, issue_date, expiry_date, status, is_current'
-        )
-        .eq('staff_id', staffData.id)
-        .eq('is_current', true)
-        .maybeSingle()
+     const { data: idData, error: idError } = await supabase
+  .from('staff_ids')
+  .select(
+    'id, staff_id, role_title, id_number, sia_number, qr_token, issue_date, expiry_date, status, is_current'
+  )
+  .eq('staff_id', staffData.id)
+  .eq('is_current', true)
+  .maybeSingle()
 
       console.log('idData:', idData)
       console.log('idError:', idError)
@@ -403,16 +404,17 @@ setDocuments(validDocs)
             ) : (
               <div className="flex flex-col items-center">
                 <IdCard
-                  fullName={staff.full_name}
-                  employeeCode={staff.employee_code ?? 'N/A'}
-                  roleTitle={staffId.role_title ?? 'Staff'}
-                  idNumber={staffId.id_number}
-                  qrToken={staffId.qr_token ?? ''}
-                  photoUrl={staff.photo_url ?? ''}
-                  issueDate={staffId.issue_date ?? ''}
-                  expiryDate={staffId.expiry_date ?? ''}
-                  idStatus={staffId.status ?? 'active'}
-                />
+  fullName={staff.full_name}
+  employeeCode={staff.employee_code ?? 'N/A'}
+  roleTitle={staffId.role_title ?? 'Staff'}
+  idNumber={staffId.id_number}
+  siaNumber={staffId.sia_number ?? ''}
+  qrToken={staffId.qr_token ?? ''}
+  photoUrl={staff.photo_url ?? ''}
+  issueDate={staffId.issue_date ?? ''}
+  expiryDate={staffId.expiry_date ?? ''}
+  idStatus={staffId.status ?? 'active'}
+/>
               </div>
             )}
           </section>
