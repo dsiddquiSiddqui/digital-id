@@ -292,7 +292,7 @@ export default function IssueIdPage() {
       return
     }
 
-    router.push(`/staff/${id}`)
+    router.push(`/v2/staff/${id}`)
     router.refresh()
   }
 
