@@ -64,6 +64,7 @@ type StaffDocument = {
   custom_document_name: string | null
   custom_document_code: string | null
   has_expiry: boolean | null
+  show_on_staff_panel?: boolean | null
   document_types: {
     name: string | null
   } | null
@@ -72,10 +73,10 @@ type StaffDocument = {
 type TabKey = 'id' | 'documents' | 'password'
 
 export default function MyIdPage() {
-  const supabase = createClient()
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
   const [staff, setStaff] = useState<Staff | null>(null)
   const [staffId, setStaffId] = useState<StaffId | null>(null)
   const [documents, setDocuments] = useState<StaffDocument[]>([])
@@ -93,154 +94,196 @@ export default function MyIdPage() {
   const [passwordError, setPasswordError] = useState('')
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true)
+    let isMounted = true
+    const supabase = createClient()
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        router.push('/staff-login')
-        return
-      }
-
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, auth_user_id, role, full_name, email, is_active')
-        .eq('auth_user_id', user.id)
-        .single()
-
-      console.log('profileData:', profileData)
-      console.log('profileError:', profileError)
-
-      if (profileError || !profileData) {
-        await supabase.auth.signOut()
-        router.push('/staff-login')
-        return
-      }
-
-      if (profileData.role !== 'staff') {
-        await supabase.auth.signOut()
-        router.push('/')
-        return
-      }
-
-      if (!profileData.is_active) {
-        await supabase.auth.signOut()
-        router.push('/staff-login')
-        return
-      }
-
-      setProfile(profileData)
-
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff')
-        .select('id, profile_id, full_name, employee_code, photo_url')
-        .eq('profile_id', profileData.id)
-        .single()
-
-      console.log('staffData:', staffData)
-      console.log('staffError:', staffError)
-
-      if (staffError || !staffData) {
-        setLoading(false)
-        return
-      }
-
-      setStaff(staffData)
-
-     const { data: idData, error: idError } = await supabase
-  .from('staff_ids')
-  .select(
-    'id, staff_id, role_title, id_number, sia_number, qr_token, issue_date, expiry_date, status, is_current'
-  )
-  .eq('staff_id', staffData.id)
-  .eq('is_current', true)
-  .maybeSingle()
-
-      console.log('idData:', idData)
-      console.log('idError:', idError)
-
-      setStaffId(idData ?? null)
-
-      const { data: docsRaw, error: docsError } = await supabase
-        .from('staff_documents')
-        .select(`
-          id,
-          staff_id,
-          document_type_id,
-          document_number,
-          issue_date,
-          expiry_date,
-          status,
-          verified,
-          verified_by,
-          verified_at,
-          file_url,
-          notes,
-          created_at,
-          updated_at,
-          custom_document_name,
-          custom_document_code,
-          has_expiry
-        `)
-        .eq('staff_id', staffData.id)
-          .eq('status', 'valid')
-  .eq('show_on_staff_panel', true)
-  .order('created_at', { ascending: false })
-  
-      console.log('staffData.id:', staffData.id)
-      console.log('docsRaw:', docsRaw)
-      console.log('docsError:', docsError)
-
-      let documentTypeMap: Record<string, string> = {}
-
-      const typeIds = [
-        ...new Set(
-          (docsRaw || [])
-            .map((doc: any) => doc.document_type_id)
-            .filter(Boolean)
+    const getUserWithTimeout = async () => {
+      return Promise.race([
+        supabase.auth.getUser(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Auth timeout')), 5000)
         ),
-      ] as string[]
+      ])
+    }
 
-      if (typeIds.length > 0) {
-        const { data: typeRows, error: typeError } = await supabase
-          .from('document_types')
-          .select('id, name')
-          .in('id', typeIds)
+    const load = async () => {
+      try {
+        if (!isMounted) return
 
-        console.log('typeRows:', typeRows)
-        console.log('typeError:', typeError)
+        setLoading(true)
+        setAuthError('')
 
-        documentTypeMap =
-          typeRows?.reduce((acc: Record<string, string>, row: any) => {
-            acc[row.id] = row.name
-            return acc
-          }, {}) || {}
+        const result: any = await getUserWithTimeout()
+        const user = result?.data?.user ?? null
+
+        if (!user) {
+          if (isMounted) {
+            setAuthError('No active session found.')
+          }
+          router.replace('/staff-login')
+          return
+        }
+
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, auth_user_id, role, full_name, email, is_active')
+          .eq('auth_user_id', user.id)
+          .single()
+
+        if (profileError || !profileData) {
+          if (isMounted) {
+            setAuthError('Profile not found.')
+          }
+          await supabase.auth.signOut()
+          router.replace('/staff-login')
+          return
+        }
+
+        if (profileData.role !== 'staff') {
+          await supabase.auth.signOut()
+          router.replace('/')
+          return
+        }
+
+        if (!profileData.is_active) {
+          if (isMounted) {
+            setAuthError('Your account is inactive.')
+          }
+          await supabase.auth.signOut()
+          router.replace('/staff-login')
+          return
+        }
+
+        if (isMounted) {
+          setProfile(profileData)
+        }
+
+        const { data: staffData, error: staffError } = await supabase
+          .from('staff')
+          .select('id, profile_id, full_name, employee_code, photo_url')
+          .eq('profile_id', profileData.id)
+          .single()
+
+        if (staffError || !staffData) {
+          if (isMounted) {
+            setAuthError('Staff profile not found.')
+          }
+          return
+        }
+
+        if (isMounted) {
+          setStaff(staffData)
+        }
+
+        const { data: idData } = await supabase
+          .from('staff_ids')
+          .select(
+            'id, staff_id, role_title, id_number, sia_number, qr_token, issue_date, expiry_date, status, is_current'
+          )
+          .eq('staff_id', staffData.id)
+          .eq('is_current', true)
+          .maybeSingle()
+
+        if (isMounted) {
+          setStaffId(idData ?? null)
+        }
+
+        const { data: docsRaw, error: docsError } = await supabase
+          .from('staff_documents')
+          .select(`
+            id,
+            staff_id,
+            document_type_id,
+            document_number,
+            issue_date,
+            expiry_date,
+            status,
+            verified,
+            verified_by,
+            verified_at,
+            file_url,
+            notes,
+            created_at,
+            updated_at,
+            custom_document_name,
+            custom_document_code,
+            has_expiry,
+            show_on_staff_panel
+          `)
+          .eq('staff_id', staffData.id)
+          .eq('status', 'valid')
+          .eq('show_on_staff_panel', true)
+          .order('created_at', { ascending: false })
+
+        if (docsError) {
+          console.error('Documents load error:', docsError)
+        }
+
+        let documentTypeMap: Record<string, string> = {}
+
+        const typeIds = [
+          ...new Set(
+            (docsRaw || [])
+              .map((doc: any) => doc.document_type_id)
+              .filter(Boolean)
+          ),
+        ] as string[]
+
+        if (typeIds.length > 0) {
+          const { data: typeRows, error: typeError } = await supabase
+            .from('document_types')
+            .select('id, name')
+            .in('id', typeIds)
+
+          if (typeError) {
+            console.error('Document types load error:', typeError)
+          }
+
+          documentTypeMap =
+            typeRows?.reduce((acc: Record<string, string>, row: any) => {
+              acc[row.id] = row.name
+              return acc
+            }, {}) || {}
+        }
+
+        const docsFormatted: StaffDocument[] = (docsRaw || []).map((doc: any) => ({
+          ...doc,
+          document_types: doc.document_type_id
+            ? { name: documentTypeMap[doc.document_type_id] || null }
+            : null,
+        }))
+
+        const validDocs = docsFormatted.filter(
+          (doc) => doc.status?.toLowerCase() === 'valid'
+        )
+
+        if (isMounted) {
+          setDocuments(validDocs)
+        }
+      } catch (error) {
+        console.error('Staff portal load error:', error)
+        if (isMounted) {
+          setAuthError('Unable to load your portal. Please log in again.')
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
       }
-
-      const docsFormatted: StaffDocument[] = (docsRaw || []).map((doc: any) => ({
-        ...doc,
-        document_types: doc.document_type_id
-          ? { name: documentTypeMap[doc.document_type_id] || null }
-          : null,
-      }))
-
-      const validDocs = docsFormatted.filter(
-  (doc) => doc.status?.toLowerCase() === 'valid'
-)
-
-setDocuments(validDocs)
-      setLoading(false)
     }
 
     load()
-  }, [router, supabase])
+
+    return () => {
+      isMounted = false
+    }
+  }, [router])
+
+  const supabase = createClient()
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/staff-login')
+    router.replace('/staff-login')
   }
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -290,11 +333,27 @@ setDocuments(validDocs)
     return staff?.full_name || profile?.full_name || 'Staff User'
   }, [staff?.full_name, profile?.full_name])
 
-  if (loading) {
+  if (loading && !profile && !staff) {
     return (
       <main className="min-h-screen bg-slate-100 p-6">
-        <div className="mx-auto max-w-6xl rounded-3xl bg-white p-8 shadow-sm">
-          <p className="text-sm text-slate-600">Loading your staff portal...</p>
+        <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
+          <p className="text-sm text-slate-600">Checking your account...</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!loading && authError && !profile && !staff) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
+          <p className="text-base font-semibold text-slate-800">{authError}</p>
+          <button
+            onClick={() => router.replace('/staff-login')}
+            className="mt-4 rounded-2xl bg-[#0094e0] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#007bb8]"
+          >
+            Go to Login
+          </button>
         </div>
       </main>
     )
@@ -306,19 +365,19 @@ setDocuments(validDocs)
         <div className="mb-6 rounded-3xl bg-gradient-to-r from-[#081a33] to-[#0f274a] p-6 text-white shadow-sm">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-             <div className="h-14 w-14 overflow-hidden rounded-2xl bg-white/10">
-  {staff?.photo_url ? (
-    <img
-      src={staff.photo_url}
-      alt={staff.full_name}
-      className="h-full w-full object-cover"
-    />
-  ) : (
-    <div className="flex h-full w-full items-center justify-center">
-      <UserCircle2 className="h-8 w-8 text-white" />
-    </div>
-  )}
-</div>
+              <div className="h-14 w-14 overflow-hidden rounded-2xl bg-white/10">
+                {staff?.photo_url ? (
+                  <img
+                    src={staff.photo_url}
+                    alt={staff.full_name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <UserCircle2 className="h-8 w-8 text-white" />
+                  </div>
+                )}
+              </div>
 
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.18em] text-sky-200">
@@ -327,7 +386,6 @@ setDocuments(validDocs)
                 <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
                   Welcome, {staffDisplayName}
                 </h1>
-                
               </div>
             </div>
 
@@ -406,17 +464,17 @@ setDocuments(validDocs)
             ) : (
               <div className="flex flex-col items-center">
                 <IdCard
-  fullName={staff.full_name}
-  employeeCode={staff.employee_code ?? 'N/A'}
-  roleTitle={staffId.role_title ?? 'Staff'}
-  idNumber={staffId.id_number}
-  siaNumber={staffId.sia_number ?? ''}
-  qrToken={staffId.qr_token ?? ''}
-  photoUrl={staff.photo_url ?? ''}
-  issueDate={staffId.issue_date ?? ''}
-  expiryDate={staffId.expiry_date ?? ''}
-  idStatus={staffId.status ?? 'active'}
-/>
+                  fullName={staff.full_name}
+                  employeeCode={staff.employee_code ?? 'N/A'}
+                  roleTitle={staffId.role_title ?? 'Staff'}
+                  idNumber={staffId.id_number}
+                  siaNumber={staffId.sia_number ?? ''}
+                  qrToken={staffId.qr_token ?? ''}
+                  photoUrl={staff.photo_url ?? ''}
+                  issueDate={staffId.issue_date ?? ''}
+                  expiryDate={staffId.expiry_date ?? ''}
+                  idStatus={staffId.status ?? 'active'}
+                />
               </div>
             )}
           </section>
@@ -555,7 +613,7 @@ setDocuments(validDocs)
                   <button
                     type="button"
                     onClick={() => setShowNewPassword((prev) => !prev)}
-                    className="text-slate-500 hover:text-slate-800"
+                    className="text-slate-500 transition hover:text-slate-800"
                   >
                     {showNewPassword ? (
                       <EyeOff className="h-5 w-5" />
@@ -587,7 +645,7 @@ setDocuments(validDocs)
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    className="text-slate-500 hover:text-slate-800"
+                    className="text-slate-500 transition hover:text-slate-800"
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="h-5 w-5" />
