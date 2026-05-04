@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
+import loogo from '@/assets/SGC-Security-Tag-Logo.svg'
 import { createClient } from '@/lib/supabase/client'
 
 type StaffProfile = {
@@ -91,23 +92,23 @@ export default function staffLoginPage() {
 }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-50">
+    <main className="relative min-h-screen overflow-hidden ">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,148,224,0.08),transparent_35%)]" />
       <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_25px_70px_rgba(15,23,42,0.08)] lg:grid-cols-2">
+        <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200  shadow-[0_25px_70px_rgba(15,23,42,0.08)] lg:grid-cols-2">
           {/* Left side */}
-          <section className="hidden bg-[#081a33] px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
+          <section className="hidden  px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
             <div>
-              <div className="inline-flex rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
+              <div className="">
                 <Image
                   src={logo}
                   alt="SGC Security"
-                  className="h-auto w-[170px] object-contain"
+                  className="h-auto w-[320px] object-contain"
                   priority
                 />
               </div>
 
-              <div className="mt-12 max-w-sm">
+              <div className="mt-6 max-w-sm">
                 <span className="inline-flex rounded-full bg-[#0094e0]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#7dd3fc]">
                   Staff Access
                 </span>
@@ -129,14 +130,14 @@ export default function staffLoginPage() {
           </section>
 
           {/* Right side */}
-          <section className="px-6 py-8 sm:px-10 sm:py-12">
+          <section className="px-6 py-8 sm:px-10 sm:py-12 bg-white">
             <div className="mx-auto w-full max-w-md">
               <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <div className="">
                   <Image
-                    src={logo}
+                    src={loogo}
                     alt="SGC Security"
-                    className="h-auto w-[150px] object-contain"
+                    className="h-auto w-[250px] object-contain"
                     priority
                   />
                 </div>

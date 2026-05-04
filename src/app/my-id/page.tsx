@@ -335,7 +335,7 @@ export default function MyIdPage() {
 
   if (loading && !profile && !staff) {
     return (
-      <main className="min-h-screen bg-slate-100 p-6">
+      <main className="min-h-screen  p-6">
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="text-sm text-slate-600">Checking your account...</p>
         </div>
@@ -345,7 +345,7 @@ export default function MyIdPage() {
 
   if (!loading && authError && !profile && !staff) {
     return (
-      <main className="min-h-screen bg-slate-100 p-6">
+      <main className="min-h-screen p-6">
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="text-base font-semibold text-slate-800">{authError}</p>
           <button
@@ -360,7 +360,7 @@ export default function MyIdPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4 sm:p-6">
+    <main className="min-h-screen  p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 rounded-3xl bg-gradient-to-r from-[#081a33] to-[#0f274a] p-6 text-white shadow-sm">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
-import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
+import logo from '@/assets/SGC-Security-Tag-Logo.svg'
 import {
   ShieldCheck,
   ShieldX,
@@ -41,15 +41,10 @@ export default async function VerifyPage({
     .eq('qr_token', token)
     .single()
 
-  if (error || !idData) {
-    return notFound()
-  }
+  if (error || !idData) return notFound()
 
   const staff = Array.isArray(idData.staff) ? idData.staff[0] : idData.staff
-
-  if (!staff) {
-    return notFound()
-  }
+  if (!staff) return notFound()
 
   const isValid =
     idData.is_current &&
@@ -58,20 +53,25 @@ export default async function VerifyPage({
     new Date(idData.expiry_date) > new Date()
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-50">
+    <main className="relative min-h-screen overflow-hidden">
+
+      {/* Background glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,148,224,0.08),transparent_35%)]" />
 
-      <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
+      {/* CENTERED WRAPPER */}
+      <div className="relative flex min-h-screen flex-col items-center justify-center px-6 py-10">
+
+        {/* MAIN CARD */}
         <div className="w-full max-w-xl rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_25px_70px_rgba(15,23,42,0.08)]">
+
+          {/* Header */}
           <div className="flex flex-col items-center text-center">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <Image
-                src={logo}
-                alt="SGC Security"
-                className="h-auto w-[150px] object-contain"
-                priority
-              />
-            </div>
+            <Image
+              src={logo}
+              alt="SGC Security"
+              className="h-auto w-[250px] object-contain"
+              priority
+            />
 
             <div className="mt-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0094e0]/10">
               {isValid ? (
@@ -81,15 +81,16 @@ export default async function VerifyPage({
               )}
             </div>
 
-            <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
+            <h1 className="mt-4 text-4xl font-bold text-slate-900">
               Staff ID Verification
             </h1>
 
-            <p className="mt-2 text-sm leading-6 text-slate-500">
+            <p className="mt-2 text-sm text-slate-500">
               Confirm the staff identity and digital ID status.
             </p>
           </div>
 
+          {/* Photo */}
           {staff.photo_url && (
             <div className="mt-6 flex justify-center">
               <div className="relative h-32 w-32 overflow-hidden rounded-2xl border border-slate-200">
@@ -103,42 +104,23 @@ export default async function VerifyPage({
             </div>
           )}
 
+          {/* Info */}
           <div className="mt-8 rounded-[28px] bg-[#f8fafc] p-6 ring-1 ring-slate-200/80">
             <div className="text-center">
               <h2 className="text-3xl font-bold text-slate-900">
                 {staff.full_name}
               </h2>
-              <p className="mt-1 text-sm font-medium uppercase tracking-[0.16em] text-slate-500">
+              <p className="mt-1 text-sm uppercase tracking-[0.16em] text-slate-500">
                 {idData.role_title}
               </p>
             </div>
 
             <div className="mt-6 space-y-3">
-              <DetailRow
-                icon={<User className="h-4 w-4 text-[#0094e0]" />}
-                label="Employee Code"
-                value={staff.employee_code}
-              />
-              <DetailRow
-                icon={<IdCard className="h-4 w-4 text-[#0094e0]" />}
-                label="ID Number"
-                value={idData.id_number}
-              />
-              <DetailRow
-                icon={<CalendarDays className="h-4 w-4 text-[#0094e0]" />}
-                label="Issue Date"
-                value={idData.issue_date || '—'}
-              />
-              <DetailRow
-                icon={<CalendarDays className="h-4 w-4 text-[#0094e0]" />}
-                label="Expiry Date"
-                value={idData.expiry_date}
-              />
-              <DetailRow
-                icon={<BadgeCheck className="h-4 w-4 text-[#0094e0]" />}
-                label="ID Status"
-                value={idData.status}
-              />
+              <DetailRow icon={<User className="h-4 w-4 text-[#0094e0]" />} label="Employee Code" value={staff.employee_code} />
+              <DetailRow icon={<IdCard className="h-4 w-4 text-[#0094e0]" />} label="ID Number" value={idData.id_number} />
+              <DetailRow icon={<CalendarDays className="h-4 w-4 text-[#0094e0]" />} label="Issue Date" value={idData.issue_date || '—'} />
+              <DetailRow icon={<CalendarDays className="h-4 w-4 text-[#0094e0]" />} label="Expiry Date" value={idData.expiry_date} />
+              <DetailRow icon={<BadgeCheck className="h-4 w-4 text-[#0094e0]" />} label="ID Status" value={idData.status} />
             </div>
 
             <div className="mt-6">
@@ -157,13 +139,41 @@ export default async function VerifyPage({
                     Invalid / Expired ID
                   </p>
                   <p className="mt-2 text-sm text-red-600">
-                    This digital ID is not currently valid for verification.
+                    This digital ID is not currently valid.
                   </p>
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        {/* ✅ APPLE-STYLE CONTACT BLOCK (CENTERED) */}
+        <div className="mt-6 w-full max-w-xl">
+          <div className="rounded-[28px] border border-white/40 bg-white/70 p-4 shadow-[0_20px_50px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+              <div className="text-center sm:text-left">
+                <p className="text-sm font-semibold text-slate-900">
+                  Need help verifying this ID?
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Contact SGC Security for verification support or to report an issue.
+                </p>
+              </div>
+
+              <a
+                href="tel:01279428498"
+                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-slate-900 to-slate-700 px-5 py-3 text-sm font-semibold text-white shadow-lg hover:opacity-90"
+              >
+                📱 01279 428 498
+              </a>
+
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </main>
   )

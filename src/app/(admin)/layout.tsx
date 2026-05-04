@@ -19,7 +19,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import Image from 'next/image'
-import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
+import logo from '@/assets/SGC-Security-Tag-Logo.svg'
 import { createClient } from '@/lib/supabase/client'
 
 type Profile = {
@@ -30,6 +30,15 @@ type Profile = {
   email: string
   is_active?: boolean
 }
+
+const ALLOWED_LAYOUT_ROLES = [
+  'super_admin',
+  'admin',
+  'hr_manager',
+  'hr',
+  'operation_manager',
+  'operation_team',
+]
 
 export default function AdminLayout({
   children,
@@ -68,7 +77,7 @@ export default function AdminLayout({
           return
         }
 
-        if (!['super_admin', 'admin'].includes(profileData.role)) {
+        if (!ALLOWED_LAYOUT_ROLES.includes(profileData.role)) {
           await supabase.auth.signOut()
           router.push('/login')
           return
@@ -91,14 +100,60 @@ export default function AdminLayout({
     router.push('/login')
   }
 
+  const role = profile?.role ?? ''
+
+  const permissions = useMemo(() => {
+    const isSuperAdmin = role === 'super_admin'
+    const isAdmin = role === 'admin'
+    const isHrManager = role === 'hr_manager'
+    const isHr = role === 'hr'
+    const isOperationManager = role === 'operation_manager'
+    const isOperationTeam = role === 'operation_team'
+
+    return {
+      canViewDashboard: true,
+
+      canViewStaff: [
+        'super_admin',
+        'admin',
+        'hr_manager',
+        'hr',
+        'operation_manager',
+        'operation_team',
+      ].includes(role),
+
+      canBulkUploadStaff: [
+        'super_admin',
+        'admin',
+        'hr_manager',
+        'hr',
+      ].includes(role),
+
+      canViewAlerts: isSuperAdmin || isAdmin,
+      canViewAuditLogs: isSuperAdmin || isAdmin,
+
+      canViewUsers: !['operation_manager', 'operation_team'].includes(role),
+
+      canViewProfile: true,
+
+      isSuperAdmin,
+      isAdmin,
+      isHrManager,
+      isHr,
+      isOperationManager,
+      isOperationTeam,
+    }
+  }, [role])
+
   const pageTitle = useMemo(() => {
     if (pathname === '/dashboard') return 'Dashboard'
-    if (pathname === '/staff') return 'Staff'
-    if (pathname === '/staff/new') return 'Create Staff'
-    if (pathname.startsWith('/staff/') && pathname.endsWith('/edit')) return 'Edit Staff'
-    if (pathname.startsWith('/staff/') && pathname.endsWith('/password')) return 'Reset Staff Password'
-    if (pathname.startsWith('/staff/') && pathname.endsWith('/issue-id')) return 'Issue Digital ID'
-    if (pathname.startsWith('/staff/')) return 'Staff Details'
+    if (pathname === '/v2/staff') return 'Staff'
+    if (pathname === '/v2/staff/new') return 'Create Staff'
+    if (pathname === '/v2/staff/bulk-upload') return 'Bulk Upload Staff'
+    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/edit')) return 'Edit Staff'
+    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/password')) return 'Reset Staff Password'
+    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/issue-id')) return 'Issue Digital ID'
+    if (pathname.startsWith('/v2/staff/')) return 'Staff Details'
     if (pathname === '/alerts') return 'Alerts'
     if (pathname === '/audit-logs') return 'Audit Logs'
     if (pathname === '/profile') return 'My Profile'
@@ -109,9 +164,82 @@ export default function AdminLayout({
     return 'Admin Panel'
   }, [pathname])
 
+  const sidebarItems = [
+    permissions.canViewDashboard
+      ? {
+          href: '/dashboard',
+          label: 'Dashboard',
+          icon: <LayoutDashboard className="h-4 w-4" />,
+          active: pathname === '/dashboard',
+        }
+      : null,
+
+    permissions.canViewStaff
+      ? {
+          href: '/v2/staff',
+          label: 'Staff',
+          icon: <Shield className="h-4 w-4" />,
+          active:
+            pathname === '/v2/staff' ||
+            pathname.startsWith('/v2/staff/') ||
+            pathname.startsWith('/staff/'),
+        }
+      : null,
+
+    permissions.canBulkUploadStaff
+      ? {
+          href: '/v2/staff/bulk-upload',
+          label: 'Bulk Upload Staff',
+          icon: <Plus className="h-4 w-4" />,
+          active: pathname === '/v2/staff/bulk-upload',
+        }
+      : null,
+
+    permissions.canViewAlerts
+      ? {
+          href: '/alerts',
+          label: 'Alerts',
+          icon: <Bell className="h-4 w-4" />,
+          active: pathname === '/alerts',
+        }
+      : null,
+
+    permissions.canViewAuditLogs
+      ? {
+          href: '/audit-logs',
+          label: 'Audit Logs',
+          icon: <FileText className="h-4 w-4" />,
+          active: pathname === '/audit-logs',
+        }
+      : null,
+
+    permissions.canViewUsers
+      ? {
+          href: '/users',
+          label: 'Users',
+          icon: <Users className="h-4 w-4" />,
+          active: pathname === '/users' || pathname.startsWith('/users/'),
+        }
+      : null,
+
+    permissions.canViewProfile
+      ? {
+          href: '/profile',
+          label: 'My Profile',
+          icon: <User className="h-4 w-4" />,
+          active: pathname === '/profile',
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    href: string
+    label: string
+    icon: React.ReactNode
+    active: boolean
+  }>
+
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#eef3f8]">
+      <main className="flex min-h-screen items-center justify-center ">
         <div className="rounded-[28px] bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200/80">
           <p className="text-sm text-slate-600">Loading admin panel...</p>
         </div>
@@ -120,8 +248,8 @@ export default function AdminLayout({
   }
 
   return (
-    <main className="min-h-screen bg-[#eef3f8] p-4 text-slate-900 lg:p-6">
-      <div className="flex min-h-[calc(100vh-2rem)] overflow-hidden rounded-[34px] border border-white/60 bg-[#f8fafc] shadow-[0_20px_60px_rgba(15,23,42,0.08)] lg:min-h-[calc(100vh-3rem)]">
+    <main className="min-h-screen  p-4 text-slate-900 lg:p-6">
+      <div className="flex min-h-[calc(100vh-2rem)] overflow-hidden rounded-[34px] border border-white/60 bg-[#f8fafcdb] shadow-[0_20px_60px_rgba(15,23,42,0.08)] lg:min-h-[calc(100vh-3rem)]">
         {mobileSidebarOpen ? (
           <div
             className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-[1px] lg:hidden"
@@ -136,12 +264,12 @@ export default function AdminLayout({
         >
           <div className="border-b border-slate-200/70 px-5 py-5">
             <div className="flex items-center justify-between lg:justify-center">
-              <div className="rounded-[26px] bg-[#eef6fb] px-4 py-5 ring-1 ring-slate-200/80">
+              <div className="">
                 <div className="flex items-center justify-center">
                   <Image
                     src={logo}
                     alt="SGC Security"
-                    className="h-auto w-[130px] object-contain"
+                    className="h-auto w-[260px] object-contain"
                     priority
                   />
                 </div>
@@ -156,56 +284,21 @@ export default function AdminLayout({
             </div>
           </div>
 
-          
-
           <nav className="flex-1 overflow-y-auto px-3 pb-4">
-            <p className="px-3 pb-3 mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+            <p className="mt-3 px-3 pb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
               Menu
             </p>
 
             <div className="space-y-1">
-              <SidebarLink
-                href="/dashboard"
-                label="Dashboard"
-                icon={<LayoutDashboard className="h-4 w-4" />}
-                active={pathname === '/dashboard'}
-              />
-              <SidebarLink
-                href="/v2/staff"
-                label="Staff"
-                icon={<Shield className="h-4 w-4" />}
-                active={pathname === '/staff' || pathname.startsWith('/staff/')}
-              />
-              <SidebarLink
-                href="/v2/staff/bulk-upload"
-                label="Bulk Upload Staff"
-                icon={<Plus className="h-4 w-4" />}
-                active={pathname === '/v2/staff/bulk-upload'}
-              />
-              <SidebarLink
-                href="/alerts"
-                label="Alerts"
-                icon={<Bell className="h-4 w-4" />}
-                active={pathname === '/alerts'}
-              />
-              <SidebarLink
-                href="/audit-logs"
-                label="Audit Logs"
-                icon={<FileText className="h-4 w-4" />}
-                active={pathname === '/audit-logs'}
-              />
-              <SidebarLink
-                href="/users"
-                label="Users"
-                icon={<Users className="h-4 w-4" />}
-                active={pathname === '/users' || pathname.startsWith('/users/')}
-              />
-              <SidebarLink
-                href="/profile"
-                label="My Profile"
-                icon={<User className="h-4 w-4" />}
-                active={pathname === '/profile'}
-              />
+              {sidebarItems.map((item) => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={item.active}
+                />
+              ))}
             </div>
           </nav>
 
@@ -240,7 +333,7 @@ export default function AdminLayout({
                   <Search className="h-4 w-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search dashboard..."
+                    placeholder={`Search ${pageTitle.toLowerCase()}...`}
                     className="w-[260px] bg-transparent px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400"
                   />
                   <span className="rounded-lg bg-white px-2 py-1 text-[11px] font-semibold text-slate-400 ring-1 ring-slate-200">
@@ -270,8 +363,8 @@ export default function AdminLayout({
                     <p className="text-sm font-semibold leading-none text-slate-900">
                       {profile?.full_name}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {profile?.email}
+                    <p className="mt-1 text-xs capitalize text-slate-500">
+                      {profile?.role?.replace(/_/g, ' ')}
                     </p>
                   </div>
                 </Link>
@@ -279,14 +372,7 @@ export default function AdminLayout({
             </div>
           </header>
 
-          <div className="px-5 py-5 lg:px-8">
-            <div className="mb-5">
-              
-             
-            </div>
-
-            {children}
-          </div>
+          <div className="px-5 py-5 lg:px-8">{children}</div>
         </div>
       </div>
     </main>

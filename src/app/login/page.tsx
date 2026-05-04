@@ -14,6 +14,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
+import loogo from '@/assets/SGC-Security-Tag-Logo.svg'
 import { createClient } from '@/lib/supabase/client'
 
 type Profile = {
@@ -22,6 +23,15 @@ type Profile = {
   role: string
   is_active?: boolean
 }
+
+const ALLOWED_ADMIN_SIDE_ROLES = [
+  'super_admin',
+  'admin',
+  'operation_manager',
+  'operation_team',
+  'hr_manager',
+  'hr',
+] as const
 
 export default function LoginPage() {
   const router = useRouter()
@@ -70,16 +80,16 @@ export default function LoginPage() {
       return
     }
 
-    if (!['super_admin', 'admin'].includes(profile.role)) {
+    if (!ALLOWED_ADMIN_SIDE_ROLES.includes(profile.role as (typeof ALLOWED_ADMIN_SIDE_ROLES)[number])) {
       await supabase.auth.signOut()
-      setError('Access denied. This login is only for admin users.')
+      setError('Access denied. Staff must use the staff login page.')
       setLoading(false)
       return
     }
 
     if (profile.is_active === false) {
       await supabase.auth.signOut()
-      setError('Your admin account is inactive. Please contact support.')
+      setError('Your account is inactive. Please contact support.')
       setLoading(false)
       return
     }
@@ -90,42 +100,41 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-50">
+    <main className="relative min-h-screen overflow-hidden ">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,148,224,0.08),transparent_35%)]" />
 
       <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_25px_70px_rgba(15,23,42,0.08)] lg:grid-cols-2">
-          {/* Left side */}
-          <section className="hidden bg-[#081a33] px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200  shadow-[0_25px_70px_rgba(15,23,42,0.08)] lg:grid-cols-2">
+          <section className="hidden  px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
             <div>
-              <div className="inline-flex rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
+              <div className="">
                 <Image
                   src={logo}
                   alt="SGC Security"
-                  className="h-auto w-[170px] object-contain"
+                  className="h-auto w-[270px] object-contain"
                   priority
                 />
               </div>
 
-              <div className="mt-12 max-w-sm">
+              <div className=" max-w-sm">
                 <span className="inline-flex rounded-full bg-[#0094e0]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#7dd3fc]">
-                  Admin Access
+                  Secure Access
                 </span>
 
                 <h1 className="mt-5 text-4xl font-bold leading-tight">
-                  Secure Admin Login
+                  Secure Dashboard Login
                 </h1>
 
                 <p className="mt-4 text-sm leading-7 text-white/70">
-                  Access your dashboard securely with role-based admin control.
+                  Access your dashboard securely with role-based access control.
                 </p>
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="flex flex-wrap gap-3">
-                <MiniPill text="Admin only" />
                 <MiniPill text="Role protected" />
+                <MiniPill text="Secure access" />
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
@@ -146,15 +155,14 @@ export default function LoginPage() {
             </div>
           </section>
 
-          {/* Right side */}
-          <section className="px-6 py-8 sm:px-10 sm:py-12">
+          <section className="px-6 py-8 sm:px-10 sm:py-12 bg-white">
             <div className="mx-auto w-full max-w-md">
               <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <div className="">
                   <Image
-                    src={logo}
+                    src={loogo}
                     alt="SGC Security"
-                    className="h-auto w-[150px] object-contain"
+                    className="h-auto w-[250px] object-contain"
                     priority
                   />
                 </div>
@@ -166,10 +174,10 @@ export default function LoginPage() {
                 </div>
 
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                  Admin Login
+                  Dashboard Login
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Sign in to continue to the admin dashboard.
+                  Sign in to continue to the dashboard.
                 </p>
               </div>
 
@@ -184,7 +192,7 @@ export default function LoginPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@email.com"
+                      placeholder="name@email.com"
                       className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
                       required
                     />
