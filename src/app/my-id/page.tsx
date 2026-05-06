@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import IdCard from '@/components/IdCard'
 import {
   BadgeCheck,
-  Download,
   Eye,
   EyeOff,
   FileText,
@@ -14,6 +13,7 @@ import {
   LogOut,
   Shield,
   UserCircle2,
+  X,
 } from 'lucide-react'
 
 type Profile = {
@@ -74,6 +74,7 @@ type TabKey = 'id' | 'documents' | 'password'
 
 export default function MyIdPage() {
   const router = useRouter()
+  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
@@ -82,6 +83,9 @@ export default function MyIdPage() {
   const [documents, setDocuments] = useState<StaffDocument[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('id')
+
+  const [selectedDocumentUrl, setSelectedDocumentUrl] = useState<string | null>(null)
+  const [selectedDocumentName, setSelectedDocumentName] = useState('Document')
 
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
@@ -93,43 +97,23 @@ export default function MyIdPage() {
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
-  const supabase = createClient()
-
-  const isMobileAppView = () => {
-    if (typeof window === 'undefined') return false
-
-    const userAgent = navigator.userAgent || navigator.vendor || ''
-
-    return /Android|iPhone|iPad|iPod/i.test(userAgent)
+  const viewDocument = (url: string | null, name: string) => {
+    if (!url) return
+    setSelectedDocumentUrl(url)
+    setSelectedDocumentName(name || 'Document')
   }
 
-  const openDocument = (url: string | null) => {
-    if (!url) return
-
-    if (isMobileAppView()) {
-      window.location.href = url
-      return
-    }
-
-    window.open(url, '_blank', 'noopener,noreferrer')
+  const closeDocumentModal = () => {
+    setSelectedDocumentUrl(null)
+    setSelectedDocumentName('Document')
   }
 
-  const downloadDocument = (url: string | null) => {
-    if (!url) return
+  const isImageFile = (url: string) => {
+    return /\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(url)
+  }
 
-    if (isMobileAppView()) {
-      window.location.href = url
-      return
-    }
-
-    const link = document.createElement('a')
-    link.href = url
-    link.target = '_blank'
-    link.rel = 'noopener noreferrer'
-    link.download = ''
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  const isPdfFile = (url: string) => {
+    return /\.pdf(\?.*)?$/i.test(url)
   }
 
   useEffect(() => {
@@ -155,9 +139,7 @@ export default function MyIdPage() {
         const user = result?.data?.user ?? null
 
         if (!user) {
-          if (isMounted) {
-            setAuthError('No active session found.')
-          }
+          if (isMounted) setAuthError('No active session found.')
           router.replace('/staff-login')
           return
         }
@@ -169,9 +151,7 @@ export default function MyIdPage() {
           .single()
 
         if (profileError || !profileData) {
-          if (isMounted) {
-            setAuthError('Profile not found.')
-          }
+          if (isMounted) setAuthError('Profile not found.')
           await supabase.auth.signOut()
           router.replace('/staff-login')
           return
@@ -184,17 +164,13 @@ export default function MyIdPage() {
         }
 
         if (!profileData.is_active) {
-          if (isMounted) {
-            setAuthError('Your account is inactive.')
-          }
+          if (isMounted) setAuthError('Your account is inactive.')
           await supabase.auth.signOut()
           router.replace('/staff-login')
           return
         }
 
-        if (isMounted) {
-          setProfile(profileData)
-        }
+        if (isMounted) setProfile(profileData)
 
         const { data: staffData, error: staffError } = await supabase
           .from('staff')
@@ -203,15 +179,11 @@ export default function MyIdPage() {
           .single()
 
         if (staffError || !staffData) {
-          if (isMounted) {
-            setAuthError('Staff profile not found.')
-          }
+          if (isMounted) setAuthError('Staff profile not found.')
           return
         }
 
-        if (isMounted) {
-          setStaff(staffData)
-        }
+        if (isMounted) setStaff(staffData)
 
         const { data: idData } = await supabase
           .from('staff_ids')
@@ -222,9 +194,7 @@ export default function MyIdPage() {
           .eq('is_current', true)
           .maybeSingle()
 
-        if (isMounted) {
-          setStaffId(idData ?? null)
-        }
+        if (isMounted) setStaffId(idData ?? null)
 
         const { data: docsRaw, error: docsError } = await supabase
           .from('staff_documents')
@@ -295,18 +265,14 @@ export default function MyIdPage() {
           (doc) => doc.status?.toLowerCase() === 'valid'
         )
 
-        if (isMounted) {
-          setDocuments(validDocs)
-        }
+        if (isMounted) setDocuments(validDocs)
       } catch (error) {
         console.error('Staff portal load error:', error)
         if (isMounted) {
           setAuthError('Unable to load your portal. Please log in again.')
         }
       } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
+        if (isMounted) setLoading(false)
       }
     }
 
@@ -584,25 +550,14 @@ export default function MyIdPage() {
 
                         <div className="flex flex-wrap gap-2">
                           {doc.file_url ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => openDocument(doc.file_url)}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                              >
-                                <Eye className="h-4 w-4" />
-                                View
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => downloadDocument(doc.file_url)}
-                                className="inline-flex items-center gap-2 rounded-xl bg-[#0094e0] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#007bb8]"
-                              >
-                                <Download className="h-4 w-4" />
-                                Download
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              onClick={() => viewDocument(doc.file_url, docName)}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0094e0] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#007bb8] sm:w-auto"
+                            >
+                              <Eye className="h-4 w-4" />
+                              View
+                            </button>
                           ) : (
                             <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-500">
                               No file attached
@@ -715,6 +670,52 @@ export default function MyIdPage() {
           </section>
         )}
       </div>
+
+      {selectedDocumentUrl ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-6">
+          <div className="flex h-[95dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:h-[90vh] sm:rounded-3xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-bold text-slate-900 sm:text-base">
+                  {selectedDocumentName}
+                </h3>
+                <p className="text-xs text-slate-500">Document Preview</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeDocumentModal}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition hover:bg-slate-200"
+                aria-label="Close document preview"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-1 items-center justify-center overflow-hidden bg-slate-100 p-2 sm:p-4">
+              {isImageFile(selectedDocumentUrl) ? (
+                <img
+                  src={selectedDocumentUrl}
+                  alt={selectedDocumentName}
+                  className="max-h-full max-w-full rounded-xl object-contain"
+                />
+              ) : isPdfFile(selectedDocumentUrl) ? (
+                <iframe
+                  src={`${selectedDocumentUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                  title={selectedDocumentName}
+                  className="h-full w-full rounded-xl border-0 bg-white"
+                />
+              ) : (
+                <iframe
+                  src={selectedDocumentUrl}
+                  title={selectedDocumentName}
+                  className="h-full w-full rounded-xl border-0 bg-white"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
