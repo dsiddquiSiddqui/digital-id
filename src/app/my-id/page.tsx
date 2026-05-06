@@ -93,9 +93,47 @@ export default function MyIdPage() {
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
+  const supabase = createClient()
+
+  const isMobileAppView = () => {
+    if (typeof window === 'undefined') return false
+
+    const userAgent = navigator.userAgent || navigator.vendor || ''
+
+    return /Android|iPhone|iPad|iPod/i.test(userAgent)
+  }
+
+  const openDocument = (url: string | null) => {
+    if (!url) return
+
+    if (isMobileAppView()) {
+      window.location.href = url
+      return
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const downloadDocument = (url: string | null) => {
+    if (!url) return
+
+    if (isMobileAppView()) {
+      window.location.href = url
+      return
+    }
+
+    const link = document.createElement('a')
+    link.href = url
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    link.download = ''
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   useEffect(() => {
     let isMounted = true
-    const supabase = createClient()
 
     const getUserWithTimeout = async () => {
       return Promise.race([
@@ -279,8 +317,6 @@ export default function MyIdPage() {
     }
   }, [router])
 
-  const supabase = createClient()
-
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.replace('/staff-login')
@@ -335,7 +371,7 @@ export default function MyIdPage() {
 
   if (loading && !profile && !staff) {
     return (
-      <main className="min-h-screen  p-6">
+      <main className="min-h-screen p-6">
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="text-sm text-slate-600">Checking your account...</p>
         </div>
@@ -360,7 +396,7 @@ export default function MyIdPage() {
   }
 
   return (
-    <main className="min-h-screen  p-4 sm:p-6">
+    <main className="min-h-screen p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 rounded-3xl bg-gradient-to-r from-[#081a33] to-[#0f274a] p-6 text-white shadow-sm">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -456,7 +492,9 @@ export default function MyIdPage() {
 
             {!staff || !staffId ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <p className="text-base font-medium text-slate-700">No digital ID assigned.</p>
+                <p className="text-base font-medium text-slate-700">
+                  No digital ID assigned.
+                </p>
                 <p className="mt-2 text-sm text-slate-500">
                   Please contact your admin if you believe this is incorrect.
                 </p>
@@ -544,28 +582,26 @@ export default function MyIdPage() {
                           ) : null}
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           {doc.file_url ? (
                             <>
-                              <a
-                                href={doc.file_url}
-                                target="_blank"
-                                rel="noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => openDocument(doc.file_url)}
                                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                               >
                                 <Eye className="h-4 w-4" />
                                 View
-                              </a>
+                              </button>
 
-                              <a
-                                href={doc.file_url}
-                                target="_blank"
-                                rel="noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => downloadDocument(doc.file_url)}
                                 className="inline-flex items-center gap-2 rounded-xl bg-[#0094e0] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#007bb8]"
                               >
                                 <Download className="h-4 w-4" />
-                                Open File
-                              </a>
+                                Download
+                              </button>
                             </>
                           ) : (
                             <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-500">
