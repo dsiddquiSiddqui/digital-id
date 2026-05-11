@@ -9,6 +9,7 @@ export async function POST(req: Request) {
 
     const staff_id =
       typeof body.staff_id === 'string' ? body.staff_id.trim() : ''
+
     const password =
       typeof body.password === 'string' ? body.password : ''
 
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
 
     const { data: currentProfile, error: currentProfileError } = await supabase
       .from('profiles')
-      .select('id, role, is_active')
+      .select('id, role, is_active, full_name, email')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -102,7 +103,7 @@ export async function POST(req: Request) {
 
     const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
-      .select('id, auth_user_id, role')
+      .select('id, auth_user_id, role, full_name, email')
       .eq('id', staff.profile_id)
       .single()
 
@@ -127,15 +128,45 @@ export async function POST(req: Request) {
 
     const { error: auditError } = await adminSupabase.from('audit_logs').insert([
       {
+        actor_profile_id: currentProfile.id,
         action_type: 'reset_staff_password',
         entity_type: 'staff',
         entity_id: staff_id,
         metadata: {
-          reset_by_profile_id: currentProfile.id,
+          actor_name:
+            currentProfile.full_name ||
+            user.email ||
+            'Unknown user',
+
+          actor_email:
+            currentProfile.email ||
+            user.email ||
+            null,
+
+          actor_role: currentProfile.role,
+
+          module: 'Staff Management',
+          page: `/admin/staff/${staff_id}`,
+
+          staff_id,
           staff_name: staff.full_name,
           staff_email: staff.email,
+
           profile_id: profile.id,
           auth_user_id: profile.auth_user_id,
+          target_profile_role: profile.role,
+
+          changes: [
+            {
+              field: 'password',
+              before: '********',
+              after: '********',
+            },
+          ],
+
+          note: `Password was reset for staff member ${
+            staff.full_name || staff.email
+          }. Password value was not stored for security.`,
         },
       },
     ])

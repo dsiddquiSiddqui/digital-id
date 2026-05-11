@@ -10,20 +10,51 @@ async function checkAccess() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { error: 'Unauthorized.', status: 401 as const, profile: null }
+    return {
+      error: 'Unauthorized.',
+      status: 401 as const,
+      profile: null,
+      user: null,
+    }
   }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
   if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
-    return { error: 'Forbidden.', status: 403 as const, profile: null }
+    return {
+      error: 'Forbidden.',
+      status: 403 as const,
+      profile: null,
+      user: null,
+    }
   }
 
-  return { error: null, status: 200 as const, profile }
+  return {
+    error: null,
+    status: 200 as const,
+    profile,
+    user,
+  }
+}
+
+function getActorMetadata(access: any) {
+  return {
+    actor_name:
+      access.profile?.full_name ||
+      access.user?.email ||
+      'Unknown user',
+
+    actor_email:
+      access.profile?.email ||
+      access.user?.email ||
+      null,
+
+    actor_role: access.profile?.role || 'Unknown role',
+  }
 }
 
 export async function GET(
@@ -64,7 +95,7 @@ export async function POST(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -104,12 +135,15 @@ export async function POST(
 
     const { data: existingStaff } = await adminSupabase
       .from('staff')
-      .select('id')
+      .select('id, full_name')
       .eq('id', id)
       .single()
 
     if (!existingStaff) {
-      return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Staff member not found.' },
+        { status: 404 }
+      )
     }
 
     if (is_primary) {
@@ -145,10 +179,43 @@ export async function POST(
         entity_type: 'staff_emergency_contact',
         entity_id: data.id,
         metadata: {
+          ...getActorMetadata(access),
+
+          module: 'Staff Management',
+          page: `/admin/staff/${id}/contacts`,
+
           staff_id: id,
-          name,
-          relationship,
-          is_primary,
+          staff_name: existingStaff.full_name,
+
+          changes: [
+            {
+              field: 'name',
+              before: null,
+              after: name,
+            },
+            {
+              field: 'relationship',
+              before: null,
+              after: relationship,
+            },
+            {
+              field: 'phone',
+              before: null,
+              after: phone,
+            },
+            {
+              field: 'email',
+              before: null,
+              after: email,
+            },
+            {
+              field: 'is_primary',
+              before: false,
+              after: is_primary,
+            },
+          ],
+
+          note: `Emergency contact ${name} was created for ${existingStaff.full_name}.`,
         },
       },
     ])
@@ -169,7 +236,7 @@ export async function PATCH(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -187,9 +254,22 @@ export async function PATCH(
       return NextResponse.json({ error: 'Missing contact_id.' }, { status: 400 })
     }
 
+    const { data: existingStaff } = await adminSupabase
+      .from('staff')
+      .select('id, full_name')
+      .eq('id', id)
+      .single()
+
+    if (!existingStaff) {
+      return NextResponse.json(
+        { error: 'Staff member not found.' },
+        { status: 404 }
+      )
+    }
+
     const { data: existingContact } = await adminSupabase
       .from('staff_emergency_contacts')
-      .select('id, staff_id')
+      .select('*')
       .eq('id', contact_id)
       .eq('staff_id', id)
       .single()
@@ -217,8 +297,24 @@ export async function PATCH(
         entity_type: 'staff_emergency_contact',
         entity_id: contact_id,
         metadata: {
+          ...getActorMetadata(access),
+
+          module: 'Staff Management',
+          page: `/admin/staff/${id}/contacts`,
+
           staff_id: id,
-          is_primary,
+          staff_name: existingStaff.full_name,
+          contact_name: existingContact.name,
+
+          changes: [
+            {
+              field: 'is_primary',
+              before: existingContact.is_primary,
+              after: is_primary,
+            },
+          ],
+
+          note: `Emergency contact ${existingContact.name} was updated for ${existingStaff.full_name}.`,
         },
       },
     ])
@@ -238,7 +334,7 @@ export async function DELETE(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -253,9 +349,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Missing contact_id.' }, { status: 400 })
     }
 
+    const { data: existingStaff } = await adminSupabase
+      .from('staff')
+      .select('id, full_name')
+      .eq('id', id)
+      .single()
+
+    if (!existingStaff) {
+      return NextResponse.json(
+        { error: 'Staff member not found.' },
+        { status: 404 }
+      )
+    }
+
     const { data: existingContact } = await adminSupabase
       .from('staff_emergency_contacts')
-      .select('id, staff_id')
+      .select('*')
       .eq('id', contact_id)
       .eq('staff_id', id)
       .single()
@@ -280,7 +389,32 @@ export async function DELETE(
         entity_type: 'staff_emergency_contact',
         entity_id: contact_id,
         metadata: {
+          ...getActorMetadata(access),
+
+          module: 'Staff Management',
+          page: `/admin/staff/${id}/contacts`,
+
           staff_id: id,
+          staff_name: existingStaff.full_name,
+
+          deleted_record: {
+            id: existingContact.id,
+            name: existingContact.name,
+            relationship: existingContact.relationship,
+            phone: existingContact.phone,
+            email: existingContact.email,
+            is_primary: existingContact.is_primary,
+          },
+
+          changes: [
+            {
+              field: 'contact_deleted',
+              before: existingContact.name,
+              after: null,
+            },
+          ],
+
+          note: `Emergency contact ${existingContact.name} was deleted for ${existingStaff.full_name}.`,
         },
       },
     ])

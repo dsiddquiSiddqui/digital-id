@@ -41,11 +41,15 @@ export async function POST(request: Request) {
 
     const { data: currentProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, role')
+      .select('id, role, full_name, email')
       .eq('auth_user_id', currentUser.id)
       .single()
 
-    if (profileError || !currentProfile || currentProfile.role !== 'super_admin') {
+    if (
+      profileError ||
+      !currentProfile ||
+      currentProfile.role !== 'super_admin'
+    ) {
       return NextResponse.json(
         { error: 'Forbidden.' },
         { status: 403 }
@@ -118,50 +122,131 @@ export async function POST(request: Request) {
       await adminSupabase.auth.admin.deleteUser(authUserId)
 
       return NextResponse.json(
-        { error: createdProfileError?.message || 'Failed to create profile.' },
+        {
+          error:
+            createdProfileError?.message ||
+            'Failed to create profile.',
+        },
         { status: 400 }
       )
     }
 
-    const { data: createdStaff, error: createdStaffError } = await adminSupabase
-      .from('staff')
-      .insert([
-        {
-          profile_id: createdProfile.id,
-          employee_code,
-          full_name,
-          company_name,
-          phone: phone || null,
-          email,
-          status: status || 'active',
-          photo_url: photo_url || null,
-        },
-      ])
-      .select('id')
-      .single()
+    const { data: createdStaff, error: createdStaffError } =
+      await adminSupabase
+        .from('staff')
+        .insert([
+          {
+            profile_id: createdProfile.id,
+            employee_code,
+            full_name,
+            company_name,
+            phone: phone || null,
+            email,
+            status: status || 'active',
+            photo_url: photo_url || null,
+          },
+        ])
+        .select('id')
+        .single()
 
     if (createdStaffError || !createdStaff) {
-      await adminSupabase.from('profiles').delete().eq('id', createdProfile.id)
+      await adminSupabase
+        .from('profiles')
+        .delete()
+        .eq('id', createdProfile.id)
+
       await adminSupabase.auth.admin.deleteUser(authUserId)
 
       return NextResponse.json(
-        { error: createdStaffError?.message || 'Failed to create staff record.' },
+        {
+          error:
+            createdStaffError?.message ||
+            'Failed to create staff record.',
+        },
         { status: 400 }
       )
     }
 
-    const { error: auditError } = await adminSupabase.from('audit_logs').insert([
-      {
-        actor_profile_id: currentProfile.id,
-        action_type: 'create_staff_account',
-        entity_type: 'staff',
-        entity_id: createdStaff.id,
-        metadata: {
-          email,
-          employee_code,
+    const { error: auditError } = await adminSupabase
+      .from('audit_logs')
+      .insert([
+        {
+          actor_profile_id: currentProfile.id,
+          action_type: 'create_staff_account',
+          entity_type: 'staff',
+          entity_id: createdStaff.id,
+          metadata: {
+            actor_name:
+              currentProfile.full_name ||
+              currentUser.email ||
+              'Unknown user',
+
+            actor_email:
+              currentProfile.email ||
+              currentUser.email ||
+              null,
+
+            actor_role: currentProfile.role,
+
+            module: 'Staff Management',
+            page: `/admin/staff/${createdStaff.id}`,
+
+            staff_id: createdStaff.id,
+            profile_id: createdProfile.id,
+            auth_user_id: authUserId,
+
+            created_staff_name: full_name,
+            created_staff_email: email,
+            employee_code,
+            company_name,
+
+            changes: [
+              {
+                field: 'full_name',
+                before: null,
+                after: full_name,
+              },
+              {
+                field: 'employee_code',
+                before: null,
+                after: employee_code,
+              },
+              {
+                field: 'company_name',
+                before: null,
+                after: company_name,
+              },
+              {
+                field: 'phone',
+                before: null,
+                after: phone || null,
+              },
+              {
+                field: 'email',
+                before: null,
+                after: email,
+              },
+              {
+                field: 'status',
+                before: null,
+                after: status || 'active',
+              },
+              {
+                field: 'photo_url',
+                before: null,
+                after: photo_url || null,
+              },
+              {
+                field: 'login_account_created',
+                before: false,
+                after: true,
+              },
+            ],
+
+            note: `Staff account ${full_name} was created with login access.`,
+          },
         },
-      },
-    ])
+      ])
 
     if (auditError) {
       console.error('Audit log insert failed:', auditError.message)

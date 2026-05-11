@@ -124,6 +124,20 @@ type StatusAction = {
   className: string
 }
 
+function formatUKDate(dateString?: string | null) {
+  if (!dateString) return '—'
+
+  const date = new Date(dateString)
+
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
 export default function V2StaffDetailPage() {
   const params = useParams()
   const id = params.id as string
@@ -136,7 +150,8 @@ export default function V2StaffDetailPage() {
   const [staff, setStaff] = useState<Staff | null>(null)
   const [employment, setEmployment] = useState<StaffEmployment | null>(null)
   const [address, setAddress] = useState<StaffAddress | null>(null)
-  const [emergencyContact, setEmergencyContact] = useState<StaffEmergencyContact | null>(null)
+  const [emergencyContact, setEmergencyContact] =
+    useState<StaffEmergencyContact | null>(null)
   const [bankDetails, setBankDetails] = useState<StaffBankDetails | null>(null)
   const [currentId, setCurrentId] = useState<StaffIdRecord | null>(null)
   const [documents, setDocuments] = useState<StaffDocument[]>([])
@@ -187,9 +202,12 @@ export default function V2StaffDetailPage() {
         setCurrentId((digitalIdJson.digital_id as StaffIdRecord | null) || null)
         setAddress((addressJson.address as StaffAddress | null) || null)
 
-        const allContacts = (contactsJson.contacts as StaffEmergencyContact[]) || []
+        const allContacts =
+          (contactsJson.contacts as StaffEmergencyContact[]) || []
         const primaryContact =
-          allContacts.find((contact) => contact.is_primary) || allContacts[0] || null
+          allContacts.find((contact) => contact.is_primary) ||
+          allContacts[0] ||
+          null
 
         setEmergencyContact(primaryContact)
         setLoading(false)
@@ -265,64 +283,55 @@ export default function V2StaffDetailPage() {
         {
           key: 'suspended',
           label: 'Suspend',
-          className:
-            'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
+          className: 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
         },
         {
           key: 'revoked',
           label: 'Revoke',
-          className:
-            'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
+          className: 'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
         },
       ],
       suspended: [
         {
           key: 'active',
           label: 'Activate',
-          className:
-            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
         },
         {
           key: 'revoked',
           label: 'Revoke',
-          className:
-            'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
+          className: 'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
         },
       ],
       revoked: [
         {
           key: 'active',
           label: 'Activate',
-          className:
-            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
         },
       ],
       inactive: [
         {
           key: 'active',
           label: 'Activate',
-          className:
-            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
         },
         {
           key: 'suspended',
           label: 'Suspend',
-          className:
-            'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
+          className: 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
         },
         {
           key: 'revoked',
           label: 'Revoke',
-          className:
-            'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
+          className: 'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
         },
       ],
       archived: [
         {
           key: 'active',
           label: 'Activate',
-          className:
-            'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
+          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
         },
       ],
     }
@@ -330,10 +339,14 @@ export default function V2StaffDetailPage() {
     return actionMap[currentStatus] || []
   }, [staff?.status])
 
-  const validDocuments = documents.filter((doc) => doc.status?.toLowerCase() === 'valid').length
+  const validDocuments = documents.filter(
+    (doc) => doc.status?.toLowerCase() === 'valid'
+  ).length
+
   const problemDocuments = documents.filter((doc) =>
     ['expired', 'rejected', 'missing'].includes(doc.status?.toLowerCase())
   ).length
+
   const latestDocuments = documents.slice(0, 3)
 
   if (loading) {
@@ -347,7 +360,9 @@ export default function V2StaffDetailPage() {
   if (error || !staff) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-red-600">{error || 'Staff member not found.'}</p>
+        <p className="text-sm text-red-600">
+          {error || 'Staff member not found.'}
+        </p>
       </div>
     )
   }
@@ -459,9 +474,18 @@ export default function V2StaffDetailPage() {
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <MiniStat title="Profile Completion" value={`${completion}%`} />
-        <MiniStat title="Current ID" value={currentId ? currentId.id_number : 'Missing'} />
-        <MiniStat title="Employment" value={employment?.employment_type || 'Missing'} />
-        <MiniStat title="Emergency Contact" value={emergencyContact ? 'Added' : 'Missing'} />
+        <MiniStat
+          title="Current ID"
+          value={currentId ? currentId.id_number : 'Missing'}
+        />
+        <MiniStat
+          title="Employment"
+          value={employment?.employment_type || 'Missing'}
+        />
+        <MiniStat
+          title="Emergency Contact"
+          value={emergencyContact ? 'Added' : 'Missing'}
+        />
         <MiniStat title="Documents" value={`${documents.length}`} />
       </section>
 
@@ -490,8 +514,15 @@ export default function V2StaffDetailPage() {
               <InfoBox label="Second Phone" value={staff.second_phone || '—'} />
               <InfoBox label="Email" value={staff.email || '—'} />
               <InfoBox label="Nationality" value={staff.nationality || '—'} />
-              <InfoBox label="Country of Birth" value={staff.country_of_birth || '—'} />
+              <InfoBox
+                label="Country of Birth"
+                value={staff.country_of_birth || '—'}
+              />
               <InfoBox label="Gender" value={staff.gender || '—'} />
+              <InfoBox
+                label="Date of Birth"
+                value={formatUKDate(staff.date_of_birth)}
+              />
             </div>
           </Card>
 
@@ -509,12 +540,30 @@ export default function V2StaffDetailPage() {
           >
             {employment ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <InfoBox label="Employment Type" value={employment.employment_type || '—'} />
-                <InfoBox label="Contract Number" value={employment.contract_number || '—'} />
-                <InfoBox label="Contract Start" value={employment.contract_start || '—'} />
-                <InfoBox label="Contract End" value={employment.contract_end || '—'} />
-                <InfoBox label="Pay Schedule" value={employment.pay_schedule || '—'} />
-                <InfoBox label="Payroll Reference" value={employment.payroll_reference || '—'} />
+                <InfoBox
+                  label="Employment Type"
+                  value={employment.employment_type || '—'}
+                />
+                <InfoBox
+                  label="Contract Number"
+                  value={employment.contract_number || '—'}
+                />
+                <InfoBox
+                  label="Contract Start"
+                  value={formatUKDate(employment.contract_start)}
+                />
+                <InfoBox
+                  label="Contract End"
+                  value={formatUKDate(employment.contract_end)}
+                />
+                <InfoBox
+                  label="Pay Schedule"
+                  value={employment.pay_schedule || '—'}
+                />
+                <InfoBox
+                  label="Payroll Reference"
+                  value={employment.payroll_reference || '—'}
+                />
                 <InfoBox label="Tax Code" value={employment.tax_code || '—'} />
                 <InfoBox label="NI Number" value={employment.ni_number || '—'} />
               </div>
@@ -539,9 +588,18 @@ export default function V2StaffDetailPage() {
             {documents.length > 0 ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <InfoBox label="Total Documents" value={String(documents.length)} />
-                  <InfoBox label="Valid Documents" value={String(validDocuments)} />
-                  <InfoBox label="Issues Found" value={String(problemDocuments)} />
+                  <InfoBox
+                    label="Total Documents"
+                    value={String(documents.length)}
+                  />
+                  <InfoBox
+                    label="Valid Documents"
+                    value={String(validDocuments)}
+                  />
+                  <InfoBox
+                    label="Issues Found"
+                    value={String(problemDocuments)}
+                  />
                 </div>
 
                 <div className="space-y-3">
@@ -561,9 +619,10 @@ export default function V2StaffDetailPage() {
                         </div>
                         <DocumentStatusBadge status={doc.status} />
                       </div>
+
                       <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 md:grid-cols-2">
-                        <p>Issue Date: {doc.issue_date || '—'}</p>
-                        <p>Expiry Date: {doc.expiry_date || '—'}</p>
+                        <p>Issue Date: {formatUKDate(doc.issue_date)}</p>
+                        <p>Expiry Date: {formatUKDate(doc.expiry_date)}</p>
                       </div>
                     </div>
                   ))}
@@ -579,7 +638,11 @@ export default function V2StaffDetailPage() {
             icon={<ShieldCheck className="h-5 w-5" />}
             action={
               <Link
-                href={currentId ? `/staff-ids/${currentId.id}/edit` : `/staff/${staff.id}/issue-id`}
+                href={
+                  currentId
+                    ? `/staff-ids/${currentId.id}/edit`
+                    : `/staff/${staff.id}/issue-id`
+                }
                 className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
               >
                 Manage
@@ -593,9 +656,18 @@ export default function V2StaffDetailPage() {
                   <InfoBox label="ID Number" value={currentId.id_number} />
                   <InfoBox label="Role Title" value={currentId.role_title} />
                   <InfoBox label="ID Status" value={currentId.status} />
-                  <InfoBox label="Issue Date" value={currentId.issue_date} />
-                  <InfoBox label="Expiry Date" value={currentId.expiry_date} />
-                  <InfoBox label="SIA Number" value={currentId.sia_number || '—'} />
+                  <InfoBox
+                    label="Issue Date"
+                    value={formatUKDate(currentId.issue_date)}
+                  />
+                  <InfoBox
+                    label="Expiry Date"
+                    value={formatUKDate(currentId.expiry_date)}
+                  />
+                  <InfoBox
+                    label="SIA Number"
+                    value={currentId.sia_number || '—'}
+                  />
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -611,8 +683,8 @@ export default function V2StaffDetailPage() {
                     siaNumber={currentId.sia_number}
                     qrToken={currentId.qr_token}
                     photoUrl={staff.photo_url}
-                    issueDate={currentId.issue_date}
-                    expiryDate={currentId.expiry_date}
+                    issueDate={formatUKDate(currentId.issue_date)}
+                    expiryDate={formatUKDate(currentId.expiry_date)}
                     idStatus={currentId.status}
                   />
                 </div>
@@ -716,7 +788,10 @@ export default function V2StaffDetailPage() {
           >
             {address ? (
               <div className="space-y-3">
-                <InfoBox label="Street Address" value={address.street_address || '—'} />
+                <InfoBox
+                  label="Street Address"
+                  value={address.street_address || '—'}
+                />
                 <InfoBox label="City" value={address.city || '—'} />
                 <InfoBox label="Post Code" value={address.post_code || '—'} />
                 <InfoBox label="Country" value={address.country || '—'} />
@@ -742,7 +817,10 @@ export default function V2StaffDetailPage() {
             {emergencyContact ? (
               <div className="space-y-3">
                 <InfoBox label="Name" value={emergencyContact.name} />
-                <InfoBox label="Relationship" value={emergencyContact.relationship || '—'} />
+                <InfoBox
+                  label="Relationship"
+                  value={emergencyContact.relationship || '—'}
+                />
                 <InfoBox label="Phone" value={emergencyContact.phone || '—'} />
                 <InfoBox label="Email" value={emergencyContact.email || '—'} />
               </div>
@@ -766,13 +844,19 @@ export default function V2StaffDetailPage() {
           >
             {bankDetails ? (
               <div className="space-y-3">
-                <InfoBox label="Account Holder" value={bankDetails.account_holder_name || '—'} />
+                <InfoBox
+                  label="Account Holder"
+                  value={bankDetails.account_holder_name || '—'}
+                />
                 <InfoBox
                   label="Account Number"
                   value={maskValue(bankDetails.bank_account_number)}
                 />
                 <InfoBox label="Sort Code" value={bankDetails.sort_code || '—'} />
-                <InfoBox label="Reference Number" value={bankDetails.reference_number || '—'} />
+                <InfoBox
+                  label="Reference Number"
+                  value={bankDetails.reference_number || '—'}
+                />
               </div>
             ) : (
               <EmptyState text="No bank details added yet." />
@@ -858,6 +942,7 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'inactive') {
     return (
       <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
@@ -865,6 +950,7 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'suspended') {
     return (
       <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">
@@ -872,6 +958,7 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'revoked') {
     return (
       <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
@@ -879,6 +966,7 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'archived') {
     return (
       <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
@@ -912,6 +1000,7 @@ function IdBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'suspended') {
     return (
       <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">
@@ -919,6 +1008,7 @@ function IdBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'expired') {
     return (
       <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
@@ -926,6 +1016,7 @@ function IdBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'revoked') {
     return (
       <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
@@ -951,6 +1042,7 @@ function DocumentStatusBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'expired') {
     return (
       <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
@@ -958,6 +1050,7 @@ function DocumentStatusBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'rejected') {
     return (
       <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
@@ -965,6 +1058,7 @@ function DocumentStatusBadge({ status }: { status: string }) {
       </span>
     )
   }
+
   if (normalized === 'missing') {
     return (
       <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">

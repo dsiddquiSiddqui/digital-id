@@ -10,20 +10,71 @@ async function checkAccess() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { error: 'Unauthorized.', status: 401 as const, profile: null }
+    return {
+      error: 'Unauthorized.',
+      status: 401 as const,
+      profile: null,
+      user: null,
+    }
   }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
   if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
-    return { error: 'Forbidden.', status: 403 as const, profile: null }
+    return {
+      error: 'Forbidden.',
+      status: 403 as const,
+      profile: null,
+      user: null,
+    }
   }
 
-  return { error: null, status: 200 as const, profile }
+  return {
+    error: null,
+    status: 200 as const,
+    profile,
+    user,
+  }
+}
+
+function getActorMetadata(access: any) {
+  return {
+    actor_name:
+      access.profile?.full_name ||
+      access.user?.email ||
+      'Unknown user',
+    actor_email:
+      access.profile?.email ||
+      access.user?.email ||
+      null,
+    actor_role: access.profile?.role || 'Unknown role',
+  }
+}
+
+function buildChanges(
+  beforeData: Record<string, any> | null,
+  afterData: Record<string, any>
+) {
+  const changes = []
+
+  for (const key of Object.keys(afterData)) {
+    const beforeValue = beforeData ? beforeData[key] : null
+    const afterValue = afterData[key]
+
+    if (beforeValue !== afterValue) {
+      changes.push({
+        field: key,
+        before: beforeValue,
+        after: afterValue,
+      })
+    }
+  }
+
+  return changes
 }
 
 export async function GET(
@@ -64,7 +115,7 @@ export async function POST(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -124,7 +175,7 @@ export async function POST(
 
     const { data: existingStaff } = await adminSupabase
       .from('staff')
-      .select('id')
+      .select('id, full_name')
       .eq('id', id)
       .single()
 
@@ -134,10 +185,22 @@ export async function POST(
 
     const { data: existingEmployment } = await adminSupabase
       .from('staff_employment')
-      .select('id')
+      .select('*')
       .eq('staff_id', id)
       .eq('is_current', true)
       .maybeSingle()
+
+    const payload = {
+      employment_type,
+      contract_number,
+      contract_start,
+      contract_end,
+      pay_schedule,
+      payroll_reference,
+      tax_code,
+      ni_number,
+      personal_pay_rate,
+    }
 
     let resultData = null
     let dbError = null
@@ -145,17 +208,7 @@ export async function POST(
     if (existingEmployment) {
       const result = await adminSupabase
         .from('staff_employment')
-        .update({
-          employment_type,
-          contract_number,
-          contract_start,
-          contract_end,
-          pay_schedule,
-          payroll_reference,
-          tax_code,
-          ni_number,
-          personal_pay_rate,
-        })
+        .update(payload)
         .eq('id', existingEmployment.id)
         .select('*')
         .single()
@@ -168,15 +221,7 @@ export async function POST(
         .insert([
           {
             staff_id: id,
-            employment_type,
-            contract_number,
-            contract_start,
-            contract_end,
-            pay_schedule,
-            payroll_reference,
-            tax_code,
-            ni_number,
-            personal_pay_rate,
+            ...payload,
             is_current: true,
           },
         ])
@@ -194,16 +239,21 @@ export async function POST(
     await adminSupabase.from('audit_logs').insert([
       {
         actor_profile_id: access.profile.id,
-        action_type: existingEmployment ? 'update_staff_employment_v2' : 'create_staff_employment_v2',
+        action_type: existingEmployment
+          ? 'update_staff_employment_v2'
+          : 'create_staff_employment_v2',
         entity_type: 'staff_employment',
         entity_id: resultData.id,
         metadata: {
+          ...getActorMetadata(access),
+          module: 'Staff Management',
+          page: `/admin/staff/${id}/employment`,
           staff_id: id,
-          employment_type,
-          contract_number,
-          contract_start,
-          contract_end,
-          pay_schedule,
+          staff_name: existingStaff.full_name,
+          changes: buildChanges(existingEmployment, payload),
+          note: existingEmployment
+            ? `Employment details updated for ${existingStaff.full_name}.`
+            : `Employment details created for ${existingStaff.full_name}.`,
         },
       },
     ])

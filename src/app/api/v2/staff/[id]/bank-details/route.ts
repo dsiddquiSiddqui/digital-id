@@ -10,20 +10,35 @@ async function checkAccess() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { error: 'Unauthorized.', status: 401 as const, profile: null }
+    return {
+      error: 'Unauthorized.',
+      status: 401 as const,
+      profile: null,
+      user: null,
+    }
   }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
   if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
-    return { error: 'Forbidden.', status: 403 as const, profile: null }
+    return {
+      error: 'Forbidden.',
+      status: 403 as const,
+      profile: null,
+      user: null,
+    }
   }
 
-  return { error: null, status: 200 as const, profile }
+  return {
+    error: null,
+    status: 200 as const,
+    profile,
+    user,
+  }
 }
 
 export async function GET(
@@ -34,7 +49,10 @@ export async function GET(
     const access = await checkAccess()
 
     if (access.error) {
-      return NextResponse.json({ error: access.error }, { status: access.status })
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.status }
+      )
     }
 
     const { id } = await params
@@ -54,7 +72,10 @@ export async function GET(
 
     return NextResponse.json({ bank_details: data || null })
   } catch {
-    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error.' },
+      { status: 500 }
+    )
   }
 }
 
@@ -65,8 +86,11 @@ export async function POST(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
-      return NextResponse.json({ error: access.error }, { status: access.status })
+    if (access.error || !access.profile || !access.user) {
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.status }
+      )
     }
 
     const { id } = await params
@@ -74,12 +98,14 @@ export async function POST(
     const adminSupabase = createAdminClient()
 
     const account_holder_name =
-      typeof body.account_holder_name === 'string' && body.account_holder_name.trim()
+      typeof body.account_holder_name === 'string' &&
+      body.account_holder_name.trim()
         ? body.account_holder_name.trim()
         : null
 
     const bank_account_number =
-      typeof body.bank_account_number === 'string' && body.bank_account_number.trim()
+      typeof body.bank_account_number === 'string' &&
+      body.bank_account_number.trim()
         ? body.bank_account_number.trim()
         : null
 
@@ -89,23 +115,27 @@ export async function POST(
         : null
 
     const reference_number =
-      typeof body.reference_number === 'string' && body.reference_number.trim()
+      typeof body.reference_number === 'string' &&
+      body.reference_number.trim()
         ? body.reference_number.trim()
         : null
 
     const { data: existingStaff } = await adminSupabase
       .from('staff')
-      .select('id')
+      .select('id, full_name')
       .eq('id', id)
       .single()
 
     if (!existingStaff) {
-      return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Staff member not found.' },
+        { status: 404 }
+      )
     }
 
     const { data: existingBank } = await adminSupabase
       .from('staff_bank_details')
-      .select('id')
+      .select('*')
       .eq('staff_id', id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -149,20 +179,123 @@ export async function POST(
     }
 
     if (dbError) {
-      return NextResponse.json({ error: dbError.message }, { status: 400 })
+      return NextResponse.json(
+        { error: dbError.message },
+        { status: 400 }
+      )
+    }
+
+    const maskBankNumber = (value: string | null) => {
+      if (!value) return null
+
+      const last4 = value.slice(-4)
+
+      return `****${last4}`
+    }
+
+    const changes = []
+
+    if (existingBank) {
+      if (
+        existingBank.account_holder_name !== account_holder_name
+      ) {
+        changes.push({
+          field: 'account_holder_name',
+          before: existingBank.account_holder_name,
+          after: account_holder_name,
+        })
+      }
+
+      if (
+        existingBank.bank_account_number !== bank_account_number
+      ) {
+        changes.push({
+          field: 'bank_account_number',
+          before: maskBankNumber(existingBank.bank_account_number),
+          after: maskBankNumber(bank_account_number),
+        })
+      }
+
+      if (existingBank.sort_code !== sort_code) {
+        changes.push({
+          field: 'sort_code',
+          before: existingBank.sort_code,
+          after: sort_code,
+        })
+      }
+
+      if (
+        existingBank.reference_number !== reference_number
+      ) {
+        changes.push({
+          field: 'reference_number',
+          before: existingBank.reference_number,
+          after: reference_number,
+        })
+      }
+    } else {
+      changes.push(
+        {
+          field: 'account_holder_name',
+          before: null,
+          after: account_holder_name,
+        },
+        {
+          field: 'bank_account_number',
+          before: null,
+          after: maskBankNumber(bank_account_number),
+        },
+        {
+          field: 'sort_code',
+          before: null,
+          after: sort_code,
+        },
+        {
+          field: 'reference_number',
+          before: null,
+          after: reference_number,
+        }
+      )
     }
 
     await adminSupabase.from('audit_logs').insert([
       {
         actor_profile_id: access.profile.id,
-        action_type: existingBank ? 'update_staff_bank_details_v2' : 'create_staff_bank_details_v2',
+
+        action_type: existingBank
+          ? 'Update Staff Bank Details'
+          : 'Create Staff Bank Details',
+
         entity_type: 'staff_bank_details',
+
         entity_id: resultData.id,
+
         metadata: {
+          actor_name:
+            access.profile.full_name ||
+            access.user.email ||
+            'Unknown user',
+
+          actor_email:
+            access.profile.email ||
+            access.user.email ||
+            null,
+
+          actor_role: access.profile.role,
+
+          module: 'Staff Management',
+
+          page: `/admin/staff/${id}/bank-details`,
+
           staff_id: id,
-          account_holder_name,
-          sort_code,
-          reference_number,
+
+          staff_name: existingStaff.full_name,
+
+          changes,
+
+          note: existingBank
+            ? `Bank details updated for ${existingStaff.full_name}.`
+            : `Bank details created for ${existingStaff.full_name}.`,
         },
       },
     ])
@@ -172,6 +305,9 @@ export async function POST(
       bank_details: resultData,
     })
   } catch {
-    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error.' },
+      { status: 500 }
+    )
   }
 }

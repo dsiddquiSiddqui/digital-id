@@ -11,41 +11,89 @@ type SecurityEvent = {
   created_at: string
   reviewed_at: string | null
   event_payload: Record<string, any> | null
-  guards:
-    | {
-        full_name: string
-        employee_code: string
-      }[]
-    | null
+}
+
+type ScreenshotAlert = {
+  id: string
+  profile_id: string | null
+  staff_id: string | null
+  full_name: string | null
+  email: string | null
+  role: string | null
+  page: string
+  alert_type: string
+  user_agent: string | null
+  created_at: string
+}
+
+type AlertRow = {
+  id: string
+  personName: string
+  personMeta: string
+  eventType: string
+  severity: string
+  status: string
+  time: string
+  source: 'security' | 'screenshot'
+  details: string
 }
 
 export default function AlertsPage() {
   const supabase = createClient()
 
-  const [events, setEvents] = useState<SecurityEvent[]>([])
+  const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([])
+  const [screenshotAlerts, setScreenshotAlerts] = useState<ScreenshotAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
     const loadEvents = async () => {
-      const { data, error } = await supabase
-        .from('security_events')
-        .select(`
-          id,
-          event_type,
-          severity,
-          created_at,
-          reviewed_at,
-          event_payload,
-          guards (
-            full_name,
-            employee_code
-          )
-        `)
-        .order('created_at', { ascending: false })
+      setLoading(true)
 
-      if (!error && data) {
-        setEvents(data as SecurityEvent[])
+      const [securityResponse, screenshotResponse] = await Promise.all([
+        supabase
+          .from('security_events')
+          .select(`
+            id,
+            event_type,
+            severity,
+            created_at,
+            reviewed_at,
+            event_payload
+          `)
+          .order('created_at', { ascending: false }),
+
+        supabase
+          .from('screenshot_alerts')
+          .select(`
+            id,
+            profile_id,
+            staff_id,
+            full_name,
+            email,
+            role,
+            page,
+            alert_type,
+            user_agent,
+            created_at
+          `)
+          .order('created_at', { ascending: false }),
+      ])
+
+      if (!securityResponse.error && securityResponse.data) {
+        setSecurityEvents(securityResponse.data as SecurityEvent[])
+      }
+
+      if (!screenshotResponse.error && screenshotResponse.data) {
+        setScreenshotAlerts(screenshotResponse.data as ScreenshotAlert[])
+      }
+
+      if (securityResponse.error) {
+        console.error('Security events load error:', securityResponse.error)
+      }
+
+      if (screenshotResponse.error) {
+        console.error('Screenshot alerts load error:', screenshotResponse.error)
       }
 
       setLoading(false)
@@ -54,26 +102,80 @@ export default function AlertsPage() {
     loadEvents()
   }, [supabase])
 
-  const filteredEvents = useMemo(() => {
+  const rows: AlertRow[] = useMemo(() => {
+    const securityRows: AlertRow[] = securityEvents.map((event) => {
+      const payload = event.event_payload || {}
+
+      const personName =
+        payload.guard_name ||
+        payload.full_name ||
+        payload.staff_name ||
+        payload.name ||
+        'Unknown guard'
+
+      const personMeta =
+        payload.employee_code ||
+        payload.guard_code ||
+        payload.email ||
+        '—'
+
+      return {
+        id: `security-${event.id}`,
+        personName,
+        personMeta,
+        eventType: event.event_type || 'Security Event',
+        severity: event.severity || 'medium',
+        status: event.reviewed_at ? 'Reviewed' : 'Open',
+        time: event.created_at,
+        source: 'security',
+        details: formatPayload(payload),
+      }
+    })
+
+    const screenshotRows: AlertRow[] = screenshotAlerts.map((alert) => {
+      return {
+        id: `screenshot-${alert.id}`,
+        personName: alert.full_name || 'Unknown staff',
+        personMeta: alert.email || '—',
+        eventType:
+          alert.alert_type === 'screenshot_attempt'
+            ? 'Screenshot Attempt'
+            : 'Screen Hidden / App Switch',
+        severity: 'critical',
+        status: 'Open',
+        time: alert.created_at,
+        source: 'screenshot',
+        details: `Page: ${alert.page || '—'} | Role: ${
+          alert.role || '—'
+        } | Device: ${alert.user_agent || '—'}`,
+      }
+    })
+
+    return [...screenshotRows, ...securityRows].sort(
+      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+    )
+  }, [securityEvents, screenshotAlerts])
+
+  const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return events
+    if (!q) return rows
 
-    return events.filter((event) => {
-      const guardName = event.guards?.[0]?.full_name?.toLowerCase() || ''
-      const employeeCode = event.guards?.[0]?.employee_code?.toLowerCase() || ''
-
+    return rows.filter((row) => {
       return (
-        event.event_type?.toLowerCase().includes(q) ||
-        event.severity?.toLowerCase().includes(q) ||
-        guardName.includes(q) ||
-        employeeCode.includes(q) ||
-        JSON.stringify(event.event_payload || {}).toLowerCase().includes(q)
+        row.personName.toLowerCase().includes(q) ||
+        row.personMeta.toLowerCase().includes(q) ||
+        row.eventType.toLowerCase().includes(q) ||
+        row.severity.toLowerCase().includes(q) ||
+        row.status.toLowerCase().includes(q) ||
+        row.source.toLowerCase().includes(q) ||
+        row.details.toLowerCase().includes(q)
       )
     })
-  }, [events, search])
+  }, [rows, search])
 
-  const openCount = events.filter((e) => !e.reviewed_at).length
-  const reviewedCount = events.filter((e) => !!e.reviewed_at).length
+  const openCount = rows.filter((row) => row.status === 'Open').length
+  const reviewedCount = rows.filter((row) => row.status === 'Reviewed').length
+  const screenshotCount = rows.filter((row) => row.source === 'screenshot').length
 
   return (
     <div className="space-y-6">
@@ -84,7 +186,7 @@ export default function AlertsPage() {
               Alerts
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Security events and suspicious activity across the system.
+              Security events, screenshot attempts and suspicious activity across the system.
             </p>
           </div>
 
@@ -101,29 +203,33 @@ export default function AlertsPage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryCard title="Total Alerts" value={events.length} />
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <SummaryCard title="Total Alerts" value={rows.length} />
         <SummaryCard title="Open Alerts" value={openCount} />
         <SummaryCard title="Reviewed Alerts" value={reviewedCount} />
+        <SummaryCard title="Screenshot Alerts" value={screenshotCount} />
       </section>
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-6 py-4">
-          <h3 className="text-lg font-semibold text-slate-900">Security Events</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Alert Events</h3>
           <p className="mt-1 text-sm text-slate-500">
-            {filteredEvents.length} result{filteredEvents.length === 1 ? '' : 's'}
+            {filteredRows.length} result{filteredRows.length === 1 ? '' : 's'}
           </p>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[1100px]">
             <thead className="bg-slate-50">
               <tr className="border-b border-slate-200">
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
-                  Guard
+                  Person
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
                   Event
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
+                  Source
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
                   Severity
@@ -134,52 +240,61 @@ export default function AlertsPage() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
                   Time
                 </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
+                  Details
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="px-6 py-6 text-sm text-slate-500" colSpan={5}>
+                  <td className="px-6 py-6 text-sm text-slate-500" colSpan={7}>
                     Loading alerts...
                   </td>
                 </tr>
-              ) : filteredEvents.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-10 text-sm text-slate-500" colSpan={5}>
+                  <td className="px-6 py-10 text-sm text-slate-500" colSpan={7}>
                     No alerts found.
                   </td>
                 </tr>
               ) : (
-                filteredEvents.map((event) => {
-                  const guard = event.guards?.[0]
+                filteredRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-slate-200 last:border-b-0"
+                  >
+                    <td className="px-6 py-4 text-sm text-slate-900">
+                      <div className="font-medium">{row.personName}</div>
+                      <div className="text-xs text-slate-500">{row.personMeta}</div>
+                    </td>
 
-                  return (
-                    <tr key={event.id} className="border-b border-slate-200 last:border-b-0">
-                      <td className="px-6 py-4 text-sm text-slate-900">
-                        {guard
-                          ? `${guard.full_name} (${guard.employee_code})`
-                          : 'Unknown guard'}
-                      </td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-700">
+                      {row.eventType}
+                    </td>
 
-                      <td className="px-6 py-4 text-sm text-slate-700">
-                        {event.event_type}
-                      </td>
+                    <td className="px-6 py-4">
+                      <SourceBadge source={row.source} />
+                    </td>
 
-                      <td className="px-6 py-4">
-                        <SeverityBadge severity={event.severity} />
-                      </td>
+                    <td className="px-6 py-4">
+                      <SeverityBadge severity={row.severity} />
+                    </td>
 
-                      <td className="px-6 py-4">
-                        <StatusBadge reviewed={!!event.reviewed_at} />
-                      </td>
+                    <td className="px-6 py-4">
+                      <StatusBadge reviewed={row.status === 'Reviewed'} />
+                    </td>
 
-                      <td className="px-6 py-4 text-sm text-slate-700">
-                        {new Date(event.created_at).toLocaleString()}
-                      </td>
-                    </tr>
-                  )
-                })
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      {formatDateTime(row.time)}
+                    </td>
+
+                    <td className="max-w-[360px] px-6 py-4 text-xs text-slate-500">
+                      <div className="line-clamp-2">{row.details}</div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -187,6 +302,41 @@ export default function AlertsPage() {
       </section>
     </div>
   )
+}
+
+function formatDateTime(dateString: string) {
+  if (!dateString) return '—'
+
+  const date = new Date(dateString)
+
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function formatPayload(payload: Record<string, any>) {
+  const entries = Object.entries(payload || {})
+
+  if (entries.length === 0) return '—'
+
+  return entries
+    .map(([key, value]) => {
+      if (value === null || value === undefined) return `${key}: —`
+
+      if (typeof value === 'object') {
+        return `${key}: ${JSON.stringify(value)}`
+      }
+
+      return `${key}: ${String(value)}`
+    })
+    .join(' | ')
 }
 
 function SummaryCard({
@@ -201,6 +351,26 @@ function SummaryCard({
       <p className="text-sm font-medium text-slate-500">{title}</p>
       <h3 className="mt-2 text-3xl font-bold text-slate-900">{value}</h3>
     </div>
+  )
+}
+
+function SourceBadge({
+  source,
+}: {
+  source: 'security' | 'screenshot'
+}) {
+  if (source === 'screenshot') {
+    return (
+      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+        Screenshot
+      </span>
+    )
+  }
+
+  return (
+    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
+      Security
+    </span>
   )
 }
 
@@ -237,7 +407,7 @@ function SeverityBadge({
 
   return (
     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      {severity}
+      {severity || 'Low'}
     </span>
   )
 }

@@ -30,6 +30,20 @@ type StaffId = {
   qr_token: string
 }
 
+function formatUKDate(dateString?: string | null) {
+  if (!dateString) return '—'
+
+  const date = new Date(dateString)
+
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
 export default function StaffDetailPage() {
   const supabase = createClient()
   const params = useParams()
@@ -119,11 +133,7 @@ export default function StaffDetailPage() {
     )
   }
 
-  function IdStatusBadge({
-    status,
-  }: {
-    status: string
-  }) {
+  function IdStatusBadge({ status }: { status: string }) {
     const normalized = status?.toLowerCase()
 
     if (normalized === 'active') {
@@ -246,7 +256,9 @@ export default function StaffDetailPage() {
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Staff Details</h3>
+            <h3 className="text-lg font-semibold text-slate-900">
+              Staff Details
+            </h3>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <InfoBox label="Full Name" value={staff.full_name} />
@@ -261,7 +273,9 @@ export default function StaffDetailPage() {
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Issued IDs</h3>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Issued IDs
+                </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Current and historical digital IDs for this staff member
                 </p>
@@ -300,9 +314,18 @@ export default function StaffDetailPage() {
                     <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                       <InfoBox label="ID Number" value={item.id_number} />
                       <InfoBox label="Site Name" value={item.site_name || '—'} />
-                      <InfoBox label="SIA Number" value={item.sia_number || '—'} />
-                      <InfoBox label="Issue Date" value={item.issue_date} />
-                      <InfoBox label="Expiry Date" value={item.expiry_date} />
+                      <InfoBox
+                        label="SIA Number"
+                        value={item.sia_number || '—'}
+                      />
+                      <InfoBox
+                        label="Issue Date"
+                        value={formatUKDate(item.issue_date)}
+                      />
+                      <InfoBox
+                        label="Expiry Date"
+                        value={formatUKDate(item.expiry_date)}
+                      />
                     </div>
 
                     <IdCard
@@ -312,8 +335,8 @@ export default function StaffDetailPage() {
                       idNumber={item.id_number}
                       qrToken={item.qr_token}
                       photoUrl={staff.photo_url}
-                      issueDate={item.issue_date}
-                      expiryDate={item.expiry_date}
+                      issueDate={formatUKDate(item.issue_date)}
+                      expiryDate={formatUKDate(item.expiry_date)}
                       idStatus={item.status}
                     />
                   </div>
@@ -325,7 +348,9 @@ export default function StaffDetailPage() {
 
         <div className="space-y-6">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Status Actions</h3>
+            <h3 className="text-lg font-semibold text-slate-900">
+              Status Actions
+            </h3>
 
             <div className="mt-4 space-y-3">
               <button
@@ -355,13 +380,21 @@ export default function StaffDetailPage() {
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Current ID Summary</h3>
+            <h3 className="text-lg font-semibold text-slate-900">
+              Current ID Summary
+            </h3>
 
             <div className="mt-4 space-y-4">
-              <InfoBox label="Current ID" value={currentId?.id_number || 'No current ID'} />
+              <InfoBox
+                label="Current ID"
+                value={currentId?.id_number || 'No current ID'}
+              />
               <InfoBox label="Role Title" value={currentId?.role_title || '—'} />
               <InfoBox label="ID Status" value={currentId?.status || '—'} />
-              <InfoBox label="Expiry Date" value={currentId?.expiry_date || '—'} />
+              <InfoBox
+                label="Expiry Date"
+                value={formatUKDate(currentId?.expiry_date)}
+              />
             </div>
           </div>
         </div>
@@ -382,7 +415,9 @@ function InfoBox({
       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
         {label}
       </p>
-      <p className="mt-1 break-all text-sm font-medium text-slate-900">{value}</p>
+      <p className="mt-1 break-all text-sm font-medium text-slate-900">
+        {value}
+      </p>
     </div>
   )
 }

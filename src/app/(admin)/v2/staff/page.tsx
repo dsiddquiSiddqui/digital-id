@@ -31,6 +31,20 @@ type StaffIdRow = {
 type FilterStatus = 'all' | 'active' | 'inactive' | 'suspended' | 'revoked' | 'archived'
 type FilterType = 'all' | 'security' | 'warehouse' | 'event' | 'admin' | 'contractor' | 'other'
 
+function formatUKDate(dateString?: string | null) {
+  if (!dateString) return '—'
+
+  const date = new Date(dateString)
+
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
 export default function V2StaffPage() {
   const supabase = createClient()
 
@@ -319,6 +333,9 @@ export default function V2StaffPage() {
                             <IdBadge status={currentId.status} />
                             <p className="text-xs text-slate-500">
                               {currentId.id_number}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Expiry: {formatUKDate(currentId.expiry_date)}
                             </p>
                           </div>
                         ) : (

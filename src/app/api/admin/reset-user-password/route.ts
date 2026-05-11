@@ -9,6 +9,7 @@ export async function POST(req: Request) {
 
     const profile_id =
       typeof body.profile_id === 'string' ? body.profile_id.trim() : ''
+
     const password =
       typeof body.password === 'string' ? body.password : ''
 
@@ -26,7 +27,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // Current logged-in user client (uses cookies/session)
     const cookieStore = await cookies()
 
     const supabase = createServerClient(
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     const { data: currentProfile, error: currentProfileError } = await supabase
       .from('profiles')
-      .select('id, role, is_active')
+      .select('id, role, is_active, full_name, email')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -84,11 +84,12 @@ export async function POST(req: Request) {
 
     const adminSupabase = createAdminClient()
 
-    const { data: targetProfile, error: targetProfileError } = await adminSupabase
-      .from('profiles')
-      .select('id, auth_user_id, email, role')
-      .eq('id', profile_id)
-      .single()
+    const { data: targetProfile, error: targetProfileError } =
+      await adminSupabase
+        .from('profiles')
+        .select('id, auth_user_id, full_name, email, role')
+        .eq('id', profile_id)
+        .single()
 
     if (targetProfileError || !targetProfile) {
       return NextResponse.json(
@@ -97,7 +98,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // Optional safety: prevent a normal admin from resetting a super_admin password
     if (
       currentProfile.role !== 'super_admin' &&
       targetProfile.role === 'super_admin'
@@ -108,10 +108,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const { error: passwordError } = await adminSupabase.auth.admin.updateUserById(
-      targetProfile.auth_user_id,
-      { password }
-    )
+    const { error: passwordError } =
+      await adminSupabase.auth.admin.updateUserById(
+        targetProfile.auth_user_id,
+        { password }
+      )
 
     if (passwordError) {
       return NextResponse.json(
@@ -124,14 +125,42 @@ export async function POST(req: Request) {
       .from('audit_logs')
       .insert([
         {
+          actor_profile_id: currentProfile.id,
           action_type: 'reset_user_password',
           entity_type: 'profile',
           entity_id: profile_id,
           metadata: {
-            reset_by_profile_id: currentProfile.id,
+            actor_name:
+              currentProfile.full_name ||
+              user.email ||
+              'Unknown user',
+
+            actor_email:
+              currentProfile.email ||
+              user.email ||
+              null,
+
+            actor_role: currentProfile.role,
+
+            module: 'User Management',
+            page: `/admin/users/${profile_id}`,
+
+            target_user_name: targetProfile.full_name,
+            target_user_email: targetProfile.email,
+            target_user_role: targetProfile.role,
             target_auth_user_id: targetProfile.auth_user_id,
-            target_email: targetProfile.email,
-            target_role: targetProfile.role,
+
+            changes: [
+              {
+                field: 'password',
+                before: '********',
+                after: '********',
+              },
+            ],
+
+            note: `Password was reset for ${
+              targetProfile.full_name || targetProfile.email
+            }. Password value was not stored for security.`,
           },
         },
       ])

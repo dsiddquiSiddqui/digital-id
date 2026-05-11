@@ -87,6 +87,9 @@ export default function MyIdPage() {
   const [selectedDocumentUrl, setSelectedDocumentUrl] = useState<string | null>(null)
   const [selectedDocumentName, setSelectedDocumentName] = useState('Document')
 
+  const [screenBlocked, setScreenBlocked] = useState(false)
+  const [alertSaving, setAlertSaving] = useState(false)
+
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
     confirmPassword: '',
@@ -115,6 +118,83 @@ export default function MyIdPage() {
   const isPdfFile = (url: string) => {
     return /\.pdf(\?.*)?$/i.test(url)
   }
+
+  function formatUKDate(dateString?: string | null) {
+    if (!dateString) return '—'
+
+    const date = new Date(dateString)
+
+    if (Number.isNaN(date.getTime())) return '—'
+
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  }
+
+  const saveScreenshotAlert = async (alertType: string) => {
+    if (alertSaving) return
+
+    try {
+      setAlertSaving(true)
+
+      await supabase.from('screenshot_alerts').insert({
+        profile_id: profile?.id ?? null,
+        staff_id: staff?.id ?? null,
+        full_name: staff?.full_name || profile?.full_name || null,
+        email: profile?.email || null,
+        role: profile?.role || null,
+        page: 'staff-portal/my-id',
+        alert_type: alertType,
+        user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
+      })
+    } catch (error) {
+      console.error('Screenshot alert save error:', error)
+    } finally {
+      setAlertSaving(false)
+    }
+  }
+
+  useEffect(() => {
+    const blockScreen = async (type: string) => {
+      setScreenBlocked(true)
+      await saveScreenshotAlert(type)
+
+      setTimeout(() => {
+        setScreenBlocked(false)
+      }, 2500)
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+
+      if (
+        key === 'printscreen' ||
+        (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(key)) ||
+        (e.ctrlKey && key === 'p') ||
+        (e.metaKey && key === 'p') ||
+        (e.ctrlKey && e.shiftKey && key === 's')
+      ) {
+        e.preventDefault()
+        blockScreen('screenshot_attempt')
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        blockScreen('screen_hidden_or_app_switch')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [profile, staff])
 
   useEffect(() => {
     let isMounted = true
@@ -363,312 +443,326 @@ export default function MyIdPage() {
 
   return (
     <main className="min-h-screen p-4 sm:p-6">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6 rounded-3xl bg-gradient-to-r from-[#081a33] to-[#0f274a] p-6 text-white shadow-sm">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="h-14 w-14 overflow-hidden rounded-2xl bg-white/10">
-                {staff?.photo_url ? (
-                  <img
-                    src={staff.photo_url}
-                    alt={staff.full_name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <UserCircle2 className="h-8 w-8 text-white" />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-sky-200">
-                  Staff Portal
-                </p>
-                <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
-                  Welcome, {staffDisplayName}
-                </h1>
-              </div>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-600"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
+      {screenBlocked ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950 p-6 text-center text-white">
+          <div className="max-w-sm rounded-3xl bg-white/10 p-6 backdrop-blur">
+            <Shield className="mx-auto mb-4 h-10 w-10 text-red-400" />
+            <h2 className="text-xl font-bold">Screenshot Not Allowed</h2>
+            <p className="mt-2 text-sm text-slate-200">
+              This screen contains protected staff information. This attempt has been logged.
+            </p>
           </div>
         </div>
+      ) : null}
 
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <SummaryCard
-            icon={<BadgeCheck className="h-5 w-5 text-[#0094e0]" />}
-            title="Digital ID"
-            value={staffId ? 'Assigned' : 'Not assigned'}
-            subtitle={staffId?.id_number ? `ID: ${staffId.id_number}` : 'No current ID'}
-          />
-          <SummaryCard
-            icon={<FileText className="h-5 w-5 text-emerald-600" />}
-            title="Documents"
-            value={`${documents.length}`}
-            subtitle={
-              documents.length === 1
-                ? '1 document found'
-                : `${documents.length} documents found`
-            }
-          />
-          <SummaryCard
-            icon={<Shield className="h-5 w-5 text-amber-600" />}
-            title="Account"
-            value={profile?.email || 'Staff account'}
-            subtitle="Password can be updated here"
-          />
-        </div>
-
-        <div className="mb-6 flex flex-wrap gap-3">
-          <TabButton
-            active={activeTab === 'id'}
-            onClick={() => setActiveTab('id')}
-            icon={<BadgeCheck className="h-4 w-4" />}
-            label="My Digital ID"
-          />
-          <TabButton
-            active={activeTab === 'documents'}
-            onClick={() => setActiveTab('documents')}
-            icon={<FileText className="h-4 w-4" />}
-            label="My Documents"
-          />
-          <TabButton
-            active={activeTab === 'password'}
-            onClick={() => setActiveTab('password')}
-            icon={<KeyRound className="h-4 w-4" />}
-            label="Change Password"
-          />
-        </div>
-
-        {activeTab === 'id' && (
-          <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900">My Digital ID</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                View your currently assigned staff digital ID.
-              </p>
-            </div>
-
-            {!staff || !staffId ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <p className="text-base font-medium text-slate-700">
-                  No digital ID assigned.
-                </p>
-                <p className="mt-2 text-sm text-slate-500">
-                  Please contact your admin if you believe this is incorrect.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <IdCard
-                  fullName={staff.full_name}
-                  employeeCode={staff.employee_code ?? 'N/A'}
-                  roleTitle={staffId.role_title ?? 'Staff'}
-                  idNumber={staffId.id_number}
-                  siaNumber={staffId.sia_number ?? ''}
-                  qrToken={staffId.qr_token ?? ''}
-                  photoUrl={staff.photo_url ?? ''}
-                  issueDate={staffId.issue_date ?? ''}
-                  expiryDate={staffId.expiry_date ?? ''}
-                  idStatus={staffId.status ?? 'active'}
-                />
-              </div>
-            )}
-          </section>
-        )}
-
-        {activeTab === 'documents' && (
-          <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900">My Documents</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                View your uploaded staff documents.
-              </p>
-            </div>
-
-            {!staff ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-600">
-                Staff profile not found.
-              </div>
-            ) : documents.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <p className="text-base font-medium text-slate-700">No documents found.</p>
-                <p className="mt-2 text-sm text-slate-500">
-                  Your documents will appear here once uploaded by admin.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {documents.map((doc) => {
-                  const docName =
-                    doc.custom_document_name ||
-                    doc.document_types?.name ||
-                    doc.custom_document_code ||
-                    doc.document_number ||
-                    'Document'
-
-                  return (
-                    <div
-                      key={doc.id}
-                      className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300"
-                    >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-2 flex items-center gap-2">
-                            <div className="rounded-xl bg-slate-100 p-2">
-                              <FileText className="h-4 w-4 text-slate-700" />
-                            </div>
-                            <h3 className="truncate text-base font-semibold text-slate-900">
-                              {docName}
-                            </h3>
-                          </div>
-
-                          <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
-                            <InfoItem
-                              label="Document Number"
-                              value={doc.document_number || '—'}
-                            />
-                            <InfoItem label="Status" value={doc.status || '—'} />
-                            <InfoItem label="Issue Date" value={doc.issue_date || '—'} />
-                            <InfoItem
-                              label="Expiry Date"
-                              value={doc.has_expiry ? doc.expiry_date || '—' : 'No expiry'}
-                            />
-                          </div>
-
-                          {doc.notes ? (
-                            <p className="mt-3 text-sm text-slate-500">{doc.notes}</p>
-                          ) : null}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {doc.file_url ? (
-                            <button
-                              type="button"
-                              onClick={() => viewDocument(doc.file_url, docName)}
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0094e0] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#007bb8] sm:w-auto"
-                            >
-                              <Eye className="h-4 w-4" />
-                              View
-                            </button>
-                          ) : (
-                            <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-500">
-                              No file attached
-                            </div>
-                          )}
-                        </div>
-                      </div>
+      <div className={screenBlocked ? 'blur-xl select-none' : ''}>
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-6 rounded-3xl bg-gradient-to-r from-[#081a33] to-[#0f274a] p-6 text-white shadow-sm">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="h-14 w-14 overflow-hidden rounded-2xl bg-white/10">
+                  {staff?.photo_url ? (
+                    <img
+                      src={staff.photo_url}
+                      alt={staff.full_name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <UserCircle2 className="h-8 w-8 text-white" />
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-        )}
+                  )}
+                </div>
 
-        {activeTab === 'password' && (
-          <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900">Change Password</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Update your staff login password securely.
-              </p>
-            </div>
-
-            <form onSubmit={handleChangePassword} className="max-w-xl space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  New Password
-                </label>
-                <div className="flex items-center rounded-2xl border border-slate-200 px-4 shadow-sm focus-within:border-[#0094e0]">
-                  <KeyRound className="h-5 w-5 text-slate-400" />
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    value={passwordForm.newPassword}
-                    onChange={(e) =>
-                      setPasswordForm((prev) => ({
-                        ...prev,
-                        newPassword: e.target.value,
-                      }))
-                    }
-                    placeholder="Enter new password"
-                    className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword((prev) => !prev)}
-                    className="text-slate-500 transition hover:text-slate-800"
-                  >
-                    {showNewPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
+                <div>
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-sky-200">
+                    Staff Portal
+                  </p>
+                  <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
+                    Welcome, {staffDisplayName}
+                  </h1>
                 </div>
               </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Confirm New Password
-                </label>
-                <div className="flex items-center rounded-2xl border border-slate-200 px-4 shadow-sm focus-within:border-[#0094e0]">
-                  <KeyRound className="h-5 w-5 text-slate-400" />
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) =>
-                      setPasswordForm((prev) => ({
-                        ...prev,
-                        confirmPassword: e.target.value,
-                      }))
-                    }
-                    placeholder="Confirm new password"
-                    className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    className="text-slate-500 transition hover:text-slate-800"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {passwordError ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                  {passwordError}
-                </div>
-              ) : null}
-
-              {passwordMessage ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  {passwordMessage}
-                </div>
-              ) : null}
 
               <button
-                type="submit"
-                disabled={passwordLoading}
-                className="rounded-2xl bg-[#0094e0] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#007bb8] disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleLogout}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-600"
               >
-                {passwordLoading ? 'Updating Password...' : 'Update Password'}
+                <LogOut className="h-4 w-4" />
+                Logout
               </button>
-            </form>
-          </section>
-        )}
+            </div>
+          </div>
+
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
+            <SummaryCard
+              icon={<BadgeCheck className="h-5 w-5 text-[#0094e0]" />}
+              title="Digital ID"
+              value={staffId ? 'Assigned' : 'Not assigned'}
+              subtitle={staffId?.id_number ? `ID: ${staffId.id_number}` : 'No current ID'}
+            />
+            <SummaryCard
+              icon={<FileText className="h-5 w-5 text-emerald-600" />}
+              title="Documents"
+              value={`${documents.length}`}
+              subtitle={
+                documents.length === 1
+                  ? '1 document found'
+                  : `${documents.length} documents found`
+              }
+            />
+            <SummaryCard
+              icon={<Shield className="h-5 w-5 text-amber-600" />}
+              title="Account"
+              value={profile?.email || 'Staff account'}
+              subtitle="Password can be updated here"
+            />
+          </div>
+
+          <div className="mb-6 flex flex-wrap gap-3">
+            <TabButton
+              active={activeTab === 'id'}
+              onClick={() => setActiveTab('id')}
+              icon={<BadgeCheck className="h-4 w-4" />}
+              label="My Digital ID"
+            />
+            <TabButton
+              active={activeTab === 'documents'}
+              onClick={() => setActiveTab('documents')}
+              icon={<FileText className="h-4 w-4" />}
+              label="My Documents"
+            />
+            <TabButton
+              active={activeTab === 'password'}
+              onClick={() => setActiveTab('password')}
+              icon={<KeyRound className="h-4 w-4" />}
+              label="Change Password"
+            />
+          </div>
+
+          {activeTab === 'id' && (
+            <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5">
+                <h2 className="text-xl font-bold text-slate-900">My Digital ID</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  View your currently assigned staff digital ID.
+                </p>
+              </div>
+
+              {!staff || !staffId ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                  <p className="text-base font-medium text-slate-700">
+                    No digital ID assigned.
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Please contact your admin if you believe this is incorrect.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <IdCard
+                    fullName={staff.full_name}
+                    employeeCode={staff.employee_code ?? 'N/A'}
+                    roleTitle={staffId.role_title ?? 'Staff'}
+                    idNumber={staffId.id_number}
+                    siaNumber={staffId.sia_number ?? ''}
+                    qrToken={staffId.qr_token ?? ''}
+                    photoUrl={staff.photo_url ?? ''}
+                    issueDate={formatUKDate(staffId.issue_date)}
+                    expiryDate={formatUKDate(staffId.expiry_date)}
+                    idStatus={staffId.status ?? 'active'}
+                  />
+                </div>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'documents' && (
+            <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5">
+                <h2 className="text-xl font-bold text-slate-900">Documents</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  View your uploaded staff documents.
+                </p>
+              </div>
+
+              {!staff ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-600">
+                  Staff profile not found.
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                  <p className="text-base font-medium text-slate-700">No documents found.</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Your documents will appear here once uploaded by admin.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {documents.map((doc) => {
+                    const docName =
+                      doc.custom_document_name ||
+                      doc.document_types?.name ||
+                      doc.custom_document_code ||
+                      doc.document_number ||
+                      'Document'
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300"
+                      >
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-2 flex items-center gap-2">
+                              <div className="rounded-xl bg-slate-100 p-2">
+                                <FileText className="h-4 w-4 text-slate-700" />
+                              </div>
+                              <h3 className="truncate text-base font-semibold text-slate-900">
+                                {docName}
+                              </h3>
+                            </div>
+
+                            <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+                              <InfoItem
+                                label="Document Number"
+                                value={doc.document_number || '—'}
+                              />
+                              <InfoItem label="Status" value={doc.status || '—'} />
+                              <InfoItem label="Issue Date" value={formatUKDate(doc.issue_date)} />
+                              <InfoItem
+                                label="Expiry Date"
+                                value={doc.has_expiry ? formatUKDate(doc.expiry_date) : 'No expiry'}
+                              />
+                            </div>
+
+                            {doc.notes ? (
+                              <p className="mt-3 text-sm text-slate-500">{doc.notes}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {doc.file_url ? (
+                              <button
+                                type="button"
+                                onClick={() => viewDocument(doc.file_url, docName)}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0094e0] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#007bb8] sm:w-auto"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                              </button>
+                            ) : (
+                              <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-500">
+                                No file attached
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'password' && (
+            <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5">
+                <h2 className="text-xl font-bold text-slate-900">Change Password</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Update your staff login password securely.
+                </p>
+              </div>
+
+              <form onSubmit={handleChangePassword} className="max-w-xl space-y-5">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    New Password
+                  </label>
+                  <div className="flex items-center rounded-2xl border border-slate-200 px-4 shadow-sm focus-within:border-[#0094e0]">
+                    <KeyRound className="h-5 w-5 text-slate-400" />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={passwordForm.newPassword}
+                      onChange={(e) =>
+                        setPasswordForm((prev) => ({
+                          ...prev,
+                          newPassword: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter new password"
+                      className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                      className="text-slate-500 transition hover:text-slate-800"
+                    >
+                      {showNewPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Confirm New Password
+                  </label>
+                  <div className="flex items-center rounded-2xl border border-slate-200 px-4 shadow-sm focus-within:border-[#0094e0]">
+                    <KeyRound className="h-5 w-5 text-slate-400" />
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) =>
+                        setPasswordForm((prev) => ({
+                          ...prev,
+                          confirmPassword: e.target.value,
+                        }))
+                      }
+                      placeholder="Confirm new password"
+                      className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      className="text-slate-500 transition hover:text-slate-800"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {passwordError ? (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                    {passwordError}
+                  </div>
+                ) : null}
+
+                {passwordMessage ? (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {passwordMessage}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="rounded-2xl bg-[#0094e0] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#007bb8] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {passwordLoading ? 'Updating Password...' : 'Update Password'}
+                </button>
+              </form>
+            </section>
+          )}
+        </div>
       </div>
 
       {selectedDocumentUrl ? (

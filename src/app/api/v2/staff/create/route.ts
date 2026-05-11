@@ -152,7 +152,7 @@ export async function POST(request: Request) {
 
     const { data: currentProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, role')
+      .select('id, role, full_name, email')
       .eq('auth_user_id', currentUser.id)
       .single()
 
@@ -289,18 +289,108 @@ export async function POST(request: Request) {
     await adminSupabase.from('audit_logs').insert([
       {
         actor_profile_id: currentProfile.id,
-        action_type: 'create_staff_v2',
-        entity_type: 'staff',
+        action_type: 'Creating new Staff',
+        entity_type: 'Staff Modules',
         entity_id: createdStaff.id,
         metadata: {
-          full_name,
-          employee_code,
-          company_name,
-          email,
-          staff_type,
-          status,
-          create_login,
-          profile_id: createdProfileId,
+          actor_name:
+            currentProfile.full_name || currentUser.email || 'Unknown user',
+          actor_email: currentProfile.email || currentUser.email || null,
+          actor_role: currentProfile.role,
+
+          module: 'Staff Management',
+          page: `/admin/staff/new`,
+
+          created_record: {
+            staff_id: createdStaff.id,
+            profile_id: createdProfileId,
+            auth_user_id: createdAuthUserId,
+          },
+
+          changes: [
+            {
+              field: 'full_name',
+              before: null,
+              after: full_name,
+            },
+            {
+              field: 'employee_code',
+              before: null,
+              after: employee_code,
+            },
+            {
+              field: 'company_name',
+              before: null,
+              after: company_name,
+            },
+            {
+              field: 'email',
+              before: null,
+              after: email,
+            },
+            {
+              field: 'phone',
+              before: null,
+              after: phone,
+            },
+            {
+              field: 'second_phone',
+              before: null,
+              after: second_phone,
+            },
+            {
+              field: 'staff_type',
+              before: null,
+              after: staff_type,
+            },
+            {
+              field: 'status',
+              before: null,
+              after: status,
+            },
+            {
+              field: 'nationality',
+              before: null,
+              after: nationality,
+            },
+            {
+              field: 'country_of_birth',
+              before: null,
+              after: country_of_birth,
+            },
+            {
+              field: 'gender',
+              before: null,
+              after: gender,
+            },
+            {
+              field: 'date_of_birth',
+              before: null,
+              after: date_of_birth,
+            },
+            {
+              field: 'access_to_car',
+              before: null,
+              after: access_to_car,
+            },
+            {
+              field: 'driver_licence',
+              before: null,
+              after: driver_licence,
+            },
+            {
+              field: 'parim_staff_id',
+              before: null,
+              after: parim_staff_id,
+            },
+            {
+              field: 'login_created',
+              before: false,
+              after: create_login,
+            },
+          ],
+
+          note: `New staff member ${full_name} was created manually.`,
         },
       },
     ])

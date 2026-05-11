@@ -10,20 +10,35 @@ async function checkAccess() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { error: 'Unauthorized.', status: 401 as const, profile: null }
+    return {
+      error: 'Unauthorized.',
+      status: 401 as const,
+      profile: null,
+      user: null,
+    }
   }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
   if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
-    return { error: 'Forbidden.', status: 403 as const, profile: null }
+    return {
+      error: 'Forbidden.',
+      status: 403 as const,
+      profile: null,
+      user: null,
+    }
   }
 
-  return { error: null, status: 200 as const, profile }
+  return {
+    error: null,
+    status: 200 as const,
+    profile,
+    user,
+  }
 }
 
 export async function GET(
@@ -64,7 +79,7 @@ export async function POST(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -94,17 +109,20 @@ export async function POST(
 
     const { data: existingStaff } = await adminSupabase
       .from('staff')
-      .select('id')
+      .select('id, full_name')
       .eq('id', id)
       .single()
 
     if (!existingStaff) {
-      return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Staff member not found.' },
+        { status: 404 }
+      )
     }
 
     const { data: existingAddress } = await adminSupabase
       .from('staff_addresses')
-      .select('id')
+      .select('*')
       .eq('staff_id', id)
       .eq('is_current', true)
       .maybeSingle()
@@ -151,17 +169,101 @@ export async function POST(
       return NextResponse.json({ error: dbError.message }, { status: 400 })
     }
 
+    const changes = []
+
+    if (existingAddress) {
+      if (existingAddress.street_address !== street_address) {
+        changes.push({
+          field: 'street_address',
+          before: existingAddress.street_address,
+          after: street_address,
+        })
+      }
+
+      if (existingAddress.city !== city) {
+        changes.push({
+          field: 'city',
+          before: existingAddress.city,
+          after: city,
+        })
+      }
+
+      if (existingAddress.post_code !== post_code) {
+        changes.push({
+          field: 'post_code',
+          before: existingAddress.post_code,
+          after: post_code,
+        })
+      }
+
+      if (existingAddress.country !== country) {
+        changes.push({
+          field: 'country',
+          before: existingAddress.country,
+          after: country,
+        })
+      }
+    } else {
+      changes.push(
+        {
+          field: 'street_address',
+          before: null,
+          after: street_address,
+        },
+        {
+          field: 'city',
+          before: null,
+          after: city,
+        },
+        {
+          field: 'post_code',
+          before: null,
+          after: post_code,
+        },
+        {
+          field: 'country',
+          before: null,
+          after: country,
+        }
+      )
+    }
+
     await adminSupabase.from('audit_logs').insert([
       {
         actor_profile_id: access.profile.id,
-        action_type: existingAddress ? 'update_staff_address_v2' : 'create_staff_address_v2',
+
+        action_type: existingAddress
+          ? 'Update Staff Address'
+          : 'Create Staff Address',
+
         entity_type: 'staff_address',
+
         entity_id: resultData.id,
+
         metadata: {
+          actor_name:
+            access.profile.full_name ||
+            access.user.email ||
+            'Unknown user',
+
+          actor_email:
+            access.profile.email || access.user.email || null,
+
+          actor_role: access.profile.role,
+
+          module: 'Staff Management',
+
+          page: `/admin/staff/${id}/address`,
+
           staff_id: id,
-          city,
-          post_code,
-          country,
+
+          staff_name: existingStaff.full_name,
+
+          changes,
+
+          note: existingAddress
+            ? `Address updated for ${existingStaff.full_name}.`
+            : `Address created for ${existingStaff.full_name}.`,
         },
       },
     ])
@@ -171,6 +273,9 @@ export async function POST(
       address: resultData,
     })
   } catch {
-    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error.' },
+      { status: 500 }
+    )
   }
 }

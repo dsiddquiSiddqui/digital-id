@@ -10,20 +10,68 @@ async function checkAccess() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { error: 'Unauthorized.', status: 401 as const, profile: null }
+    return {
+      error: 'Unauthorized.',
+      status: 401 as const,
+      profile: null,
+      user: null,
+    }
   }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
   if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
-    return { error: 'Forbidden.', status: 403 as const, profile: null }
+    return {
+      error: 'Forbidden.',
+      status: 403 as const,
+      profile: null,
+      user: null,
+    }
   }
 
-  return { error: null, status: 200 as const, profile }
+  return {
+    error: null,
+    status: 200 as const,
+    profile,
+    user,
+  }
+}
+
+function getActorMetadata(access: any) {
+  return {
+    actor_name:
+      access.profile?.full_name ||
+      access.user?.email ||
+      'Unknown user',
+    actor_email:
+      access.profile?.email ||
+      access.user?.email ||
+      null,
+    actor_role: access.profile?.role || 'Unknown role',
+  }
+}
+
+function buildChanges(beforeData: Record<string, any> | null, afterData: Record<string, any>) {
+  const changes = []
+
+  for (const key of Object.keys(afterData)) {
+    const beforeValue = beforeData ? beforeData[key] : null
+    const afterValue = afterData[key]
+
+    if (beforeValue !== afterValue) {
+      changes.push({
+        field: key,
+        before: beforeValue,
+        after: afterValue,
+      })
+    }
+  }
+
+  return changes
 }
 
 export async function GET(
@@ -71,7 +119,7 @@ export async function POST(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -79,27 +127,22 @@ export async function POST(
     const body = await request.json()
     const adminSupabase = createAdminClient()
 
-    const rawDocumentTypeId = body.document_type_id
-    const rawCustomName = body.custom_document_name
-    const rawCustomCode = body.custom_document_code
-    const rawCustomHasExpiry = body.custom_has_expiry
-
     const document_type_id =
-      typeof rawDocumentTypeId === 'string' && rawDocumentTypeId.trim()
-        ? rawDocumentTypeId.trim()
+      typeof body.document_type_id === 'string' && body.document_type_id.trim()
+        ? body.document_type_id.trim()
         : null
 
     const custom_document_name =
-      typeof rawCustomName === 'string' && rawCustomName.trim()
-        ? rawCustomName.trim()
+      typeof body.custom_document_name === 'string' && body.custom_document_name.trim()
+        ? body.custom_document_name.trim()
         : null
 
     const custom_document_code =
-      typeof rawCustomCode === 'string' && rawCustomCode.trim()
-        ? rawCustomCode.trim()
+      typeof body.custom_document_code === 'string' && body.custom_document_code.trim()
+        ? body.custom_document_code.trim()
         : null
 
-    const custom_has_expiry = Boolean(rawCustomHasExpiry)
+    const custom_has_expiry = Boolean(body.custom_has_expiry)
 
     const document_number =
       typeof body.document_number === 'string' && body.document_number.trim()
@@ -161,7 +204,7 @@ export async function POST(
 
     const { data: existingStaff, error: staffError } = await adminSupabase
       .from('staff')
-      .select('id')
+      .select('id, full_name')
       .eq('id', id)
       .single()
 
@@ -170,11 +213,12 @@ export async function POST(
     }
 
     let has_expiry = false
+    let documentTypeName: string | null = null
 
     if (!isCustomDocument) {
       const { data: docType, error: docTypeError } = await adminSupabase
         .from('document_types')
-        .select('id, has_expiry')
+        .select('id, name, has_expiry')
         .eq('id', document_type_id)
         .single()
 
@@ -183,8 +227,10 @@ export async function POST(
       }
 
       has_expiry = !!docType.has_expiry
+      documentTypeName = docType.name
     } else {
       has_expiry = custom_has_expiry
+      documentTypeName = custom_document_name
     }
 
     const insertPayload = {
@@ -227,11 +273,14 @@ export async function POST(
         entity_type: 'staff_document',
         entity_id: data.id,
         metadata: {
+          ...getActorMetadata(access),
+          module: 'Staff Management',
+          page: `/admin/staff/${id}/documents`,
           staff_id: id,
-          document_type_id,
-          custom_document_name,
-          status,
-          show_on_staff_panel,
+          staff_name: existingStaff.full_name,
+          document_name: documentTypeName,
+          changes: buildChanges(null, insertPayload),
+          note: `Document ${documentTypeName || 'Unknown document'} was created for ${existingStaff.full_name}.`,
         },
       },
     ])
@@ -241,8 +290,7 @@ export async function POST(
       document: data,
     })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Internal server error.'
+    const message = error instanceof Error ? error.message : 'Internal server error.'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
@@ -254,7 +302,7 @@ export async function PUT(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -267,27 +315,22 @@ export async function PUT(
         ? body.document_id.trim()
         : ''
 
-    const rawDocumentTypeId = body.document_type_id
-    const rawCustomName = body.custom_document_name
-    const rawCustomCode = body.custom_document_code
-    const rawCustomHasExpiry = body.custom_has_expiry
-
     const document_type_id =
-      typeof rawDocumentTypeId === 'string' && rawDocumentTypeId.trim()
-        ? rawDocumentTypeId.trim()
+      typeof body.document_type_id === 'string' && body.document_type_id.trim()
+        ? body.document_type_id.trim()
         : null
 
     const custom_document_name =
-      typeof rawCustomName === 'string' && rawCustomName.trim()
-        ? rawCustomName.trim()
+      typeof body.custom_document_name === 'string' && body.custom_document_name.trim()
+        ? body.custom_document_name.trim()
         : null
 
     const custom_document_code =
-      typeof rawCustomCode === 'string' && rawCustomCode.trim()
-        ? rawCustomCode.trim()
+      typeof body.custom_document_code === 'string' && body.custom_document_code.trim()
+        ? body.custom_document_code.trim()
         : null
 
-    const custom_has_expiry = Boolean(rawCustomHasExpiry)
+    const custom_has_expiry = Boolean(body.custom_has_expiry)
 
     const document_number =
       typeof body.document_number === 'string' && body.document_number.trim()
@@ -351,23 +394,35 @@ export async function PUT(
       )
     }
 
-    const { data: existingDocument, error: existingDocumentError } = await adminSupabase
-      .from('staff_documents')
-      .select('id, staff_id')
-      .eq('id', document_id)
-      .eq('staff_id', id)
+    const { data: existingStaff } = await adminSupabase
+      .from('staff')
+      .select('id, full_name')
+      .eq('id', id)
       .single()
+
+    if (!existingStaff) {
+      return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 })
+    }
+
+    const { data: existingDocument, error: existingDocumentError } =
+      await adminSupabase
+        .from('staff_documents')
+        .select('*')
+        .eq('id', document_id)
+        .eq('staff_id', id)
+        .single()
 
     if (existingDocumentError || !existingDocument) {
       return NextResponse.json({ error: 'Document not found.' }, { status: 404 })
     }
 
     let has_expiry = false
+    let documentTypeName: string | null = null
 
     if (!isCustomDocument) {
       const { data: docType, error: docTypeError } = await adminSupabase
         .from('document_types')
-        .select('id, has_expiry')
+        .select('id, name, has_expiry')
         .eq('id', document_type_id)
         .single()
 
@@ -376,8 +431,10 @@ export async function PUT(
       }
 
       has_expiry = !!docType.has_expiry
+      documentTypeName = docType.name
     } else {
       has_expiry = custom_has_expiry
+      documentTypeName = custom_document_name
     }
 
     const updatePayload = {
@@ -421,11 +478,14 @@ export async function PUT(
         entity_type: 'staff_document',
         entity_id: document_id,
         metadata: {
+          ...getActorMetadata(access),
+          module: 'Staff Management',
+          page: `/admin/staff/${id}/documents`,
           staff_id: id,
-          document_type_id,
-          custom_document_name,
-          status,
-          show_on_staff_panel,
+          staff_name: existingStaff.full_name,
+          document_name: documentTypeName,
+          changes: buildChanges(existingDocument, updatePayload),
+          note: `Document ${documentTypeName || 'Unknown document'} was updated for ${existingStaff.full_name}.`,
         },
       },
     ])
@@ -435,8 +495,7 @@ export async function PUT(
       document: data,
     })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Internal server error.'
+    const message = error instanceof Error ? error.message : 'Internal server error.'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
@@ -448,7 +507,7 @@ export async function DELETE(
   try {
     const access = await checkAccess()
 
-    if (access.error || !access.profile) {
+    if (access.error || !access.profile || !access.user) {
       return NextResponse.json({ error: access.error }, { status: access.status })
     }
 
@@ -463,9 +522,27 @@ export async function DELETE(
       return NextResponse.json({ error: 'Missing document_id.' }, { status: 400 })
     }
 
+    const { data: existingStaff } = await adminSupabase
+      .from('staff')
+      .select('id, full_name')
+      .eq('id', id)
+      .single()
+
+    if (!existingStaff) {
+      return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 })
+    }
+
     const { data: existingDocument } = await adminSupabase
       .from('staff_documents')
-      .select('id, staff_id')
+      .select(`
+        *,
+        document_types (
+          id,
+          code,
+          name,
+          has_expiry
+        )
+      `)
       .eq('id', document_id)
       .eq('staff_id', id)
       .single()
@@ -483,6 +560,11 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    const documentName =
+      existingDocument.document_types?.name ||
+      existingDocument.custom_document_name ||
+      'Unknown document'
+
     await adminSupabase.from('audit_logs').insert([
       {
         actor_profile_id: access.profile.id,
@@ -490,7 +572,21 @@ export async function DELETE(
         entity_type: 'staff_document',
         entity_id: document_id,
         metadata: {
+          ...getActorMetadata(access),
+          module: 'Staff Management',
+          page: `/admin/staff/${id}/documents`,
           staff_id: id,
+          staff_name: existingStaff.full_name,
+          document_name: documentName,
+          deleted_record: existingDocument,
+          changes: [
+            {
+              field: 'document_deleted',
+              before: documentName,
+              after: null,
+            },
+          ],
+          note: `Document ${documentName} was deleted for ${existingStaff.full_name}.`,
         },
       },
     ])
@@ -499,8 +595,7 @@ export async function DELETE(
       success: true,
     })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Internal server error.'
+    const message = error instanceof Error ? error.message : 'Internal server error.'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -101,6 +101,20 @@ function formatFileSize(bytes: number) {
   return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${sizes[i]}`
 }
 
+function formatUKDate(dateString?: string | null) {
+  if (!dateString) return '—'
+
+  const date = new Date(dateString)
+
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
 function FilePreview({
   file,
   previewUrl,
@@ -634,8 +648,8 @@ export default function V2StaffDocumentsPage() {
 
                         <div className="grid grid-cols-1 gap-2 text-sm text-slate-600 md:grid-cols-2">
                           <p>Number: {doc.document_number || '—'}</p>
-                          <p>Issue Date: {doc.issue_date || '—'}</p>
-                          <p>Expiry Date: {doc.expiry_date || '—'}</p>
+                          <p>Issue Date: {formatUKDate(doc.issue_date)}</p>
+                          <p>Expiry Date: {formatUKDate(doc.expiry_date)}</p>
                           <p>
                             Type Code:{' '}
                             {doc.document_types?.code || doc.custom_document_code || '—'}
