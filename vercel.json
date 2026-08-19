@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/automation-runner",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/report-delivery",
