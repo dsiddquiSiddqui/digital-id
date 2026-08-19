@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import IdCard from '@/components/IdCard'
 import {
@@ -18,11 +20,21 @@ import {
 
 type Profile = {
   id: string
+  organization_id: string | null
   auth_user_id: string
   role: string
   full_name: string | null
   email: string | null
   is_active: boolean | null
+  organizations?: {
+    primary_color: string | null
+    accent_color: string | null
+    surface_color: string | null
+  } | Array<{
+    primary_color: string | null
+    accent_color: string | null
+    surface_color: string | null
+  }> | null
 }
 
 type Staff = {
@@ -74,7 +86,7 @@ type TabKey = 'id' | 'documents' | 'password'
 
 export default function MyIdPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
@@ -88,7 +100,7 @@ export default function MyIdPage() {
   const [selectedDocumentName, setSelectedDocumentName] = useState('Document')
 
   const [screenBlocked, setScreenBlocked] = useState(false)
-  const [alertSaving, setAlertSaving] = useState(false)
+  const alertSaving = useRef(false)
 
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
@@ -133,13 +145,14 @@ export default function MyIdPage() {
     })
   }
 
-  const saveScreenshotAlert = async (alertType: string) => {
-    if (alertSaving) return
+  const saveScreenshotAlert = useCallback(async (alertType: string) => {
+    if (alertSaving.current) return
 
     try {
-      setAlertSaving(true)
+      alertSaving.current = true
 
       await supabase.from('screenshot_alerts').insert({
+        organization_id: profile?.organization_id ?? null,
         profile_id: profile?.id ?? null,
         staff_id: staff?.id ?? null,
         full_name: staff?.full_name || profile?.full_name || null,
@@ -152,9 +165,9 @@ export default function MyIdPage() {
     } catch (error) {
       console.error('Screenshot alert save error:', error)
     } finally {
-      setAlertSaving(false)
+      alertSaving.current = false
     }
-  }
+  }, [profile, staff, supabase])
 
   useEffect(() => {
     const blockScreen = async (type: string) => {
@@ -194,7 +207,7 @@ export default function MyIdPage() {
       window.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [profile, staff])
+  }, [saveScreenshotAlert])
 
   useEffect(() => {
     let isMounted = true
@@ -202,7 +215,7 @@ export default function MyIdPage() {
     const getUserWithTimeout = async () => {
       return Promise.race([
         supabase.auth.getUser(),
-        new Promise((_, reject) =>
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Auth timeout')), 5000)
         ),
       ])
@@ -215,7 +228,7 @@ export default function MyIdPage() {
         setLoading(true)
         setAuthError('')
 
-        const result: any = await getUserWithTimeout()
+        const result = await getUserWithTimeout()
         const user = result?.data?.user ?? null
 
         if (!user) {
@@ -226,7 +239,9 @@ export default function MyIdPage() {
 
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, auth_user_id, role, full_name, email, is_active')
+          .select(
+            'id, organization_id, auth_user_id, role, full_name, email, is_active, organizations:organizations(primary_color, accent_color, surface_color)'
+          )
           .eq('auth_user_id', user.id)
           .single()
 
@@ -312,8 +327,8 @@ export default function MyIdPage() {
         const typeIds = [
           ...new Set(
             (docsRaw || [])
-              .map((doc: any) => doc.document_type_id)
-              .filter(Boolean)
+              .map((doc) => doc.document_type_id)
+              .filter((typeId): typeId is string => Boolean(typeId))
           ),
         ] as string[]
 
@@ -328,13 +343,13 @@ export default function MyIdPage() {
           }
 
           documentTypeMap =
-            typeRows?.reduce((acc: Record<string, string>, row: any) => {
+            typeRows?.reduce((acc: Record<string, string>, row) => {
               acc[row.id] = row.name
               return acc
             }, {}) || {}
         }
 
-        const docsFormatted: StaffDocument[] = (docsRaw || []).map((doc: any) => ({
+        const docsFormatted: StaffDocument[] = (docsRaw || []).map((doc) => ({
           ...doc,
           document_types: doc.document_type_id
             ? { name: documentTypeMap[doc.document_type_id] || null }
@@ -356,12 +371,12 @@ export default function MyIdPage() {
       }
     }
 
-    load()
+    void load()
 
     return () => {
       isMounted = false
     }
-  }, [router])
+  }, [router, supabase])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -415,9 +430,20 @@ export default function MyIdPage() {
     return staff?.full_name || profile?.full_name || 'Staff User'
   }, [staff?.full_name, profile?.full_name])
 
+  const organization = Array.isArray(profile?.organizations)
+    ? profile?.organizations[0] ?? null
+    : profile?.organizations ?? null
+
+  const tenantStyle = {
+    '--tenant-primary': organization?.primary_color || '#0094e0',
+    '--tenant-accent': organization?.accent_color || '#081a33',
+    '--tenant-surface': organization?.surface_color || '#f8fafc',
+    '--brand': organization?.primary_color || '#0094e0',
+  } as CSSProperties
+
   if (loading && !profile && !staff) {
     return (
-      <main className="min-h-screen p-6">
+      <main className="tenant-theme min-h-screen p-6" style={tenantStyle}>
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="text-sm text-slate-600">Checking your account...</p>
         </div>
@@ -427,7 +453,7 @@ export default function MyIdPage() {
 
   if (!loading && authError && !profile && !staff) {
     return (
-      <main className="min-h-screen p-6">
+      <main className="tenant-theme min-h-screen p-6" style={tenantStyle}>
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="text-base font-semibold text-slate-800">{authError}</p>
           <button
@@ -442,7 +468,7 @@ export default function MyIdPage() {
   }
 
   return (
-    <main className="min-h-screen p-4 sm:p-6">
+    <main className="tenant-theme min-h-screen p-4 sm:p-6" style={tenantStyle}>
       {screenBlocked ? (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950 p-6 text-center text-white">
           <div className="max-w-sm rounded-3xl bg-white/10 p-6 backdrop-blur">
@@ -462,9 +488,12 @@ export default function MyIdPage() {
               <div className="flex items-start gap-4">
                 <div className="h-14 w-14 overflow-hidden rounded-2xl bg-white/10">
                   {staff?.photo_url ? (
-                    <img
+                    <Image
                       src={staff.photo_url}
                       alt={staff.full_name}
+                      width={56}
+                      height={56}
+                      unoptimized
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -788,9 +817,12 @@ export default function MyIdPage() {
 
             <div className="flex flex-1 items-center justify-center overflow-hidden bg-slate-100 p-2 sm:p-4">
               {isImageFile(selectedDocumentUrl) ? (
-                <img
+                <Image
                   src={selectedDocumentUrl}
                   alt={selectedDocumentName}
+                  width={1200}
+                  height={900}
+                  unoptimized
                   className="max-h-full max-w-full rounded-xl object-contain"
                 />
               ) : isPdfFile(selectedDocumentUrl) ? (

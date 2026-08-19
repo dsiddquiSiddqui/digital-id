@@ -20,11 +20,11 @@ async function checkAccess() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, full_name, email')
+    .select('id, organization_id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+  if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
     return {
       error: 'Forbidden.',
       status: 403 as const,
@@ -41,7 +41,10 @@ async function checkAccess() {
   }
 }
 
-function getActorMetadata(access: any) {
+function getActorMetadata(access: {
+  profile: { full_name?: string | null; email?: string | null; role?: string | null } | null
+  user: { email?: string | null } | null
+}) {
   return {
     actor_name:
       access.profile?.full_name ||
@@ -55,7 +58,7 @@ function getActorMetadata(access: any) {
   }
 }
 
-function buildChanges(beforeData: Record<string, any> | null, afterData: Record<string, any>) {
+function buildChanges(beforeData: Record<string, unknown> | null, afterData: Record<string, unknown>) {
   const changes = []
 
   for (const key of Object.keys(afterData)) {
@@ -100,6 +103,7 @@ export async function GET(
         )
       `)
       .eq('staff_id', id)
+      .eq('organization_id', access.profile!.organization_id)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -206,6 +210,7 @@ export async function POST(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (staffError || !existingStaff) {
@@ -220,6 +225,7 @@ export async function POST(
         .from('document_types')
         .select('id, name, has_expiry')
         .eq('id', document_type_id)
+        .eq('organization_id', access.profile.organization_id)
         .single()
 
       if (docTypeError || !docType) {
@@ -234,6 +240,7 @@ export async function POST(
     }
 
     const insertPayload = {
+      organization_id: access.profile.organization_id,
       staff_id: id,
       document_type_id: isCustomDocument ? null : document_type_id,
       custom_document_name: isCustomDocument ? custom_document_name : null,
@@ -268,6 +275,7 @@ export async function POST(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
         action_type: 'create_staff_document_v2',
         entity_type: 'staff_document',
@@ -398,6 +406,7 @@ export async function PUT(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -410,6 +419,7 @@ export async function PUT(
         .select('*')
         .eq('id', document_id)
         .eq('staff_id', id)
+        .eq('organization_id', access.profile.organization_id)
         .single()
 
     if (existingDocumentError || !existingDocument) {
@@ -424,6 +434,7 @@ export async function PUT(
         .from('document_types')
         .select('id, name, has_expiry')
         .eq('id', document_type_id)
+        .eq('organization_id', access.profile.organization_id)
         .single()
 
       if (docTypeError || !docType) {
@@ -456,6 +467,7 @@ export async function PUT(
       .update(updatePayload)
       .eq('id', document_id)
       .eq('staff_id', id)
+      .eq('organization_id', access.profile.organization_id)
       .select(`
         *,
         document_types (
@@ -473,6 +485,7 @@ export async function PUT(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
         action_type: 'update_staff_document_v2',
         entity_type: 'staff_document',
@@ -526,6 +539,7 @@ export async function DELETE(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -545,6 +559,7 @@ export async function DELETE(
       `)
       .eq('id', document_id)
       .eq('staff_id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingDocument) {
@@ -555,6 +570,7 @@ export async function DELETE(
       .from('staff_documents')
       .delete()
       .eq('id', document_id)
+      .eq('organization_id', access.profile.organization_id)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
@@ -567,6 +583,7 @@ export async function DELETE(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
         action_type: 'delete_staff_document_v2',
         entity_type: 'staff_document',

@@ -193,12 +193,6 @@ export default function IssueIdPage() {
     }
   }, [id, supabase])
 
-  useEffect(() => {
-    if (!expiryManuallyChanged) {
-      setExpiryDate(addOneYear(issueDate))
-    }
-  }, [issueDate, expiryManuallyChanged])
-
   const handleIssue = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
@@ -462,7 +456,11 @@ export default function IssueIdPage() {
               type="date"
               value={issueDate}
               onChange={(e) => {
-                setIssueDate(e.target.value)
+                const nextIssueDate = e.target.value
+                setIssueDate(nextIssueDate)
+                if (!expiryManuallyChanged) {
+                  setExpiryDate(addOneYear(nextIssueDate))
+                }
               }}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
               required

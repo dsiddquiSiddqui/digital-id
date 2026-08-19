@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -192,7 +192,7 @@ export default function V2StaffDocumentsPage() {
   const [editForm, setEditForm] = useState<DocumentFormState>(getInitialFormState())
   const [editFilePreview, setEditFilePreview] = useState<string | null>(null)
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
 
@@ -228,11 +228,11 @@ export default function V2StaffDocumentsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
   useEffect(() => {
-    if (id) loadData()
-  }, [id])
+    if (id) void Promise.resolve().then(loadData)
+  }, [id, loadData])
 
   useEffect(() => {
     if (!addForm.file) {

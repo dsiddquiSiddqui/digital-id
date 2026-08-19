@@ -15,6 +15,9 @@ import {
   UserRound,
   FileText,
   ShieldCheck,
+  ClipboardCheck,
+  Clock3,
+  Gauge,
 } from 'lucide-react'
 import IdCard from '@/components/IdCard'
 
@@ -146,6 +149,7 @@ export default function V2StaffDetailPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [statusLoading, setStatusLoading] = useState<string | null>(null)
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const [staff, setStaff] = useState<Staff | null>(null)
   const [employment, setEmployment] = useState<StaffEmployment | null>(null)
@@ -254,6 +258,36 @@ export default function V2StaffDetailPage() {
     }
   }
 
+  const exportIdPdf = async () => {
+    if (!staff) return
+    setExportingPdf(true)
+    setError('')
+    try {
+      const response = await fetch('/api/admin/id-card-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staff_id: staff.id }),
+      })
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        setError(result.error || 'Unable to export ID PDF.')
+        return
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `id-card-${staff.employee_code || staff.id}.pdf`
+      link.click()
+      window.URL.revokeObjectURL(url)
+      setMessage('ID PDF exported.')
+    } catch {
+      setError('Something went wrong while exporting the ID PDF.')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   const completion = useMemo(() => {
     if (!staff) return 0
 
@@ -348,6 +382,18 @@ export default function V2StaffDetailPage() {
   ).length
 
   const latestDocuments = documents.slice(0, 3)
+
+  const riskLevel = useMemo(() => {
+    if (!currentId || problemDocuments > 0 || completion < 70) return 'high'
+    if (completion < 90 || validDocuments < documents.length) return 'medium'
+    return 'low'
+  }, [completion, currentId, documents.length, problemDocuments, validDocuments])
+
+  const timeline = [
+    { label: 'Profile created', value: formatUKDate(staff?.created_at), tone: 'neutral' },
+    { label: currentId ? 'Current ID issued' : 'Digital ID missing', value: currentId ? formatUKDate(currentId.issue_date) : 'Action needed', tone: currentId ? 'good' : 'warn' },
+    { label: problemDocuments > 0 ? 'Document issue found' : 'Documents reviewed', value: problemDocuments > 0 ? `${problemDocuments} issue(s)` : `${validDocuments} valid`, tone: problemDocuments > 0 ? 'warn' : 'good' },
+  ]
 
   if (loading) {
     return (
@@ -489,6 +535,38 @@ export default function V2StaffDetailPage() {
         <MiniStat title="Documents" value={`${documents.length}`} />
       </section>
 
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Gauge className="h-5 w-5 text-slate-500" />
+            <h2 className="text-lg font-semibold text-slate-900">Compliance Signal</h2>
+          </div>
+          <div className={`mt-5 rounded-3xl border p-5 ${riskLevel === 'low' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : riskLevel === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+            <p className="text-3xl font-black capitalize">{riskLevel}</p>
+            <p className="mt-2 text-sm font-semibold opacity-80">
+              {riskLevel === 'low' ? 'Profile, ID, and documents look healthy.' : riskLevel === 'medium' ? 'Some profile or document data should be reviewed.' : 'Missing ID, document issues, or low completion need attention.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Clock3 className="h-5 w-5 text-slate-500" />
+            <h2 className="text-lg font-semibold text-slate-900">Profile Timeline</h2>
+          </div>
+          <div className="mt-5 space-y-3">
+            {timeline.map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="text-sm font-bold text-slate-700">{item.label}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-black ${item.tone === 'good' ? 'bg-emerald-100 text-emerald-700' : item.tone === 'warn' ? 'bg-amber-100 text-amber-700' : 'bg-white text-slate-500'}`}>
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card
@@ -576,13 +654,22 @@ export default function V2StaffDetailPage() {
             title="Documents"
             icon={<FileText className="h-5 w-5" />}
             action={
-              <Link
-                href={`/v2/staff/${staff.id}/documents`}
-                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-              >
-                Manage
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/v2/staff/${staff.id}/checklist`}
+                  className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  Checklist
+                </Link>
+                <Link
+                  href={`/v2/staff/${staff.id}/documents`}
+                  className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
+                >
+                  Manage
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
             }
           >
             {documents.length > 0 ? (
@@ -770,6 +857,14 @@ export default function V2StaffDetailPage() {
                   Issue Digital ID
                 </Link>
               )}
+              <button
+                type="button"
+                onClick={exportIdPdf}
+                disabled={exportingPdf}
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-60"
+              >
+                {exportingPdf ? 'Exporting PDF...' : 'Export ID PDF'}
+              </button>
             </div>
           </Card>
 

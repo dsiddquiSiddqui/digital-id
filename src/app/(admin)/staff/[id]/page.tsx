@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -45,7 +46,7 @@ function formatUKDate(dateString?: string | null) {
 }
 
 export default function StaffDetailPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const params = useParams()
   const id = params.id as string
 
@@ -56,7 +57,7 @@ export default function StaffDetailPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data: staffData } = await supabase
       .from('staff')
       .select('*')
@@ -72,11 +73,11 @@ export default function StaffDetailPage() {
     if (staffData) setStaff(staffData)
     if (idData) setStaffIds(idData)
     setLoading(false)
-  }
+  }, [id, supabase])
 
   useEffect(() => {
-    if (id) fetchData()
-  }, [id])
+    if (id) void Promise.resolve().then(fetchData)
+  }, [id, fetchData])
 
   const updateStatus = async (newStatus: string) => {
     if (!staff) return
@@ -105,7 +106,7 @@ export default function StaffDetailPage() {
 
       setStaff((prev) => (prev ? { ...prev, status: newStatus } : prev))
       setMessage(`Staff status updated to ${newStatus}.`)
-    } catch (err) {
+    } catch {
       setError('Something went wrong while updating status.')
     } finally {
       setStatusLoading(null)
@@ -182,9 +183,12 @@ export default function StaffDetailPage() {
           <div className="flex items-start gap-4">
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-slate-100">
               {staff.photo_url ? (
-                <img
+                <Image
                   src={staff.photo_url}
                   alt={staff.full_name}
+                  width={64}
+                  height={64}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (

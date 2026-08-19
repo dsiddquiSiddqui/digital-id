@@ -1,39 +1,64 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import NextImage from 'next/image'
 import {
   LayoutDashboard,
   Shield,
   Bell,
   FileText,
   LogOut,
+  LogIn,
   Menu,
   X,
-  Plus,
   User,
   Users,
-  Search,
   Mail,
   ChevronRight,
+  Settings,
+  BadgeDollarSign,
+  ClipboardCheck,
+  FileBarChart,
+  ShieldCheck,
+  LifeBuoy,
+  FileSpreadsheet,
+  CreditCard,
+  GitBranch,
+  CheckSquare,
 } from 'lucide-react'
-import Image from 'next/image'
-import logo from '@/assets/SGC-Security-Tag-Logo.svg'
 import { createClient } from '@/lib/supabase/client'
+import LegalConsentBanner from '@/components/LegalConsentBanner'
+import AdminCommandBar from '@/components/admin/AdminCommandBar'
+import { ToastProvider } from '@/components/admin/ToastProvider'
 
 type Profile = {
   id: string
+  organization_id?: string | null
   auth_user_id: string
   role: string
   full_name: string
   email: string
   is_active?: boolean
+  organizations?: {
+    id: string
+    name: string
+    slug: string
+    logo_url: string | null
+    background_image_url: string | null
+    theme_key: string
+    primary_color: string
+    accent_color: string
+    surface_color: string
+  } | null
 }
 
 const ALLOWED_LAYOUT_ROLES = [
   'super_admin',
   'admin',
+  'manager',
   'hr_manager',
   'hr',
   'operation_manager',
@@ -67,7 +92,9 @@ export default function AdminLayout({
 
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select(
+            '*, organizations:organizations(id, name, slug, logo_url, background_image_url, theme_key, primary_color, accent_color, surface_color)'
+          )
           .eq('auth_user_id', user.id)
           .single()
 
@@ -83,6 +110,16 @@ export default function AdminLayout({
           return
         }
 
+        if (profileData.role === 'super_admin' && profileData.organization_id) {
+          const sessionResponse = await fetch('/api/platform/organizations/session')
+          const sessionResult = await sessionResponse.json().catch(() => null)
+
+          if (sessionResult?.expired || sessionResult?.redirect_to) {
+            router.push(sessionResult.redirect_to || '/platform/organizations')
+            return
+          }
+        }
+
         setProfile(profileData)
       } catch (error) {
         console.error('Admin layout error:', error)
@@ -95,12 +132,44 @@ export default function AdminLayout({
     checkAdmin()
   }, [router, supabase])
 
+  useEffect(() => {
+    if (!profile) return
+    const record = () => {
+      fetch('/api/session/activity', { method: 'POST' }).catch(() => null)
+    }
+    record()
+    const timer = window.setInterval(record, 5 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [profile])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
+  const handleLeaveWorkspace = async () => {
+    await fetch('/api/platform/organizations/leave', {
+      method: 'POST',
+    })
+    router.push('/platform/organizations')
+  }
+
   const role = profile?.role ?? ''
+  const organization = profile?.organizations ?? null
+  const tenantStyle = {
+    '--tenant-primary': organization?.primary_color || '#0094e0',
+    '--tenant-accent': organization?.accent_color || '#081a33',
+    '--tenant-surface': organization?.surface_color || '#f8fafc',
+    '--brand': organization?.primary_color || '#0094e0',
+    ...(organization?.background_image_url
+      ? {
+          backgroundImage: `linear-gradient(rgba(248,250,252,0.88), rgba(248,250,252,0.88)), url(${organization.background_image_url})`,
+          backgroundAttachment: 'fixed',
+          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+        }
+      : {}),
+  } as CSSProperties
 
   const permissions = useMemo(() => {
     const isSuperAdmin = role === 'super_admin'
@@ -135,6 +204,7 @@ export default function AdminLayout({
       canViewUsers: !['operation_manager', 'operation_team'].includes(role),
 
       canViewProfile: true,
+      canManageSettings: isSuperAdmin || isAdmin,
 
       isSuperAdmin,
       isAdmin,
@@ -153,89 +223,240 @@ export default function AdminLayout({
     if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/edit')) return 'Edit Staff'
     if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/password')) return 'Reset Staff Password'
     if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/issue-id')) return 'Issue Digital ID'
+    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/checklist')) return 'Document Checklist'
     if (pathname.startsWith('/v2/staff/')) return 'Staff Details'
     if (pathname === '/alerts') return 'Alerts'
+    if (pathname === '/expiry-alerts') return 'Expiry Alerts'
+    if (pathname === '/billing') return 'Billing'
+    if (pathname === '/reports') return 'Reports'
+    if (pathname === '/notifications') return 'Notifications'
+    if (pathname === '/document-renewals') return 'Document Renewals'
+    if (pathname === '/imports') return 'Import History'
+    if (pathname === '/bulk-actions') return 'Bulk Actions'
+    if (pathname === '/id-card-designer') return 'ID Card Designer'
+    if (pathname === '/custom-domains') return 'Custom Domains'
+    if (pathname === '/automations') return 'Workflow Automations'
+    if (pathname === '/setup-wizard') return 'Setup Wizard'
+    if (pathname === '/enterprise-health') return 'Enterprise Health'
+    if (pathname === '/launch-checklist') return 'Launch Checklist'
+    if (pathname === '/email-templates') return 'Email Templates'
+    if (pathname === '/scheduled-jobs') return 'Scheduled Jobs'
+    if (pathname === '/permission-audit') return 'Permission Audit'
+    if (pathname === '/production-readiness') return 'Production Readiness'
+    if (pathname === '/security-center') return 'Security Center'
+    if (pathname === '/onboarding-checklist') return 'Onboarding Checklist'
+    if (pathname === '/help') return 'Help Center'
     if (pathname === '/audit-logs') return 'Audit Logs'
     if (pathname === '/profile') return 'My Profile'
+    if (pathname === '/settings') return 'Organization Settings'
+    if (pathname === '/settings/permissions') return 'Role Permissions'
     if (pathname === '/users') return 'Users'
+    if (pathname === '/users/invite') return 'Invite User'
     if (pathname.startsWith('/users/') && pathname.endsWith('/edit')) return 'Edit User'
     if (pathname.startsWith('/users/') && pathname.endsWith('/password')) return 'Reset User Password'
     if (pathname.startsWith('/staff-ids/') && pathname.endsWith('/edit')) return 'Edit Digital ID'
     return 'Admin Panel'
   }, [pathname])
 
-  const sidebarItems = [
-    permissions.canViewDashboard
-      ? {
-          href: '/dashboard',
-          label: 'Dashboard',
-          icon: <LayoutDashboard className="h-4 w-4" />,
-          active: pathname === '/dashboard',
-        }
-      : null,
+  const sidebarSections = [
+    {
+      title: 'Workspace',
+      items: [
+        permissions.canViewDashboard
+          ? {
+              href: '/dashboard',
+              label: 'Dashboard',
+              icon: <LayoutDashboard className="h-4 w-4" />,
+              active: pathname === '/dashboard',
+            }
+          : null,
+        permissions.canViewStaff
+          ? {
+              href: '/v2/staff',
+              label: 'Staff',
+              icon: <Shield className="h-4 w-4" />,
+              active:
+                pathname === '/v2/staff' ||
+                pathname.startsWith('/v2/staff/') ||
+                pathname.startsWith('/staff/'),
+            }
+          : null,
+        permissions.canViewStaff
+          ? {
+              href: '/reports',
+              label: 'Reports',
+              icon: <FileBarChart className="h-4 w-4" />,
+              active: pathname === '/reports',
+            }
+          : null,
+        permissions.canViewStaff
+          ? {
+              href: '/notifications',
+              label: 'Notifications',
+              icon: <Bell className="h-4 w-4" />,
+              active: pathname === '/notifications',
+            }
+          : null,
+      ],
+    },
+    {
+      title: 'Operations',
+      items: [
+        permissions.canViewAlerts
+          ? {
+              href: '/alerts',
+              label: 'Alerts',
+              icon: <Bell className="h-4 w-4" />,
+              active: pathname === '/alerts',
+            }
+          : null,
+        permissions.canViewStaff
+          ? {
+              href: '/expiry-alerts',
+              label: 'Expiry Alerts',
+              icon: <FileText className="h-4 w-4" />,
+              active: pathname === '/expiry-alerts',
+            }
+          : null,
+        permissions.canViewStaff
+          ? {
+              href: '/document-renewals',
+              label: 'Renewals',
+              icon: <ClipboardCheck className="h-4 w-4" />,
+              active: pathname === '/document-renewals',
+            }
+          : null,
+        permissions.canBulkUploadStaff
+          ? {
+              href: '/bulk-actions',
+              label: 'Bulk Actions',
+              icon: <FileSpreadsheet className="h-4 w-4" />,
+              active:
+                pathname === '/bulk-actions' ||
+                pathname === '/imports' ||
+                pathname === '/v2/staff/bulk-upload',
+            }
+          : null,
+      ],
+    },
+    {
+      title: 'Build',
+      items: [
+        permissions.canManageSettings
+          ? {
+              href: '/setup-wizard',
+              label: 'Setup Wizard',
+              icon: <CheckSquare className="h-4 w-4" />,
+              active:
+                pathname === '/setup-wizard' ||
+                pathname === '/onboarding-checklist' ||
+                pathname === '/launch-checklist' ||
+                pathname === '/production-readiness',
+            }
+          : null,
+        permissions.canManageSettings
+          ? {
+              href: '/id-card-designer',
+              label: 'ID Designer',
+              icon: <CreditCard className="h-4 w-4" />,
+              active: pathname === '/id-card-designer',
+            }
+          : null,
+        permissions.canManageSettings
+          ? {
+              href: '/automations',
+              label: 'Automations',
+              icon: <GitBranch className="h-4 w-4" />,
+              active: pathname === '/automations',
+            }
+          : null,
+      ],
+    },
+    {
+      title: 'Admin',
+      items: [
+        permissions.canViewUsers
+          ? {
+              href: '/users',
+              label: 'Users',
+              icon: <Users className="h-4 w-4" />,
+              active: pathname === '/users' || pathname.startsWith('/users/'),
+            }
+          : null,
+        permissions.canManageSettings
+          ? {
+              href: '/billing',
+              label: 'Billing',
+              icon: <BadgeDollarSign className="h-4 w-4" />,
+              active: pathname === '/billing',
+            }
+          : null,
+        permissions.canManageSettings
+          ? {
+              href: '/security-center',
+              label: 'Security',
+              icon: <ShieldCheck className="h-4 w-4" />,
+              active:
+                pathname === '/security-center' ||
+                pathname === '/permission-audit' ||
+                pathname === '/audit-logs',
+            }
+          : null,
+        permissions.canManageSettings
+          ? {
+              href: '/settings',
+              label: 'Settings',
+              icon: <Settings className="h-4 w-4" />,
+              active:
+                pathname === '/settings' ||
+                pathname === '/settings/permissions' ||
+                pathname === '/custom-domains' ||
+                pathname === '/email-templates' ||
+                pathname === '/scheduled-jobs' ||
+                pathname === '/enterprise-health',
+            }
+          : null,
+      ],
+    },
+    {
+      title: 'Support',
+      items: [
+        permissions.canViewProfile
+          ? {
+              href: '/help',
+              label: 'Docs & Tickets',
+              icon: <LifeBuoy className="h-4 w-4" />,
+              active: pathname === '/help',
+            }
+          : null,
+        permissions.canViewProfile
+          ? {
+              href: '/profile',
+              label: 'My Profile',
+              icon: <User className="h-4 w-4" />,
+              active: pathname === '/profile',
+            }
+          : null,
+      ],
+    },
+  ]
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(Boolean) as Array<{
+        href: string
+        label: string
+        icon: React.ReactNode
+        active: boolean
+      }>,
+    }))
+    .filter((section) => section.items.length > 0)
 
-    permissions.canViewStaff
-      ? {
-          href: '/v2/staff',
-          label: 'Staff',
-          icon: <Shield className="h-4 w-4" />,
-          active:
-            pathname === '/v2/staff' ||
-            pathname.startsWith('/v2/staff/') ||
-            pathname.startsWith('/staff/'),
-        }
-      : null,
-
-    permissions.canBulkUploadStaff
-      ? {
-          href: '/v2/staff/bulk-upload',
-          label: 'Bulk Upload Staff',
-          icon: <Plus className="h-4 w-4" />,
-          active: pathname === '/v2/staff/bulk-upload',
-        }
-      : null,
-
-    permissions.canViewAlerts
-      ? {
-          href: '/alerts',
-          label: 'Alerts',
-          icon: <Bell className="h-4 w-4" />,
-          active: pathname === '/alerts',
-        }
-      : null,
-
-    permissions.canViewAuditLogs
-      ? {
-          href: '/audit-logs',
-          label: 'Audit Logs',
-          icon: <FileText className="h-4 w-4" />,
-          active: pathname === '/audit-logs',
-        }
-      : null,
-
-    permissions.canViewUsers
-      ? {
-          href: '/users',
-          label: 'Users',
-          icon: <Users className="h-4 w-4" />,
-          active: pathname === '/users' || pathname.startsWith('/users/'),
-        }
-      : null,
-
-    permissions.canViewProfile
-      ? {
-          href: '/profile',
-          label: 'My Profile',
-          icon: <User className="h-4 w-4" />,
-          active: pathname === '/profile',
-        }
-      : null,
-  ].filter(Boolean) as Array<{
+  type SidebarItem = {
     href: string
     label: string
     icon: React.ReactNode
     active: boolean
-  }>
+  }
 
   if (loading) {
     return (
@@ -248,7 +469,8 @@ export default function AdminLayout({
   }
 
   return (
-    <main className="min-h-screen  p-4 text-slate-900 lg:p-6">
+    <ToastProvider>
+    <main className="tenant-theme min-h-screen p-4 text-slate-900 lg:p-6" style={tenantStyle}>
       <div className="flex min-h-[calc(100vh-2rem)] overflow-hidden rounded-[34px] border border-white/60 bg-[#f8fafcdb] shadow-[0_20px_60px_rgba(15,23,42,0.08)] lg:min-h-[calc(100vh-3rem)]">
         {mobileSidebarOpen ? (
           <div
@@ -264,15 +486,41 @@ export default function AdminLayout({
         >
           <div className="border-b border-slate-200/70 px-5 py-5">
             <div className="flex items-center justify-between lg:justify-center">
-              <div className="">
-                <div className="flex items-center justify-center">
-                  <Image
-                    src={logo}
-                    alt="SGC Security"
-                    className="h-auto w-[260px] object-contain"
-                    priority
-                  />
+              <div className="w-full">
+                <div className="flex items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
+                  <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-[var(--tenant-primary)] text-white">
+                    {organization?.logo_url ? (
+                      <NextImage
+                        unoptimized
+                        src={organization.logo_url}
+                        alt=""
+                        width={44}
+                        height={44}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Shield className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-slate-950">
+                      Security ID
+                    </p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      Workspace
+                    </p>
+                  </div>
                 </div>
+                {organization ? (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                    <p className="truncate text-sm font-bold text-slate-950">
+                      {organization.name}
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      {organization.slug}
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               <button
@@ -285,24 +533,47 @@ export default function AdminLayout({
           </div>
 
           <nav className="flex-1 overflow-y-auto px-3 pb-4">
-            <p className="mt-3 px-3 pb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-              Menu
-            </p>
-
-            <div className="space-y-1">
-              {sidebarItems.map((item) => (
-                <SidebarLink
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                  active={item.active}
-                />
+            <div className="mt-4 space-y-5">
+              {sidebarSections.map((section) => (
+                <div key={section.title}>
+                  <p className="px-3 pb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    {section.title}
+                  </p>
+                  <div className="space-y-1">
+                    {section.items.map((item: SidebarItem) => (
+                      <SidebarLink
+                        key={item.href}
+                        href={item.href}
+                        label={item.label}
+                        icon={item.icon}
+                        active={item.active}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
+            <p className="mt-5 rounded-2xl bg-white px-4 py-3 text-xs font-semibold leading-5 text-slate-500 ring-1 ring-slate-200">
+              Press Ctrl K for advanced tools, imports, domains, jobs, audit logs, and launch checks.
+            </p>
           </nav>
 
           <div className="border-t border-slate-200 p-4">
+            {role === 'super_admin' && organization ? (
+              <button
+                onClick={handleLeaveWorkspace}
+                className="mb-3 flex w-full items-center justify-between rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-amber-100 p-2">
+                    <LogIn className="h-4 w-4 rotate-180" />
+                  </div>
+                  <span>Exit workspace</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-amber-500" />
+              </button>
+            ) : null}
+
             <button
               onClick={handleLogout}
               className="group flex w-full items-center justify-between rounded-[22px] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
@@ -319,6 +590,22 @@ export default function AdminLayout({
         </aside>
 
         <div className="flex-1 lg:pl-0">
+          {role === 'super_admin' && organization ? (
+            <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-amber-900 lg:px-8">
+              <div className="flex flex-col gap-3 text-sm font-semibold md:flex-row md:items-center md:justify-between">
+                <span>
+                  Super admin audit mode: viewing {organization.name}. This access expires after 30 minutes and all changes are audited.
+                </span>
+                <button
+                  onClick={handleLeaveWorkspace}
+                  className="inline-flex items-center justify-center rounded-full bg-amber-900 px-4 py-2 text-xs font-black text-white"
+                >
+                  Exit workspace
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <header className="border-b border-slate-200/70 bg-[#f8fafc] px-5 py-4 lg:px-8">
             <div className="flex items-center justify-between gap-4 rounded-[26px] bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/80">
               <div className="flex items-center gap-3">
@@ -329,33 +616,23 @@ export default function AdminLayout({
                   <Menu className="h-5 w-5" />
                 </button>
 
-                <div className="hidden items-center rounded-2xl bg-[#f8fafc] px-4 py-3 ring-1 ring-slate-200 md:flex">
-                  <Search className="h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder={`Search ${pageTitle.toLowerCase()}...`}
-                    className="w-[260px] bg-transparent px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  />
-                  <span className="rounded-lg bg-white px-2 py-1 text-[11px] font-semibold text-slate-400 ring-1 ring-slate-200">
-                    ⌘ F
-                  </span>
-                </div>
+                <AdminCommandBar pageTitle={pageTitle} />
               </div>
 
               <div className="flex items-center gap-3">
-                <button className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f8fafc] text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100">
+                <Link href="/email-templates" aria-label="Open email templates" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f8fafc] text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100">
                   <Mail className="h-4 w-4" />
-                </button>
+                </Link>
 
-                <button className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f8fafc] text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100">
+                <Link href="/notifications" aria-label="Open notifications" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f8fafc] text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100">
                   <Bell className="h-4 w-4" />
-                </button>
+                </Link>
 
                 <Link
                   href="/profile"
                   className="flex items-center gap-3 rounded-full bg-[#f8fafc] px-3 py-2 ring-1 ring-slate-200 transition hover:bg-slate-100"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0094e0]/15 text-sm font-bold text-[#0094e0]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--tenant-primary)_14%,white)] text-sm font-bold text-[var(--tenant-primary)]">
                     {profile?.full_name?.charAt(0)?.toUpperCase() || 'A'}
                   </div>
 
@@ -373,9 +650,11 @@ export default function AdminLayout({
           </header>
 
           <div className="px-5 py-5 lg:px-8">{children}</div>
+          <LegalConsentBanner />
         </div>
       </div>
     </main>
+    </ToastProvider>
   )
 }
 
@@ -395,7 +674,7 @@ function SidebarLink({
       href={href}
       className={`group flex items-center gap-3 rounded-[18px] px-4 py-3 text-sm font-medium transition ${
         active
-          ? 'bg-[#0094e0] text-white shadow-sm'
+          ? 'bg-[var(--tenant-primary)] text-white shadow-sm'
           : 'text-slate-600 hover:bg-white hover:text-slate-900'
       }`}
     >

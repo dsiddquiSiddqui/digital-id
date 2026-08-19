@@ -17,17 +17,18 @@ export async function GET() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('organization_id, role')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+    if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     const { data, error } = await adminSupabase
       .from('document_types')
       .select('*')
+      .eq('organization_id', profile.organization_id)
       .order('name', { ascending: true })
 
     if (error) {

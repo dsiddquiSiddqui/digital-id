@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getBillingPlan } from '@/lib/billing-plans'
 
 const ALLOWED_STATUSES = ['active', 'inactive', 'suspended', 'revoked', 'archived']
 const ALLOWED_TYPES = ['security', 'warehouse', 'event', 'admin', 'contractor', 'other']
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
 
     const { data: currentProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, role, full_name, email')
+      .select('id, organization_id, role, full_name, email')
       .eq('auth_user_id', currentUser.id)
       .single()
 
@@ -164,9 +165,57 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
+    const { data: organization } = await adminSupabase
+      .from('organizations')
+      .select('id, status, plan')
+      .eq('id', currentProfile.organization_id)
+      .single()
+
+    if (!organization || !['active', 'trialing'].includes(organization.status)) {
+      return NextResponse.json(
+        { error: 'This organization is not active.' },
+        { status: 403 }
+      )
+    }
+
+    const billingPlan = getBillingPlan(organization.plan)
+
+    if (billingPlan.staffLimit !== null) {
+      const { count: currentStaffCount } = await adminSupabase
+        .from('staff')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentProfile.organization_id)
+
+      if ((currentStaffCount || 0) >= billingPlan.staffLimit) {
+        return NextResponse.json(
+          {
+            error: `${billingPlan.name} plan allows ${billingPlan.staffLimit} staff records. Upgrade the organization plan to add more staff.`,
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    if (create_login && billingPlan.userLimit !== null) {
+      const { count: currentUserCount } = await adminSupabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentProfile.organization_id)
+
+      if ((currentUserCount || 0) >= billingPlan.userLimit) {
+        return NextResponse.json(
+          {
+            error: `${billingPlan.name} plan allows ${billingPlan.userLimit} users. Create this staff member without login access or upgrade the plan.`,
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     const { data: existingStaff } = await adminSupabase
       .from('staff')
       .select('id')
+      .eq('organization_id', currentProfile.organization_id)
       .eq('employee_code', employee_code)
       .maybeSingle()
 
@@ -216,6 +265,7 @@ export async function POST(request: Request) {
           .from('profiles')
           .insert([
             {
+              organization_id: currentProfile.organization_id,
               auth_user_id: createdAuthUserId,
               role: 'staff',
               full_name,
@@ -242,6 +292,7 @@ export async function POST(request: Request) {
     }
 
     const insertPayload = {
+      organization_id: currentProfile.organization_id,
       profile_id: createdProfileId,
       full_name,
       parim_staff_id,
@@ -288,6 +339,7 @@ export async function POST(request: Request) {
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: currentProfile.organization_id,
         actor_profile_id: currentProfile.id,
         action_type: 'Creating new Staff',
         entity_type: 'Staff Modules',
@@ -402,7 +454,7 @@ export async function POST(request: Request) {
       auth_user_id: createdAuthUserId,
       login_created: create_login,
     })
-  } catch (error) {
+  } catch {
     if (createdStaffId) {
       await adminSupabase.from('staff').delete().eq('id', createdStaffId)
     }

@@ -2,22 +2,27 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
-import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
-import loogo from '@/assets/SGC-Security-Tag-Logo.svg'
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type StaffProfile = {
   id: string
+  organization_id: string | null
   auth_user_id: string
   role: string
   full_name: string
   email: string
   is_active: boolean
+  organizations?: {
+    status: string
+    require_2fa?: boolean
+  } | Array<{
+    status: string
+    require_2fa?: boolean
+  }> | null
 }
 
-export default function staffLoginPage() {
+export default function StaffLoginPage() {
   const supabase = createClient()
   const router = useRouter()
 
@@ -57,7 +62,7 @@ export default function staffLoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, auth_user_id, role, full_name, email, is_active')
+      .select('id, organization_id, auth_user_id, role, full_name, email, is_active, organizations:organizations(status, require_2fa)')
       .eq('auth_user_id', user.id)
       .single<StaffProfile>()
 
@@ -79,11 +84,35 @@ export default function staffLoginPage() {
       return
     }
 
+    const organization = Array.isArray(profile.organizations)
+      ? profile.organizations[0] ?? null
+      : profile.organizations ?? null
+
+    if (
+      profile.organization_id &&
+      organization &&
+      !['active', 'trialing'].includes(organization.status)
+    ) {
+      await supabase.auth.signOut()
+      setError('This organization is not active. Please contact your admin.')
+      return
+    }
+
     // 🔥 IMPORTANT FIX FOR WEBVIEW
+    if (organization?.require_2fa) {
+      const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (assurance?.nextLevel === 'aal2' && assurance?.currentLevel !== 'aal2') {
+        router.replace('/mfa?next=/my-id')
+        return
+      }
+    }
+
+    await fetch('/api/session/activity', { method: 'POST' }).catch(() => null)
+
     await new Promise((res) => setTimeout(res, 500))
 
     router.replace('/my-id')
-  } catch (err: any) {
+  } catch (err) {
     console.error('Login error:', err)
     setError('Something went wrong. Please try again.')
   } finally {
@@ -92,33 +121,27 @@ export default function staffLoginPage() {
 }
 
   return (
-    <main className="relative min-h-screen overflow-hidden ">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,148,224,0.08),transparent_35%)]" />
-      <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200  shadow-[0_25px_70px_rgba(15,23,42,0.08)] lg:grid-cols-2">
-          {/* Left side */}
-          <section className="hidden  px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
+    <main className="min-h-screen bg-[#eef3f8] px-5 py-8 text-slate-950">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center">
+        <div className="grid w-full overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] lg:grid-cols-[0.94fr_1.06fr]">
+          <section className="hidden bg-slate-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
             <div>
-              <div className="">
-                <Image
-                  src={logo}
-                  alt="SGC Security"
-                  className="h-auto w-[320px] object-contain"
-                  priority
-                />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-950">
+                <ShieldCheck className="h-6 w-6" />
               </div>
 
               <div className="mt-6 max-w-sm">
-                <span className="inline-flex rounded-full bg-[#0094e0]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#7dd3fc]">
+                <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-white/55">
                   Staff Access
                 </span>
 
-                <h1 className="mt-5 text-4xl font-bold leading-tight">
-                  Secure Staff Login
+                <h1 className="mt-5 text-4xl font-black leading-tight">
+                  Open your digital staff ID.
                 </h1>
 
                 <p className="mt-4 text-sm leading-7 text-white/70">
-                  Access your digital ID securely and verify your active Staff profile.
+                  Staff can sign in to view their current ID, documents, and
+                  account settings in a protected portal.
                 </p>
               </div>
             </div>
@@ -129,26 +152,17 @@ export default function staffLoginPage() {
             </div>
           </section>
 
-          {/* Right side */}
-          <section className="px-6 py-8 sm:px-10 sm:py-12 bg-white">
+          <section className="bg-[#f8fafc] px-6 py-8 sm:px-10 sm:py-12">
             <div className="mx-auto w-full max-w-md">
-              <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-                <div className="">
-                  <Image
-                    src={loogo}
-                    alt="SGC Security"
-                    className="h-auto w-[250px] object-contain"
-                    priority
-                  />
-                </div>
-              </div>
-
               <div className="mb-8">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0094e0]/10">
-                  <ShieldCheck className="h-7 w-7 text-[#0094e0]" />
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                  <ShieldCheck className="h-7 w-7" />
                 </div>
 
-                <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                  Security ID Platform
+                </p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                   Staff Login
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -158,12 +172,15 @@ export default function staffLoginPage() {
 
               <form onSubmit={handleLogin} className="space-y-5">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label htmlFor="staff-login-email" className="mb-2 block text-sm font-semibold text-slate-700">
                     Email Address
                   </label>
-                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-[#0094e0]">
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-slate-950">
                     <Mail className="h-5 w-5 text-slate-400" />
                     <input
+                      id="staff-login-email"
+                      name="email"
+                      autoComplete="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -175,12 +192,15 @@ export default function staffLoginPage() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label htmlFor="staff-login-password" className="mb-2 block text-sm font-semibold text-slate-700">
                     Password
                   </label>
-                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-[#0094e0]">
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-slate-950">
                     <LockKeyhole className="h-5 w-5 text-slate-400" />
                     <input
+                      id="staff-login-password"
+                      name="password"
+                      autoComplete="current-password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -211,9 +231,10 @@ export default function staffLoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-2xl bg-[#0094e0] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#007bb8] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? 'Logging in...' : 'Login to My ID'}
+                  {!loading ? <ArrowRight className="h-4 w-4" /> : null}
                 </button>
               </form>
             </div>

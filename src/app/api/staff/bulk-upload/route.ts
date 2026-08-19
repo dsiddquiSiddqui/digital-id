@@ -2,11 +2,20 @@ import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { getBillingPlan } from '@/lib/billing-plans'
 
 export const runtime = 'nodejs'
 
 const ALLOWED_STATUSES = ['active', 'inactive', 'suspended', 'revoked', 'archived']
 const ALLOWED_TYPES = ['security', 'warehouse', 'event', 'admin', 'contractor', 'other']
+type ImportRow = Record<string, unknown>
+type DocumentTypeRow = { id: string; code: string; name: string; has_expiry: boolean | null }
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
 
 function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -24,13 +33,13 @@ function createAdminClient() {
   })
 }
 
-function normalize(value: any): string | null {
+function normalize(value: unknown): string | null {
   if (value === undefined || value === null) return null
   const text = String(value).trim()
   return text === '' ? null : text
 }
 
-function toBoolean(value: any, fallback = false): boolean {
+function toBoolean(value: unknown, fallback = false): boolean {
   if (typeof value === 'boolean') return value
   if (typeof value === 'number') return value === 1
 
@@ -40,13 +49,13 @@ function toBoolean(value: any, fallback = false): boolean {
   return ['true', '1', 'yes', 'y'].includes(text)
 }
 
-function toNumber(value: any): number | null {
+function toNumber(value: unknown): number | null {
   if (value === undefined || value === null || value === '') return null
   const num = Number(value)
   return Number.isFinite(num) ? num : null
 }
 
-function excelDateToISO(value: any): string | null {
+function excelDateToISO(value: unknown): string | null {
   if (!value) return null
 
   if (typeof value === 'number') {
@@ -68,7 +77,7 @@ function excelDateToISO(value: any): string | null {
   return date.toISOString().slice(0, 10)
 }
 
-function buildFullName(row: Record<string, any>) {
+function buildFullName(row: ImportRow) {
   const fullName = normalize(row.full_name)
   if (fullName) return fullName
 
@@ -78,7 +87,7 @@ function buildFullName(row: Record<string, any>) {
   return joined || null
 }
 
-function cleanRows(rows: any[]) {
+function cleanRows(rows: ImportRow[]) {
   return Array.isArray(rows)
     ? rows.filter((row) =>
         Object.values(row).some((v) => String(v ?? '').trim() !== '')
@@ -100,7 +109,7 @@ function generateTempPassword(length = 12) {
   return result
 }
 
-async function generateEmployeeCode(supabase: any): Promise<string> {
+async function generateEmployeeCode(supabase: SupabaseClient): Promise<string> {
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = `HD-${Date.now().toString().slice(-6)}-${crypto
       .randomBytes(2)
@@ -121,7 +130,7 @@ async function generateEmployeeCode(supabase: any): Promise<string> {
 }
 
 async function findStaffByParimOrEmployeeCode(
-  supabase: any,
+  supabase: SupabaseClient,
   parimStaffId: string | null,
   employeeCode: string | null
 ) {
@@ -150,7 +159,7 @@ async function findStaffByParimOrEmployeeCode(
   return null
 }
 
-async function getExistingProfileByEmail(supabase: any, email: string) {
+async function getExistingProfileByEmail(supabase: SupabaseClient, email: string) {
   const { data, error } = await supabase
     .from('profiles')
     .select('id, auth_user_id, email, role')
@@ -162,7 +171,7 @@ async function getExistingProfileByEmail(supabase: any, email: string) {
 }
 
 async function createProfileAndLoginForBulk(params: {
-  supabase: any
+  supabase: SupabaseClient
   fullName: string
   email: string
   password: string
@@ -230,6 +239,7 @@ async function createProfileAndLoginForBulk(params: {
 
 export async function POST(request: Request) {
   const supabase = createAdminClient()
+  const authSupabase = await createServerClient()
 
   const stats = {
     staffCreated: 0,
@@ -265,6 +275,7 @@ export async function POST(request: Request) {
     email: string
     temp_password: string
   }> = []
+  let importBatchId: string | null = null
 
   try {
     const formData = await request.formData()
@@ -280,7 +291,7 @@ export async function POST(request: Request) {
     const getSheetRows = (sheetName: string) =>
       workbook.SheetNames.includes(sheetName)
         ? cleanRows(
-            XLSX.utils.sheet_to_json<any>(workbook.Sheets[sheetName], { defval: '' })
+            XLSX.utils.sheet_to_json<ImportRow>(workbook.Sheets[sheetName], { defval: '' })
           )
         : []
 
@@ -299,14 +310,84 @@ export async function POST(request: Request) {
       )
     }
 
+    const {
+      data: { user },
+    } = await authSupabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+
+    const { data: currentProfile } = await authSupabase
+      .from('profiles')
+      .select('id, organization_id, role')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (
+      !currentProfile?.organization_id ||
+      !['super_admin', 'admin', 'hr_manager', 'hr'].includes(currentProfile.role)
+    ) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
+
+    const { data: importBatch } = await supabase
+      .from('staff_import_batches')
+      .insert({
+        organization_id: currentProfile.organization_id,
+        source: 'admin_bulk_upload',
+        file_name: file.name || 'bulk-upload.xlsx',
+        uploaded_by: currentProfile.id,
+        status: 'processing',
+        total_rows:
+          staffRows.length +
+          employmentRows.length +
+          addressRows.length +
+          emergencyRows.length +
+          bankRows.length +
+          digitalIdRows.length +
+          documentRows.length,
+      })
+      .select('id')
+      .single()
+
+    importBatchId = importBatch?.id || null
+
+    const { data: organization } = await supabase
+      .from('organizations')
+      .select('id, plan')
+      .eq('id', currentProfile.organization_id)
+      .single()
+
+    const { count: existingStaffCount } = await supabase
+      .from('staff')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', currentProfile.organization_id)
+
+    const plan = getBillingPlan(organization?.plan)
+    const incomingCreateRows = staffRows.length
+
+    if (
+      plan.staffLimit !== null &&
+      (existingStaffCount || 0) + incomingCreateRows > plan.staffLimit
+    ) {
+      return NextResponse.json(
+        {
+          error: `This package allows ${plan.staffLimit} staff records. Reduce the import or upgrade the package.`,
+        },
+        { status: 400 }
+      )
+    }
+
     const { data: documentTypes, error: documentTypesError } = await supabase
       .from('document_types')
       .select('id, code, name, has_expiry')
+      .eq('organization_id', currentProfile.organization_id)
 
     if (documentTypesError) throw documentTypesError
 
-    const docTypeByCode = new Map<string, any>()
-    const docTypeByName = new Map<string, any>()
+    const docTypeByCode = new Map<string, DocumentTypeRow>()
+    const docTypeByName = new Map<string, DocumentTypeRow>()
 
     for (const item of documentTypes || []) {
       docTypeByCode.set(String(item.code).toLowerCase(), item)
@@ -426,7 +507,7 @@ export async function POST(request: Request) {
           first_name: normalize(row.first_name),
           last_name: normalize(row.last_name),
           parim_person_id: normalize(row.parim_person_id),
-          company_name: normalize(row.company_name) || 'SGC Security Services',
+          company_name: normalize(row.company_name) || 'Security Services',
           email,
           phone: normalize(row.phone),
           second_phone: normalize(row.second_phone),
@@ -469,7 +550,7 @@ export async function POST(request: Request) {
         }
 
         staffIdByParim.set(parimStaffId, staffId)
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (createdProfileId) {
           await supabase.from('profiles').delete().eq('id', createdProfileId)
         }
@@ -483,7 +564,7 @@ export async function POST(request: Request) {
           sheet: 'Staff',
           row: rowNumber,
           parim_staff_id: parimStaffId || undefined,
-          message: error?.message || 'Failed to import staff row',
+          message: getErrorMessage(error, 'Failed to import staff row'),
         })
       }
     }
@@ -564,13 +645,13 @@ export async function POST(request: Request) {
           if (error) throw error
           stats.employmentInserted++
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         stats.failed++
         errors.push({
           sheet: 'Employment',
           row: rowNumber,
           parim_staff_id: parimStaffId || undefined,
-          message: error?.message || 'Failed to import employment row',
+          message: getErrorMessage(error, 'Failed to import employment row'),
         })
       }
     }
@@ -627,13 +708,13 @@ export async function POST(request: Request) {
           if (error) throw error
           stats.addressInserted++
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         stats.failed++
         errors.push({
           sheet: 'CurrentAddress',
           row: rowNumber,
           parim_staff_id: parimStaffId || undefined,
-          message: error?.message || 'Failed to import address row',
+          message: getErrorMessage(error, 'Failed to import address row'),
         })
       }
     }
@@ -700,13 +781,13 @@ export async function POST(request: Request) {
           if (error) throw error
           stats.emergencyInserted++
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         stats.failed++
         errors.push({
           sheet: 'EmergencyContacts',
           row: rowNumber,
           parim_staff_id: parimStaffId || undefined,
-          message: error?.message || 'Failed to import emergency contact row',
+          message: getErrorMessage(error, 'Failed to import emergency contact row'),
         })
       }
     }
@@ -762,13 +843,13 @@ export async function POST(request: Request) {
           if (error) throw error
           stats.bankInserted++
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         stats.failed++
         errors.push({
           sheet: 'BankDetails',
           row: rowNumber,
           parim_staff_id: parimStaffId || undefined,
-          message: error?.message || 'Failed to import bank details row',
+          message: getErrorMessage(error, 'Failed to import bank details row'),
         })
       }
     }
@@ -817,7 +898,7 @@ export async function POST(request: Request) {
           role_title: roleTitle,
           sia_number: normalize(row.sia_number),
           qr_token: qrToken,
-          watermark_text: normalize(row.watermark_text) || 'SGC Security Services',
+          watermark_text: normalize(row.watermark_text) || 'Security Services',
           is_current: true,
           status: normalize(row.status) || 'active',
         }
@@ -844,13 +925,13 @@ export async function POST(request: Request) {
           if (error) throw error
           stats.digitalIdInserted++
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         stats.failed++
         errors.push({
           sheet: 'DigitalIDs',
           row: rowNumber,
           parim_staff_id: parimStaffId || undefined,
-          message: error?.message || 'Failed to import digital ID row',
+          message: getErrorMessage(error, 'Failed to import digital ID row'),
         })
       }
     }
@@ -878,9 +959,9 @@ export async function POST(request: Request) {
         const customDocumentName = normalize(row.custom_document_name)
         const customDocumentCode = normalize(row.custom_document_code)
 
-        let matchedType: any = null
-        if (code && docTypeByCode.has(code)) matchedType = docTypeByCode.get(code)
-        if (!matchedType && name && docTypeByName.has(name)) matchedType = docTypeByName.get(name)
+        let matchedType: DocumentTypeRow | null = null
+        if (code) matchedType = docTypeByCode.get(code) ?? null
+        if (!matchedType && name) matchedType = docTypeByName.get(name) ?? null
 
         if (!matchedType && !customDocumentName) {
           stats.failed++
@@ -948,27 +1029,81 @@ export async function POST(request: Request) {
           if (error) throw error
           stats.documentsInserted++
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         stats.failed++
         errors.push({
           sheet: 'Documents',
           row: rowNumber,
           parim_staff_id: parimStaffId || undefined,
-          message: error?.message || 'Failed to import document row',
+          message: getErrorMessage(error, 'Failed to import document row'),
         })
       }
     }
 
+    if (importBatchId) {
+      if (errors.length > 0) {
+        await supabase.from('staff_import_rows').insert(
+          errors.map((error) => ({
+            organization_id: currentProfile.organization_id,
+            batch_id: importBatchId,
+            row_number: error.row || 0,
+            raw_data: {
+              sheet: error.sheet,
+              parim_staff_id: error.parim_staff_id || null,
+            },
+            processed: false,
+            processing_errors: { message: error.message },
+          }))
+        )
+      }
+
+      await supabase
+        .from('staff_import_batches')
+        .update({
+          status: errors.length > 0 ? 'completed' : 'completed',
+          processed_rows:
+            stats.staffCreated +
+            stats.staffUpdated +
+            stats.employmentInserted +
+            stats.employmentUpdated +
+            stats.addressInserted +
+            stats.addressUpdated +
+            stats.emergencyInserted +
+            stats.emergencyUpdated +
+            stats.bankInserted +
+            stats.bankUpdated +
+            stats.digitalIdInserted +
+            stats.digitalIdUpdated +
+            stats.documentsInserted +
+            stats.documentsUpdated,
+          failed_rows: errors.length,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', importBatchId)
+    }
+
     return NextResponse.json({
       success: true,
+      import_batch_id: importBatchId,
       stats,
       generatedPasswords,
       errors,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (importBatchId) {
+      await supabase
+        .from('staff_import_batches')
+        .update({
+          status: 'failed',
+          failed_rows: errors.length || 1,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', importBatchId)
+    }
+
     return NextResponse.json(
       {
-        error: error?.message || 'Bulk upload failed',
+        error: getErrorMessage(error, 'Bulk upload failed'),
       },
       { status: 500 }
     )

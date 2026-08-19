@@ -15,11 +15,11 @@ async function checkAccess() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role')
+    .select('id, organization_id, role')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+  if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
     return { error: 'Forbidden.', status: 403 as const, profile: null }
   }
 
@@ -44,6 +44,7 @@ export async function GET(
       .from('staff_ids')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile!.organization_id)
       .eq('is_current', true)
       .maybeSingle()
 

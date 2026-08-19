@@ -15,10 +15,20 @@ import { createClient } from '@/lib/supabase/client'
 type Profile = {
   id: string
   auth_user_id: string
+  organization_id?: string | null
   role: string
   full_name: string
   email: string
   is_active?: boolean
+  organizations?: {
+    name: string
+    primary_color: string
+    accent_color: string
+  } | Array<{
+    name: string
+    primary_color: string
+    accent_color: string
+  }> | null
 }
 
 type Stats = {
@@ -54,30 +64,56 @@ export default function DashboardPage() {
 
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('*')
+          .select(
+            'id, auth_user_id, organization_id, role, full_name, email, is_active, organizations:organizations(name, primary_color, accent_color)'
+          )
           .eq('auth_user_id', user.id)
           .single()
 
-        setProfile(profileData ?? null)
+        const scopedProfile = (profileData ?? null) as Profile | null
+        setProfile(scopedProfile)
 
-        const role = profileData?.role ?? ''
+        const role = scopedProfile?.role ?? ''
+        const organizationId = scopedProfile?.organization_id ?? null
         const canViewUsers = !['operation_manager', 'operation_team'].includes(role)
         const canViewAlerts = ['super_admin', 'admin'].includes(role)
 
         const usersQuery = canViewUsers
-          ? supabase.from('profiles').select('*', { count: 'exact', head: true })
+          ? organizationId
+            ? supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true })
+                .eq('organization_id', organizationId)
+            : supabase.from('profiles').select('*', { count: 'exact', head: true })
           : Promise.resolve({ count: 0 })
 
-        const staffQuery = supabase
+        const staffQuery = organizationId
+          ? supabase
+              .from('staff')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', organizationId)
+          : supabase
           .from('staff')
           .select('*', { count: 'exact', head: true })
 
-        const idsQuery = supabase
+        const idsQuery = organizationId
+          ? supabase
+              .from('staff_ids')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', organizationId)
+          : supabase
           .from('staff_ids')
           .select('*', { count: 'exact', head: true })
 
         const alertsQuery = canViewAlerts
-          ? supabase.from('security_events').select('*', { count: 'exact', head: true })
+          ? organizationId
+            ? supabase
+                .from('security_events')
+                .select('*', { count: 'exact', head: true })
+                .eq('organization_id', organizationId)
+            : supabase
+                .from('security_events')
+                .select('*', { count: 'exact', head: true })
           : Promise.resolve({ count: 0 })
 
         const [u, s, i, a] = await Promise.all([
@@ -104,6 +140,9 @@ export default function DashboardPage() {
   }, [supabase])
 
   const role = profile?.role ?? ''
+  const organization = Array.isArray(profile?.organizations)
+    ? profile?.organizations[0] ?? null
+    : profile?.organizations ?? null
 
   const permissions = useMemo(() => {
     const isSuperAdmin = role === 'super_admin'
@@ -288,7 +327,10 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold">Dashboard</h2>
-        <p className="mt-1 text-slate-500">{welcomeText}</p>
+        <p className="mt-1 text-slate-500">
+          {organization?.name ? `${organization.name} - ` : ''}
+          {welcomeText}
+        </p>
       </div>
 
       <div
@@ -367,7 +409,10 @@ export default function DashboardPage() {
             </div>
           ) : null}
 
-          <div className="rounded-2xl bg-[#081a33] p-6 text-white">
+          <div
+            className="rounded-2xl p-6 text-white"
+            style={{ backgroundColor: organization?.accent_color || '#081a33' }}
+          >
             <h3 className="text-lg font-semibold">Digital Identity</h3>
             <p className="mt-2 text-sm opacity-70">
               Verified IDs across system
@@ -395,7 +440,7 @@ function Card({
   return (
     <div
       className={`rounded-2xl p-5 shadow ${
-        highlight ? 'bg-[#0094e0] text-white' : 'bg-white'
+        highlight ? 'bg-[var(--tenant-primary,#0094e0)] text-white' : 'bg-white'
       }`}
     >
       <div className="flex items-center justify-between">

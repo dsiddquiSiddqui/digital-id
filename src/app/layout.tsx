@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Security ID Admin',
   description: 'Admin dashboard for guard digital IDs',
   icons: {
-    icon: '/favi.png',
+    icon: '/security-id-icon.svg',
   },
 }
 
@@ -17,7 +17,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   )
 }

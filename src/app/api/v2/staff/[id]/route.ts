@@ -22,11 +22,11 @@ export async function GET(
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('organization_id, role')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+    if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
@@ -34,6 +34,7 @@ export async function GET(
       .from('staff')
       .select('*')
       .eq('id', id)
+      .eq('organization_id', profile.organization_id)
       .single()
 
     if (error || !data) {

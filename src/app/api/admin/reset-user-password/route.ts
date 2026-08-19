@@ -20,9 +20,9 @@ export async function POST(req: Request) {
       )
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters.' },
+        { error: 'Password must be at least 8 characters.' },
         { status: 400 }
       )
     }
@@ -57,11 +57,11 @@ export async function POST(req: Request) {
 
     const { data: currentProfile, error: currentProfileError } = await supabase
       .from('profiles')
-      .select('id, role, is_active, full_name, email')
+      .select('id, organization_id, role, is_active, full_name, email')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (currentProfileError || !currentProfile) {
+    if (currentProfileError || !currentProfile?.organization_id) {
       return NextResponse.json(
         { error: 'Admin profile not found.' },
         { status: 403 }
@@ -87,8 +87,9 @@ export async function POST(req: Request) {
     const { data: targetProfile, error: targetProfileError } =
       await adminSupabase
         .from('profiles')
-        .select('id, auth_user_id, full_name, email, role')
+        .select('id, organization_id, auth_user_id, full_name, email, role')
         .eq('id', profile_id)
+        .eq('organization_id', currentProfile.organization_id)
         .single()
 
     if (targetProfileError || !targetProfile) {
@@ -125,6 +126,7 @@ export async function POST(req: Request) {
       .from('audit_logs')
       .insert([
         {
+          organization_id: currentProfile.organization_id,
           actor_profile_id: currentProfile.id,
           action_type: 'reset_user_password',
           entity_type: 'profile',

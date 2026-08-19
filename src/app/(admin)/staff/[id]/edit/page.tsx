@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -272,9 +273,12 @@ export default function EditStaffPage() {
 
             <div className="mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-slate-100">
               {photoUrl ? (
-                <img
+                <Image
                   src={photoUrl}
                   alt={fullName}
+                  width={80}
+                  height={80}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (

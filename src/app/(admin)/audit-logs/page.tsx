@@ -6,8 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 
 type AuditChange = {
   field: string
-  before?: any
-  after?: any
+  before?: unknown
+  after?: unknown
 }
 
 type AuditMetadata = {
@@ -17,8 +17,8 @@ type AuditMetadata = {
   module?: string
   page?: string
   changes?: AuditChange[]
-  before?: Record<string, any>
-  after?: Record<string, any>
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
   note?: string
 }
 
@@ -66,8 +66,8 @@ function getChanges(metadata: AuditMetadata | null): AuditChange[] {
   return []
 }
 
-function formatValue(value: any) {
-  if (value === null || value === undefined || value === '') return '—'
+function formatValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '-'
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
@@ -84,10 +84,31 @@ export default function AuditLogsPage() {
     const loadLogs = async () => {
       setLoading(true)
 
-      const { data, error } = await supabase
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
+      const { data: myProfile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      let query = supabase
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })
+
+      if (myProfile?.organization_id) {
+        query = query.eq('organization_id', myProfile.organization_id)
+      }
+
+      const { data, error } = await query
 
       if (!error && data) {
         setLogs(data as AuditLog[])
@@ -295,15 +316,15 @@ function AuditChangesModal({
   const changes = getChanges(metadata)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm">
+      <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
           <div>
             <h3 className="text-xl font-bold text-slate-900">
-              What Changed
+              Audit Detail
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              {log.action_type} • {formatDateTime(log.created_at)}
+              {log.action_type} - {formatDateTime(log.created_at)}
             </p>
           </div>
 
@@ -316,7 +337,7 @@ function AuditChangesModal({
           </button>
         </div>
 
-        <div className="max-h-[calc(90vh-90px)] overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <ModalInfo title="Changed By" value={metadata?.actor_name || metadata?.actor_email || 'Unknown user'} />
             <ModalInfo title="Role" value={metadata?.actor_role || 'Unknown role'} />

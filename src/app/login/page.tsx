@@ -1,20 +1,15 @@
 'use client'
 
-import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import {
-  ArrowRight,
   Eye,
   EyeOff,
   LockKeyhole,
   Mail,
+  ArrowRight,
   ShieldCheck,
-  UserRound,
 } from 'lucide-react'
-import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
-import loogo from '@/assets/SGC-Security-Tag-Logo.svg'
 import { createClient } from '@/lib/supabase/client'
 
 type Profile = {
@@ -22,11 +17,20 @@ type Profile = {
   auth_user_id: string
   role: string
   is_active?: boolean
+  organization_id?: string | null
+  organizations?: {
+    status: string
+    require_2fa?: boolean
+  } | Array<{
+    status: string
+    require_2fa?: boolean
+  }> | null
 }
 
 const ALLOWED_ADMIN_SIDE_ROLES = [
   'super_admin',
   'admin',
+  'manager',
   'operation_manager',
   'operation_team',
   'hr_manager',
@@ -42,6 +46,17 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [createdWorkspace, setCreatedWorkspace] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+
+    if (params.get('created') === '1') {
+      window.setTimeout(() => {
+        setCreatedWorkspace(params.get('workspace') || 'workspace')
+      }, 0)
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -69,7 +84,7 @@ export default function LoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, auth_user_id, role, is_active')
+      .select('id, auth_user_id, role, is_active, organization_id, organizations:organizations(status, require_2fa)')
       .eq('auth_user_id', user.id)
       .single<Profile>()
 
@@ -94,104 +109,108 @@ export default function LoginPage() {
       return
     }
 
+    const organization = Array.isArray(profile.organizations)
+      ? profile.organizations[0] ?? null
+      : profile.organizations ?? null
+
+    if (
+      profile.organization_id &&
+      organization &&
+      !['active', 'trialing'].includes(organization.status)
+    ) {
+      await supabase.auth.signOut()
+      setError('This organization is not active. Please contact platform support.')
+      setLoading(false)
+      return
+    }
+
+    if (organization?.require_2fa) {
+      const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (assurance?.nextLevel === 'aal2' && assurance?.currentLevel !== 'aal2') {
+        router.push('/mfa?next=/dashboard')
+        return
+      }
+    }
+
+    await fetch('/api/session/activity', { method: 'POST' }).catch(() => null)
+
     setLoading(false)
     router.push('/dashboard')
     router.refresh()
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden ">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,148,224,0.08),transparent_35%)]" />
-
-      <div className="relative flex min-h-screen items-center justify-center px-6 py-10">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-200  shadow-[0_25px_70px_rgba(15,23,42,0.08)] lg:grid-cols-2">
-          <section className="hidden  px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
+    <main className="min-h-screen bg-[#eef3f8] px-5 py-8 text-slate-950">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center">
+        <div className="grid w-full overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] lg:grid-cols-[0.94fr_1.06fr]">
+          <section className="hidden bg-slate-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
             <div>
-              <div className="">
-                <Image
-                  src={logo}
-                  alt="SGC Security"
-                  className="h-auto w-[270px] object-contain"
-                  priority
-                />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-950">
+                <ShieldCheck className="h-6 w-6" />
               </div>
-
-              <div className=" max-w-sm">
-                <span className="inline-flex rounded-full bg-[#0094e0]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#7dd3fc]">
-                  Secure Access
-                </span>
-
-                <h1 className="mt-5 text-4xl font-bold leading-tight">
-                  Secure Dashboard Login
-                </h1>
-
-                <p className="mt-4 text-sm leading-7 text-white/70">
-                  Access your dashboard securely with role-based access control.
-                </p>
-              </div>
+              <p className="mt-8 text-xs font-black uppercase tracking-[0.2em] text-white/45">
+                Workspace sign in
+              </p>
+              <h1 className="mt-4 max-w-sm text-4xl font-black leading-tight">
+                Access your security ID operations dashboard.
+              </h1>
+              <p className="mt-5 max-w-sm text-sm leading-7 text-white/65">
+                Sign in to manage staff records, digital IDs, alerts, users, and
+                audit activity for your organization.
+              </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <MiniPill text="Role protected" />
-                <MiniPill text="Secure access" />
-              </div>
-
-              
+            <div className="grid gap-3">
+              <MiniPill text="Organization scoped" />
+              <MiniPill text="Role protected" />
+              <MiniPill text="Audit tracked" />
             </div>
           </section>
 
-          <section className="px-6 py-8 sm:px-10 sm:py-12 bg-white">
+          <section className="bg-[#f8fafc] px-6 py-8 sm:px-10 sm:py-12">
             <div className="mx-auto w-full max-w-md">
-              <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-                <div className="">
-                  <Image
-                    src={loogo}
-                    alt="SGC Security"
-                    className="h-auto w-[250px] object-contain"
-                    priority
-                  />
-                </div>
-              </div>
-
               <div className="mb-8">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0094e0]/10">
-                  <ShieldCheck className="h-7 w-7 text-[#0094e0]" />
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                  <ShieldCheck className="h-7 w-7" />
                 </div>
-
-                <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                  Dashboard Login
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                  Security ID Platform
+                </p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                  Login
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Sign in to continue to the dashboard.
+                  Continue to your organization dashboard.
                 </p>
+                {createdWorkspace ? (
+                  <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                    Workspace created for {createdWorkspace}. Sign in with the
+                    owner account to continue.
+                  </p>
+                ) : null}
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Email Address
-                  </label>
-                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-[#0094e0]">
-                    <Mail className="h-5 w-5 text-slate-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@email.com"
-                      className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
-                      required
-                    />
-                  </div>
-                </div>
+                <LoginField
+                  id="login-email"
+                  icon={<Mail className="h-5 w-5 text-slate-400" />}
+                  label="Email address"
+                  type="email"
+                  value={email}
+                  onChange={setEmail}
+                  placeholder="admin@company.com"
+                />
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label htmlFor="login-password" className="mb-2 block text-sm font-semibold text-slate-700">
                     Password
                   </label>
-                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-[#0094e0]">
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-slate-950">
                     <LockKeyhole className="h-5 w-5 text-slate-400" />
                     <input
+                      id="login-password"
+                      name="password"
+                      autoComplete="current-password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -204,11 +223,7 @@ export default function LoginPage() {
                       onClick={() => setShowPassword((prev) => !prev)}
                       className="cursor-pointer text-slate-500 transition hover:text-slate-800"
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
@@ -222,18 +237,64 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full cursor-pointer rounded-2xl bg-[#0094e0] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#007bb8] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? 'Signing in...' : 'Login to Dashboard'}
+                  {loading ? 'Signing in...' : 'Login to dashboard'}
+                  {!loading ? <ArrowRight className="h-4 w-4" /> : null}
                 </button>
               </form>
 
-              
+              <p className="mt-6 text-center text-sm text-slate-500">
+                New organization?{' '}
+                <a href="/signup" className="font-bold text-slate-950 hover:underline">
+                  Create workspace
+                </a>
+              </p>
             </div>
           </section>
-        </div>
+      </div>
       </div>
     </main>
+  )
+}
+
+function LoginField({
+  id,
+  icon,
+  label,
+  type,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string
+  icon: React.ReactNode
+  label: string
+  type: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-sm font-semibold text-slate-700">
+        {label}
+      </label>
+      <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-slate-950">
+        {icon}
+        <input
+          id={id}
+          name={type === 'email' ? 'email' : id}
+          autoComplete={type === 'email' ? 'email' : undefined}
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
+          required
+        />
+      </div>
+    </div>
   )
 }
 

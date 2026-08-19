@@ -20,11 +20,11 @@ async function checkAccess() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, full_name, email')
+    .select('id, organization_id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+  if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
     return {
       error: 'Forbidden.',
       status: 403 as const,
@@ -41,7 +41,10 @@ async function checkAccess() {
   }
 }
 
-function getActorMetadata(access: any) {
+function getActorMetadata(access: {
+  profile: { full_name?: string | null; email?: string | null; role?: string | null } | null
+  user: { email?: string | null } | null
+}) {
   return {
     actor_name:
       access.profile?.full_name ||
@@ -75,6 +78,7 @@ export async function GET(
       .from('staff_emergency_contacts')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile!.organization_id)
       .order('is_primary', { ascending: false })
       .order('created_at', { ascending: false })
 
@@ -137,6 +141,7 @@ export async function POST(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -151,12 +156,14 @@ export async function POST(
         .from('staff_emergency_contacts')
         .update({ is_primary: false })
         .eq('staff_id', id)
+        .eq('organization_id', access.profile.organization_id)
     }
 
     const { data, error } = await adminSupabase
       .from('staff_emergency_contacts')
       .insert([
         {
+          organization_id: access.profile.organization_id,
           staff_id: id,
           name,
           relationship,
@@ -174,6 +181,7 @@ export async function POST(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
         action_type: 'create_staff_emergency_contact_v2',
         entity_type: 'staff_emergency_contact',
@@ -258,6 +266,7 @@ export async function PATCH(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -272,6 +281,7 @@ export async function PATCH(
       .select('*')
       .eq('id', contact_id)
       .eq('staff_id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingContact) {
@@ -283,15 +293,18 @@ export async function PATCH(
         .from('staff_emergency_contacts')
         .update({ is_primary: false })
         .eq('staff_id', id)
+        .eq('organization_id', access.profile.organization_id)
 
       await adminSupabase
         .from('staff_emergency_contacts')
         .update({ is_primary: true })
         .eq('id', contact_id)
+        .eq('organization_id', access.profile.organization_id)
     }
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
         action_type: 'update_staff_emergency_contact_v2',
         entity_type: 'staff_emergency_contact',
@@ -353,6 +366,7 @@ export async function DELETE(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -367,6 +381,7 @@ export async function DELETE(
       .select('*')
       .eq('id', contact_id)
       .eq('staff_id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingContact) {
@@ -377,6 +392,7 @@ export async function DELETE(
       .from('staff_emergency_contacts')
       .delete()
       .eq('id', contact_id)
+      .eq('organization_id', access.profile.organization_id)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
@@ -384,6 +400,7 @@ export async function DELETE(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
         action_type: 'delete_staff_emergency_contact_v2',
         entity_type: 'staff_emergency_contact',

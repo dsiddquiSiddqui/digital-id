@@ -75,8 +75,8 @@ export default function BulkUploadStaffPage() {
       }
 
       setResult(data)
-    } catch (err: any) {
-      setError(err?.message || 'Something went wrong during import')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong during import')
     } finally {
       setLoading(false)
     }

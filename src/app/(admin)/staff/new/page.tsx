@@ -9,7 +9,7 @@ export default function NewStaffPage() {
 
   const [fullName, setFullName] = useState('')
   const [employeeCode, setEmployeeCode] = useState('')
-  const [companyName, setCompanyName] = useState('H&D Security')
+  const [companyName, setCompanyName] = useState('Security Services')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -81,7 +81,7 @@ export default function NewStaffPage() {
       setTimeout(() => {
         router.push('/staff')
       }, 700)
-    } catch (err) {
+    } catch {
       setLoading(false)
       setError('Something went wrong while creating the staff member.')
     }

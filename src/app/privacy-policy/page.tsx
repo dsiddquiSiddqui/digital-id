@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Privacy Policy | SGC ID ME",
-  description: "Privacy Policy for the SGC ID ME mobile application.",
+  title: "Privacy Policy | Security ID",
+  description: "Privacy Policy for the Security ID staff identity platform.",
 };
 
 export default function PrivacyPolicyPage() {
@@ -14,9 +14,10 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <p className="mb-6">
-          SGC ID ME is an internal staff digital ID application designed for
-          authorised users of SGC. This Privacy Policy explains how we collect,
-          use, and protect information when users access and use the app.
+          Security ID is a staff digital identity platform designed for
+          authorised users of registered organizations. This Privacy Policy
+          explains how we collect, use, and protect information when users
+          access and use the app.
         </p>
 
         <h2 className="text-2xl font-semibold mt-8 mb-3">
@@ -115,7 +116,12 @@ export default function PrivacyPolicyPage() {
           us at:
         </p>
 
-        <p className="font-medium">Email: operations@sgcsecurityservices.co.uk</p>
+        <p className="font-medium">
+          Email:{' '}
+          <a className="underline" href="mailto:privacy@security-id.app">
+            privacy@security-id.app
+          </a>
+        </p>
       </div>
     </main>
   );

@@ -14,8 +14,8 @@ function mapStaffStatusToIdStatus(status: string) {
 }
 
 function buildChanges(
-  beforeData: Record<string, any>,
-  afterData: Record<string, any>
+  beforeData: Record<string, unknown>,
+  afterData: Record<string, unknown>
 ) {
   const changes = []
 
@@ -94,12 +94,13 @@ export async function POST(req: Request) {
 
     const { data: currentProfile } = await supabase
       .from('profiles')
-      .select('id, role, full_name, email')
+      .select('id, organization_id, role, full_name, email')
       .eq('auth_user_id', currentUser.id)
       .single()
 
     if (
       !currentProfile ||
+      !currentProfile.organization_id ||
       !['super_admin', 'admin', 'manager'].includes(currentProfile.role)
     ) {
       return NextResponse.json(
@@ -112,6 +113,7 @@ export async function POST(req: Request) {
       .from('staff')
       .select('id, full_name, employee_code, company_name, phone, email, status, photo_url')
       .eq('id', staff_id)
+      .eq('organization_id', currentProfile.organization_id)
       .single()
 
     if (fetchStaffError || !existingStaff) {
@@ -135,6 +137,7 @@ export async function POST(req: Request) {
       .from('staff')
       .update(updatePayload)
       .eq('id', staff_id)
+      .eq('organization_id', currentProfile.organization_id)
 
     if (updateStaffError) {
       return NextResponse.json(
@@ -149,6 +152,7 @@ export async function POST(req: Request) {
       .from('staff_ids')
       .select('id, staff_id, is_current, status')
       .eq('staff_id', staff_id)
+      .eq('organization_id', currentProfile.organization_id)
 
     if (currentIdsError) {
       return NextResponse.json(
@@ -163,6 +167,7 @@ export async function POST(req: Request) {
       .from('staff_ids')
       .update({ status: idStatus })
       .eq('staff_id', staff_id)
+      .eq('organization_id', currentProfile.organization_id)
       .eq('is_current', true)
       .select('id, staff_id, is_current, status')
 
@@ -190,6 +195,7 @@ export async function POST(req: Request) {
 
     const { error: auditError } = await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: currentProfile.organization_id,
         actor_profile_id: currentProfile.id,
         action_type: 'update_staff',
         entity_type: 'staff',

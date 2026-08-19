@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Briefcase } from 'lucide-react'
 
@@ -28,7 +28,6 @@ type StaffSummary = {
 
 export default function V2StaffEmploymentPage() {
   const params = useParams()
-  const router = useRouter()
   const id = params.id as string
 
   const [loading, setLoading] = useState(true)

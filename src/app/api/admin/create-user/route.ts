@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getBillingPlan } from '@/lib/billing-plans'
 
 const ALLOWED_ROLES = ['super_admin', 'admin', 'guard']
 
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
 
     const { data: currentProfile } = await supabase
       .from('profiles')
-      .select('id, role, full_name, email')
+      .select('id, organization_id, role, full_name, email')
       .eq('auth_user_id', currentUser.id)
       .single()
 
@@ -92,6 +93,37 @@ export async function POST(req: Request) {
       )
     }
 
+    const { data: organization } = await adminSupabase
+      .from('organizations')
+      .select('id, status, plan')
+      .eq('id', currentProfile.organization_id)
+      .single()
+
+    if (!organization || !['active', 'trialing'].includes(organization.status)) {
+      return NextResponse.json(
+        { error: 'This organization is not active.' },
+        { status: 403 }
+      )
+    }
+
+    const billingPlan = getBillingPlan(organization.plan)
+
+    if (billingPlan.userLimit !== null) {
+      const { count: currentUserCount } = await adminSupabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentProfile.organization_id)
+
+      if ((currentUserCount || 0) >= billingPlan.userLimit) {
+        return NextResponse.json(
+          {
+            error: `${billingPlan.name} plan allows ${billingPlan.userLimit} users. Upgrade the organization plan to add more users.`,
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     const { data: authData, error: authError } =
       await adminSupabase.auth.admin.createUser({
         email,
@@ -113,6 +145,7 @@ export async function POST(req: Request) {
     const { data: insertedProfile, error: profileError } = await adminSupabase
       .from('profiles')
       .insert({
+        organization_id: currentProfile.organization_id,
         auth_user_id: authData.user.id,
         full_name,
         email,
@@ -138,6 +171,7 @@ export async function POST(req: Request) {
     const { error: auditError } = await adminSupabase.from('audit_logs').insert([
       {
         actor_profile_id: currentProfile.id,
+        organization_id: currentProfile.organization_id,
         action_type: 'create_user',
         entity_type: 'profile',
         entity_id: insertedProfile.id,

@@ -10,7 +10,7 @@ type SecurityEvent = {
   severity: string
   created_at: string
   reviewed_at: string | null
-  event_payload: Record<string, any> | null
+  event_payload: Record<string, unknown> | null
 }
 
 type ScreenshotAlert = {
@@ -50,34 +50,59 @@ export default function AlertsPage() {
     const loadEvents = async () => {
       setLoading(true)
 
-      const [securityResponse, screenshotResponse] = await Promise.all([
-        supabase
-          .from('security_events')
-          .select(`
-            id,
-            event_type,
-            severity,
-            created_at,
-            reviewed_at,
-            event_payload
-          `)
-          .order('created_at', { ascending: false }),
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-        supabase
-          .from('screenshot_alerts')
-          .select(`
-            id,
-            profile_id,
-            staff_id,
-            full_name,
-            email,
-            role,
-            page,
-            alert_type,
-            user_agent,
-            created_at
-          `)
-          .order('created_at', { ascending: false }),
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
+      const { data: myProfile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      const organizationId = myProfile?.organization_id
+
+      let securityQuery = supabase
+        .from('security_events')
+        .select(`
+          id,
+          event_type,
+          severity,
+          created_at,
+          reviewed_at,
+          event_payload
+        `)
+        .order('created_at', { ascending: false })
+
+      let screenshotQuery = supabase
+        .from('screenshot_alerts')
+        .select(`
+          id,
+          profile_id,
+          staff_id,
+          full_name,
+          email,
+          role,
+          page,
+          alert_type,
+          user_agent,
+          created_at
+        `)
+        .order('created_at', { ascending: false })
+
+      if (organizationId) {
+        securityQuery = securityQuery.eq('organization_id', organizationId)
+        screenshotQuery = screenshotQuery.eq('organization_id', organizationId)
+      }
+
+      const [securityResponse, screenshotResponse] = await Promise.all([
+        securityQuery,
+        screenshotQuery,
       ])
 
       if (!securityResponse.error && securityResponse.data) {
@@ -107,16 +132,16 @@ export default function AlertsPage() {
       const payload = event.event_payload || {}
 
       const personName =
-        payload.guard_name ||
-        payload.full_name ||
-        payload.staff_name ||
-        payload.name ||
+        stringPayloadValue(payload, 'guard_name') ||
+        stringPayloadValue(payload, 'full_name') ||
+        stringPayloadValue(payload, 'staff_name') ||
+        stringPayloadValue(payload, 'name') ||
         'Unknown guard'
 
       const personMeta =
-        payload.employee_code ||
-        payload.guard_code ||
-        payload.email ||
+        stringPayloadValue(payload, 'employee_code') ||
+        stringPayloadValue(payload, 'guard_code') ||
+        stringPayloadValue(payload, 'email') ||
         '—'
 
       return {
@@ -321,7 +346,7 @@ function formatDateTime(dateString: string) {
   })
 }
 
-function formatPayload(payload: Record<string, any>) {
+function formatPayload(payload: Record<string, unknown>) {
   const entries = Object.entries(payload || {})
 
   if (entries.length === 0) return '—'
@@ -337,6 +362,15 @@ function formatPayload(payload: Record<string, any>) {
       return `${key}: ${String(value)}`
     })
     .join(' | ')
+}
+
+function stringPayloadValue(payload: Record<string, unknown>, key: string) {
+  const value = payload[key]
+
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+
+  return ''
 }
 
 function SummaryCard({

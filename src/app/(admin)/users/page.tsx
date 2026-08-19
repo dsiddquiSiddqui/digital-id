@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search, Plus, Users, UserCheck, UserX } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 type Profile = {
   id: string
   auth_user_id: string
+  organization_id?: string | null
   role: string
   full_name: string
   email: string
@@ -26,15 +27,6 @@ type Role =
 
 type RoleFilter = 'all' | Role
 type StatusFilter = 'all' | 'active' | 'inactive'
-
-const USER_ROLES: Role[] = [
-  'super_admin',
-  'admin',
-  'operation_manager',
-  'operation_team',
-  'hr_manager',
-  'hr',
-]
 
 const ROLE_LABELS: Record<Role, string> = {
   super_admin: 'Super Admin',
@@ -143,7 +135,7 @@ function canEditTarget(currentUserRole: Role | null, targetRole: Role): boolean 
 }
 
 export default function UsersPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [currentUserRole, setCurrentUserRole] = useState<Role | null>(null)
   const [users, setUsers] = useState<Profile[]>([])
@@ -174,7 +166,7 @@ export default function UsersPage() {
     role: 'operation_team',
   })
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true)
     setError('')
 
@@ -192,7 +184,7 @@ export default function UsersPage() {
 
       const { data: myProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, organization_id')
         .eq('auth_user_id', user.id)
         .single()
 
@@ -216,6 +208,7 @@ export default function UsersPage() {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .eq('organization_id', myProfile.organization_id)
         .in('role', visibleRoles)
         .order('created_at', { ascending: false })
 
@@ -233,11 +226,11 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
   useEffect(() => {
-    loadUsers()
-  }, [])
+    void Promise.resolve().then(loadUsers)
+  }, [loadUsers])
 
   const visibleRoles = useMemo(
     () => getVisibleRoles(currentUserRole),

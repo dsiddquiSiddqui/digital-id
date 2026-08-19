@@ -20,11 +20,11 @@ async function checkAccess() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, full_name, email')
+    .select('id, organization_id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+  if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
     return {
       error: 'Forbidden.',
       status: 403 as const,
@@ -59,6 +59,7 @@ export async function GET(
       .from('staff_addresses')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile!.organization_id)
       .eq('is_current', true)
       .maybeSingle()
 
@@ -111,6 +112,7 @@ export async function POST(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -124,6 +126,7 @@ export async function POST(
       .from('staff_addresses')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile.organization_id)
       .eq('is_current', true)
       .maybeSingle()
 
@@ -140,6 +143,7 @@ export async function POST(
           country,
         })
         .eq('id', existingAddress.id)
+        .eq('organization_id', access.profile.organization_id)
         .select('*')
         .single()
 
@@ -150,6 +154,7 @@ export async function POST(
         .from('staff_addresses')
         .insert([
           {
+            organization_id: access.profile.organization_id,
             staff_id: id,
             street_address,
             city,
@@ -230,6 +235,7 @@ export async function POST(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
 
         action_type: existingAddress

@@ -61,34 +61,61 @@ export default function V2StaffPage() {
       setLoading(true)
       setError('')
 
-      const [staffRes, idsRes] = await Promise.all([
-        supabase
-          .from('staff')
-          .select(`
-            id,
-            full_name,
-            employee_code,
-            company_name,
-            email,
-            phone,
-            status,
-            staff_type,
-            photo_url,
-            created_at
-          `)
-          .order('created_at', { ascending: false }),
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-        supabase
-          .from('staff_ids')
-          .select(`
-            id,
-            staff_id,
-            id_number,
-            status,
-            expiry_date,
-            is_current
-          `)
-          .eq('is_current', true),
+      if (!user) {
+        setError('Unable to load current user.')
+        setLoading(false)
+        return
+      }
+
+      const { data: myProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      if (profileError || !myProfile?.organization_id) {
+        setError('Unable to load your organization.')
+        setLoading(false)
+        return
+      }
+
+      const staffQuery = supabase
+        .from('staff')
+        .select(`
+          id,
+          full_name,
+          employee_code,
+          company_name,
+          email,
+          phone,
+          status,
+          staff_type,
+          photo_url,
+          created_at
+        `)
+        .eq('organization_id', myProfile.organization_id)
+        .order('created_at', { ascending: false })
+
+      const idsQuery = supabase
+        .from('staff_ids')
+        .select(`
+          id,
+          staff_id,
+          id_number,
+          status,
+          expiry_date,
+          is_current
+        `)
+        .eq('organization_id', myProfile.organization_id)
+        .eq('is_current', true)
+
+      const [staffRes, idsRes] = await Promise.all([
+        staffQuery,
+        idsQuery,
       ])
 
       if (staffRes.error) {
@@ -380,7 +407,7 @@ function StatCard({
   return (
     <div
       className={`rounded-2xl p-5 shadow-sm ${
-        highlight ? 'bg-[#0094e0] text-white' : 'border border-slate-200 bg-white'
+        highlight ? 'bg-[var(--tenant-primary,#0094e0)] text-white' : 'border border-slate-200 bg-white'
       }`}
     >
       <div className="flex items-center justify-between">

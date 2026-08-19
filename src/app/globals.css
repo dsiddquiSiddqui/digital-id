@@ -7,6 +7,9 @@
   --brand: #0094e0;
   --brand-light: rgba(0, 148, 224, 0.1);
   --brand-hover: #007bb8;
+  --tenant-primary: #0094e0;
+  --tenant-accent: #081a33;
+  --tenant-surface: #f8fafc;
 }
 
 html, body {
@@ -16,9 +19,82 @@ html, body {
 
 
 body {
-  background-image: url('../assets/Gradient-Backgroud.jpg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-color: #fbfaf8;
+}
+
+button, a, input, select, textarea {
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--tenant-primary);
+}
+
+@media print {
+  body {
+    background: white !important;
+  }
+
+  aside, nav, header, button {
+    box-shadow: none !important;
+  }
+}
+
+.tenant-theme {
+  background-color: var(--tenant-surface);
+}
+
+.tenant-theme .bg-\[\#0094e0\],
+.tenant-theme .bg-\[\#0094e0\]\/10,
+.tenant-theme .bg-\[\#0094e0\]\/15,
+.tenant-theme .bg-slate-900 {
+  background-color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .bg-\[\#0094e0\]\/10 {
+  background-color: color-mix(in srgb, var(--tenant-primary) 10%, white) !important;
+}
+
+.tenant-theme .bg-\[\#0094e0\]\/15 {
+  background-color: color-mix(in srgb, var(--tenant-primary) 15%, white) !important;
+}
+
+.tenant-theme .hover\:bg-\[\#007bb8\]:hover,
+.tenant-theme .hover\:bg-slate-800:hover,
+.tenant-theme .hover\:bg-slate-700:hover {
+  background-color: color-mix(in srgb, var(--tenant-primary) 84%, black) !important;
+}
+
+.tenant-theme .text-\[\#0094e0\] {
+  color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .text-\[\#081a33\] {
+  color: var(--tenant-accent) !important;
+}
+
+.tenant-theme .border-\[\#0094e0\],
+.tenant-theme .focus-within\:border-\[\#0094e0\]:focus-within {
+  border-color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .bg-\[\#081a33\] {
+  background-color: var(--tenant-accent) !important;
+}
+
+.tenant-theme .from-\[\#081a33\] {
+  --tw-gradient-from: var(--tenant-accent) !important;
+}
+
+.tenant-theme .to-\[\#0f274a\] {
+  --tw-gradient-to: color-mix(in srgb, var(--tenant-accent) 78%, white) !important;
+}
+
+.tenant-theme .bg-\[\#f8fafc\],
+.tenant-theme .bg-\[\#f8fafcdb\] {
+  background-color: var(--tenant-surface) !important;
 }

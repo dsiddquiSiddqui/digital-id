@@ -1,4 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a Next.js 16 security ID administration platform.
+
+## Environment and integrations
+
+Copy `.env.example` to `.env.local`, supply real credentials, then run:
+
+```bash
+npm run check:env
+npm run check:env:production
+```
+
+The production check deliberately fails when Supabase, custom-domain, cron, or error-tracking configuration is absent. Resend variables are required when `EMAIL_PROVIDER=resend`; billing credentials are required when a non-manual billing provider is selected. Secrets must never be committed.
+
+## Database migrations
+
+Ordered, reproducible database changes live in `supabase/migrations`. Apply them in filename order with the Supabase CLI (`supabase db push`) or your deployment migration runner. `database/archive` contains a legacy one-shot bundle for reference only and must not be applied after the ordered migrations.
+
+## Quality checks
+
+```bash
+npm run lint
+npm test
+npm run test:integration
+npm run test:e2e
+npm run build
+```
+
+The smoke checker asserts exact expected status codes; an expected 404 is declared per route and no longer treated as a generic success.
 
 ## Getting Started
 

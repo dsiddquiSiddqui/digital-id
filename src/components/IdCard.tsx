@@ -1,8 +1,8 @@
 'use client'
 
-import Image from 'next/image'
 import { QRCodeCanvas } from 'qrcode.react'
-import logo from '@/assets/SGC-Security-Tag-White-Inverse-Logo.svg'
+import { ShieldCheck } from 'lucide-react'
+import Image from 'next/image'
 
 type Props = {
   fullName: string
@@ -50,13 +50,16 @@ export default function IdCard({
     <div className="w-[360px] overflow-hidden rounded-[26px] border border-slate-300 bg-white shadow-[0_20px_45px_rgba(15,23,42,0.12)]">
       {/* Header */}
       <div className="bg-[#081a33] px-6 py-5 text-white">
-        <div className="flex items-center justify-center">
-          <Image
-            src={logo}
-            alt="SGC Security Logo"
-            className="h-auto w-[180px] object-contain"
-            priority
-          />
+        <div className="flex items-center justify-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#081a33]">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-black leading-none">Digital Staff ID</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">
+              Verified identity
+            </p>
+          </div>
         </div>
       </div>
 
@@ -69,9 +72,12 @@ export default function IdCard({
       <div className="px-6 py-6">
         <div className="flex flex-col items-center text-center">
           {photoUrl ? (
-            <img
+            <Image
               src={photoUrl}
               alt={fullName}
+              width={96}
+              height={96}
+              unoptimized
               className="h-24 w-24 rounded-full border-4 border-slate-100 object-cover"
             />
           ) : (

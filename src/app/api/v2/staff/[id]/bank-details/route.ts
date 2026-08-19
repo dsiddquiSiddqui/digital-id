@@ -20,11 +20,11 @@ async function checkAccess() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, full_name, email')
+    .select('id, organization_id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+  if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
     return {
       error: 'Forbidden.',
       status: 403 as const,
@@ -62,6 +62,7 @@ export async function GET(
       .from('staff_bank_details')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile!.organization_id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -124,6 +125,7 @@ export async function POST(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -137,6 +139,7 @@ export async function POST(
       .from('staff_bank_details')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile.organization_id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -154,6 +157,7 @@ export async function POST(
           reference_number,
         })
         .eq('id', existingBank.id)
+        .eq('organization_id', access.profile.organization_id)
         .select('*')
         .single()
 
@@ -164,6 +168,7 @@ export async function POST(
         .from('staff_bank_details')
         .insert([
           {
+            organization_id: access.profile.organization_id,
             staff_id: id,
             account_holder_name,
             bank_account_number,
@@ -260,6 +265,7 @@ export async function POST(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
 
         action_type: existingBank

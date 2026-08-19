@@ -24,7 +24,7 @@ export default function V2NewStaffPage() {
   const [fullName, setFullName] = useState('')
   const [parimStaffId, setParimStaffId] = useState('')
   const [employeeCode, setEmployeeCode] = useState('')
-  const [companyName, setCompanyName] = useState('H&D Security')
+  const [companyName, setCompanyName] = useState('Security Services')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [secondPhone, setSecondPhone] = useState('')
@@ -270,7 +270,7 @@ export default function V2NewStaffPage() {
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="H&D Security"
+              placeholder="Security Services"
             />
           </div>
 

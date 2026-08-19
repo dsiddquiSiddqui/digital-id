@@ -6,8 +6,8 @@ const ALLOWED_STATUSES = ['active', 'inactive', 'suspended', 'revoked', 'archive
 const ALLOWED_TYPES = ['security', 'warehouse', 'event', 'admin', 'contractor', 'other']
 
 function buildChanges(
-  beforeData: Record<string, any>,
-  afterData: Record<string, any>
+  beforeData: Record<string, unknown>,
+  afterData: Record<string, unknown>
 ) {
   const changes = []
 
@@ -121,12 +121,13 @@ export async function POST(
 
     const { data: currentProfile } = await supabase
       .from('profiles')
-      .select('id, role, full_name, email')
+      .select('id, organization_id, role, full_name, email')
       .eq('auth_user_id', user.id)
       .single()
 
     if (
       !currentProfile ||
+      !currentProfile.organization_id ||
       !['super_admin', 'admin', 'manager'].includes(currentProfile.role)
     ) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
@@ -136,6 +137,7 @@ export async function POST(
       .from('staff')
       .select('*')
       .eq('id', id)
+      .eq('organization_id', currentProfile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -145,6 +147,7 @@ export async function POST(
     const { data: duplicateCode } = await adminSupabase
       .from('staff')
       .select('id')
+      .eq('organization_id', currentProfile.organization_id)
       .eq('employee_code', employee_code)
       .neq('id', id)
       .maybeSingle()
@@ -180,6 +183,7 @@ export async function POST(
       .from('staff')
       .update(updatePayload)
       .eq('id', id)
+      .eq('organization_id', currentProfile.organization_id)
 
     if (updateError) {
       return NextResponse.json(
@@ -190,6 +194,7 @@ export async function POST(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: currentProfile.organization_id,
         actor_profile_id: currentProfile.id,
         action_type: 'update_staff_v2',
         entity_type: 'staff',

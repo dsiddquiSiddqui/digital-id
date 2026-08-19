@@ -291,7 +291,7 @@ export default function V2EditStaffPage() {
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="H&D Security"
+              placeholder="Security Services"
             />
           </div>
 
@@ -468,9 +468,12 @@ export default function V2EditStaffPage() {
 
             <div className="mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-slate-100">
               {photoUrl ? (
-                <img
+                <Image
                   src={photoUrl}
                   alt={fullName}
+                  width={80}
+                  height={80}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (

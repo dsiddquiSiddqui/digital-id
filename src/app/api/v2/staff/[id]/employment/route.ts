@@ -20,11 +20,11 @@ async function checkAccess() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, full_name, email')
+    .select('id, organization_id, role, full_name, email')
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!profile || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
+  if (!profile?.organization_id || !['super_admin', 'admin', 'manager'].includes(profile.role)) {
     return {
       error: 'Forbidden.',
       status: 403 as const,
@@ -41,7 +41,10 @@ async function checkAccess() {
   }
 }
 
-function getActorMetadata(access: any) {
+function getActorMetadata(access: {
+  profile: { full_name?: string | null; email?: string | null; role?: string | null } | null
+  user: { email?: string | null } | null
+}) {
   return {
     actor_name:
       access.profile?.full_name ||
@@ -56,8 +59,8 @@ function getActorMetadata(access: any) {
 }
 
 function buildChanges(
-  beforeData: Record<string, any> | null,
-  afterData: Record<string, any>
+  beforeData: Record<string, unknown> | null,
+  afterData: Record<string, unknown>
 ) {
   const changes = []
 
@@ -95,6 +98,7 @@ export async function GET(
       .from('staff_employment')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile!.organization_id)
       .eq('is_current', true)
       .maybeSingle()
 
@@ -177,6 +181,7 @@ export async function POST(
       .from('staff')
       .select('id, full_name')
       .eq('id', id)
+      .eq('organization_id', access.profile.organization_id)
       .single()
 
     if (!existingStaff) {
@@ -187,6 +192,7 @@ export async function POST(
       .from('staff_employment')
       .select('*')
       .eq('staff_id', id)
+      .eq('organization_id', access.profile.organization_id)
       .eq('is_current', true)
       .maybeSingle()
 
@@ -210,6 +216,7 @@ export async function POST(
         .from('staff_employment')
         .update(payload)
         .eq('id', existingEmployment.id)
+        .eq('organization_id', access.profile.organization_id)
         .select('*')
         .single()
 
@@ -220,6 +227,7 @@ export async function POST(
         .from('staff_employment')
         .insert([
           {
+            organization_id: access.profile.organization_id,
             staff_id: id,
             ...payload,
             is_current: true,
@@ -238,6 +246,7 @@ export async function POST(
 
     await adminSupabase.from('audit_logs').insert([
       {
+        organization_id: access.profile.organization_id,
         actor_profile_id: access.profile.id,
         action_type: existingEmployment
           ? 'update_staff_employment_v2'

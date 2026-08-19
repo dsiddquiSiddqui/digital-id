@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Phone, Plus, Trash2, TriangleAlert } from 'lucide-react'
@@ -39,7 +39,7 @@ export default function V2StaffContactsPage() {
   const [email, setEmail] = useState('')
   const [isPrimary, setIsPrimary] = useState(false)
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
 
@@ -65,11 +65,11 @@ export default function V2StaffContactsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
   useEffect(() => {
-    if (id) loadData()
-  }, [id])
+    if (id) void Promise.resolve().then(loadData)
+  }, [id, loadData])
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
