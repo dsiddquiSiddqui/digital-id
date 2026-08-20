@@ -245,7 +245,7 @@ export default function EditDigitalIdPage() {
           </div>
 
           <Link
-            href={`/staff/${record.staff_id}`}
+            href={`/v2/staff/${record.staff_id}`}
             className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Back to Staff

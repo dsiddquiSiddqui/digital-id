@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import {
   Eye,
   EyeOff,
   LockKeyhole,
   Mail,
   ArrowRight,
-  ShieldCheck,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -145,14 +145,14 @@ export default function LoginPage() {
         <div className="grid w-full overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] lg:grid-cols-[0.94fr_1.06fr]">
           <section className="hidden bg-slate-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
             <div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-950">
-                <ShieldCheck className="h-6 w-6" />
+              <div className="flex h-14 w-16 items-center justify-center rounded-2xl bg-white p-2">
+                <Image src="/digital-id-x-icon.png" alt="" width={165} height={134} priority className="h-auto w-full" />
               </div>
               <p className="mt-8 text-xs font-black uppercase tracking-[0.2em] text-white/45">
                 Workspace sign in
               </p>
               <h1 className="mt-4 max-w-sm text-4xl font-black leading-tight">
-                Access your security ID operations dashboard.
+                Access your Digital ID X operations dashboard.
               </h1>
               <p className="mt-5 max-w-sm text-sm leading-7 text-white/65">
                 Sign in to manage staff records, digital IDs, alerts, users, and
@@ -170,12 +170,8 @@ export default function LoginPage() {
           <section className="bg-[#f8fafc] px-6 py-8 sm:px-10 sm:py-12">
             <div className="mx-auto w-full max-w-md">
               <div className="mb-8">
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white">
-                  <ShieldCheck className="h-7 w-7" />
-                </div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                  Security ID Platform
-                </p>
+                <Image src="/digital-id-x-logo.png" alt="Digital ID X" width={800} height={134} priority className="mb-6 h-auto w-[210px]" />
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Admin workspace</p>
                 <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                   Login
                 </h2>

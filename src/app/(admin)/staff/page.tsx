@@ -79,7 +79,7 @@ export default function StaffPage() {
             </div>
 
             <Link
-              href="/staff/new"
+              href="/v2/staff/new"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               <Plus className="h-4 w-4" />
@@ -149,7 +149,7 @@ export default function StaffPage() {
                   <tr key={member.id} className="border-b border-slate-200 last:border-b-0">
                     <td className="px-6 py-4">
                       <Link
-                        href={`/staff/${member.id}`}
+                        href={`/v2/staff/${member.id}`}
                         className="font-medium text-slate-900 transition hover:text-slate-700 hover:underline"
                       >
                         {member.full_name}
@@ -170,7 +170,7 @@ export default function StaffPage() {
 
                     <td className="px-6 py-4 text-right">
                       <Link
-                        href={`/staff/${member.id}`}
+                        href={`/v2/staff/${member.id}`}
                         className="inline-flex items-center gap-1 text-sm font-medium text-slate-700 transition hover:text-slate-900"
                       >
                         View

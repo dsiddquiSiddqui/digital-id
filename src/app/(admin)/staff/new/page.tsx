@@ -79,7 +79,7 @@ export default function NewStaffPage() {
       setSuccess('Staff member created successfully.')
 
       setTimeout(() => {
-        router.push('/staff')
+        router.push('/v2/staff')
       }, 700)
     } catch {
       setLoading(false)

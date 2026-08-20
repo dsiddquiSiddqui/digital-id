@@ -3,8 +3,7 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Upload, ChevronLeft, X } from 'lucide-react'
+import { Upload, X } from 'lucide-react'
 
 type Staff = {
   id: string
@@ -218,28 +217,13 @@ export default function V2EditStaffPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Edit Staff
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Update staff details using the new V2 schema.
-            </p>
-          </div>
+      <header>
+        <p className="dx-eyebrow">Personal</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[var(--dx-ink)]">Personal information</h2>
+        <p className="mt-2 text-sm text-[var(--dx-muted)]">Update identity, contact and profile information. Required fields are clearly marked.</p>
+      </header>
 
-          <Link
-            href={`/v2/staff/${id}`}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back to Staff
-          </Link>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="dx-surface p-5 sm:p-6">
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className="lg:col-span-2">
             <h2 className="text-lg font-semibold text-slate-900">Basic Information</h2>

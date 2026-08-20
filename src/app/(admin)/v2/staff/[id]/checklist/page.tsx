@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { CheckCircle2, Circle, ClipboardCheck, FileWarning } from 'lucide-react'
+import { CheckCircle2, Circle, FileWarning } from 'lucide-react'
 
 type ChecklistRow = {
   document_type: { id: string; name: string; code: string; is_mandatory: boolean; has_expiry: boolean }
@@ -54,24 +54,14 @@ export default function StaffDocumentChecklistPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
-              <ClipboardCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black tracking-tight text-slate-950">Document Checklist</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                {staff?.full_name} {staff?.employee_code ? `- ${staff.employee_code}` : ''}
-              </p>
-            </div>
-          </div>
-          <Link href={`/v2/staff/${staffId}/documents`} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white">
-            Manage documents
-          </Link>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="dx-eyebrow">Compliance</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[var(--dx-ink)]">Document checklist</h2>
+          <p className="mt-2 text-sm text-[var(--dx-muted)]">Track required and optional records for {staff?.full_name || 'this staff member'}.</p>
         </div>
-      </section>
+        <Link href={`/v2/staff/${staffId}/documents`} className="dx-button dx-button-primary">Manage documents</Link>
+      </header>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Metric label="Complete" value={`${percent}%`} />
@@ -79,7 +69,7 @@ export default function StaffDocumentChecklistPage() {
         <Metric label="Required missing" value={String(summary.required_missing)} danger={summary.required_missing > 0} />
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="dx-surface p-5 sm:p-6">
         <div className="divide-y divide-slate-100">
           {rows.map((row) => (
             <div key={row.document_type.id} className="flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">

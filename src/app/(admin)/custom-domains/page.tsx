@@ -124,7 +124,7 @@ export default function CustomDomainsPage() {
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <DnsBox label="CNAME" value={`${domain.domain} -> ${domain.dns_target}`} ok={domain.cname_ok} />
-              <DnsBox label="TXT verification" value={`security-id-verification=${domain.verification_token}`} ok={domain.txt_ok} />
+              <DnsBox label="TXT verification" value={`digital-id-x-verification=${domain.verification_token}`} ok={domain.txt_ok} />
             </div>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-xs font-semibold text-slate-500">

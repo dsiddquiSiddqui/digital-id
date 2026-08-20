@@ -20,7 +20,7 @@ async function waitForServer() {
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${baseUrl}/security-id-icon.svg`, {
+      const response = await fetch(`${baseUrl}/digital-id-x-icon.svg`, {
         signal: AbortSignal.timeout(1000),
       })
       if (response.ok) return

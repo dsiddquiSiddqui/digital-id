@@ -1,4 +1,4 @@
-export type ThemeKey = 'command-blue' | 'ember-ops' | 'forest-shift'
+export type ThemeKey = 'digital-id-x' | 'command-blue' | 'ember-ops' | 'forest-shift'
 
 export type OrganizationTheme = {
   key: ThemeKey
@@ -10,6 +10,14 @@ export type OrganizationTheme = {
 }
 
 export const ORGANIZATION_THEMES: OrganizationTheme[] = [
+  {
+    key: 'digital-id-x',
+    name: 'Digital ID X',
+    description: 'The signature lime, ink, and warm canvas palette.',
+    primaryColor: '#c8ff4d',
+    accentColor: '#171915',
+    surfaceColor: '#f3f1eb',
+  },
   {
     key: 'command-blue',
     name: 'Command Blue',

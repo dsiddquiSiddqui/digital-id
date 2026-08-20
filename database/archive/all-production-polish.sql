@@ -1,4 +1,4 @@
-﻿-- Production polish upgrade bundle for an existing Security ID SaaS database.
+-- Production polish upgrade bundle for an existing Digital ID X SaaS database.
 -- Legacy one-shot bundle retained for reference only; use supabase/migrations for deployments.
 -- Safe to re-run: tables/columns/indexes use IF NOT EXISTS and triggers are dropped/recreated.
 
@@ -365,7 +365,7 @@ create table if not exists public.organization_domains (
   status text not null default 'pending' check (status in ('pending', 'verified', 'failed', 'disabled')),
   purpose text not null default 'login' check (purpose in ('login', 'verification', 'both')),
   verification_token text not null default encode(gen_random_bytes(18), 'hex'),
-  dns_target text not null default 'security-id.app',
+  dns_target text not null default 'digitalidx.app',
   last_checked_at timestamptz,
   verified_at timestamptz,
   created_at timestamptz not null default now(),

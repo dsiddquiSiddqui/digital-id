@@ -291,7 +291,7 @@ export async function POST(
 
           module: 'Staff Management',
 
-          page: `/admin/staff/${id}/bank-details`,
+          page: `/v2/staff/${id}/bank-details`,
 
           staff_id: id,
 

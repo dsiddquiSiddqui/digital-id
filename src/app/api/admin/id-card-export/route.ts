@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     if (!staff) return NextResponse.json({ error: 'Staff not found.' }, { status: 404 })
 
     const lines = [
-      organization?.name || 'Security ID',
+      organization?.name || 'Digital ID X',
       'Branded Digital ID Export',
       `Name: ${staff.full_name}`,
       `Employee Code: ${staff.employee_code}`,

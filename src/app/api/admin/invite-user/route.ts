@@ -114,18 +114,18 @@ export async function POST(request: Request) {
       organizationId,
       profileId: result.access.profile.id,
       to: email,
-      subject: `You have been invited to ${usage.organization?.name || 'Security ID'}`,
+      subject: `You have been invited to ${usage.organization?.name || 'Digital ID X'}`,
       templateKey: 'user_invitation',
       metadata: {
         invitation_id: invitation.id,
-        organization_name: usage.organization?.name || 'Security ID',
+        organization_name: usage.organization?.name || 'Digital ID X',
         full_name: fullName || email,
         invite_url: fullInviteUrl,
         role,
       },
       text: `You have been invited. Open this link: ${fullInviteUrl}`,
       html: `
-        <p>You have been invited to ${usage.organization?.name || 'Security ID'}.</p>
+        <p>You have been invited to ${usage.organization?.name || 'Digital ID X'}.</p>
         <p><a href="${fullInviteUrl}">Accept invitation</a></p>
       `,
     })

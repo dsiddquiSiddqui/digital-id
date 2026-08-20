@@ -1,6 +1,5 @@
 'use client'
 
-import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -14,20 +13,19 @@ import {
   LogIn,
   Menu,
   X,
-  User,
   Users,
   Mail,
   ChevronRight,
   Settings,
-  BadgeDollarSign,
   ClipboardCheck,
   FileBarChart,
   ShieldCheck,
-  LifeBuoy,
   FileSpreadsheet,
-  CreditCard,
-  GitBranch,
-  CheckSquare,
+  ListChecks,
+  IdCard,
+  Workflow,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import LegalConsentBanner from '@/components/LegalConsentBanner'
@@ -76,6 +74,7 @@ export default function AdminLayout({
 
   const [loading, setLoading] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
 
   useEffect(() => {
@@ -156,21 +155,6 @@ export default function AdminLayout({
 
   const role = profile?.role ?? ''
   const organization = profile?.organizations ?? null
-  const tenantStyle = {
-    '--tenant-primary': organization?.primary_color || '#0094e0',
-    '--tenant-accent': organization?.accent_color || '#081a33',
-    '--tenant-surface': organization?.surface_color || '#f8fafc',
-    '--brand': organization?.primary_color || '#0094e0',
-    ...(organization?.background_image_url
-      ? {
-          backgroundImage: `linear-gradient(rgba(248,250,252,0.88), rgba(248,250,252,0.88)), url(${organization.background_image_url})`,
-          backgroundAttachment: 'fixed',
-          backgroundPosition: 'center',
-          backgroundSize: 'cover',
-        }
-      : {}),
-  } as CSSProperties
-
   const permissions = useMemo(() => {
     const isSuperAdmin = role === 'super_admin'
     const isAdmin = role === 'admin'
@@ -215,70 +199,28 @@ export default function AdminLayout({
     }
   }, [role])
 
-  const pageTitle = useMemo(() => {
-    if (pathname === '/dashboard') return 'Dashboard'
-    if (pathname === '/v2/staff') return 'Staff'
-    if (pathname === '/v2/staff/new') return 'Create Staff'
-    if (pathname === '/v2/staff/bulk-upload') return 'Bulk Upload Staff'
-    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/edit')) return 'Edit Staff'
-    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/password')) return 'Reset Staff Password'
-    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/issue-id')) return 'Issue Digital ID'
-    if (pathname.startsWith('/v2/staff/') && pathname.endsWith('/checklist')) return 'Document Checklist'
-    if (pathname.startsWith('/v2/staff/')) return 'Staff Details'
-    if (pathname === '/alerts') return 'Alerts'
-    if (pathname === '/expiry-alerts') return 'Expiry Alerts'
-    if (pathname === '/billing') return 'Billing'
-    if (pathname === '/reports') return 'Reports'
-    if (pathname === '/notifications') return 'Notifications'
-    if (pathname === '/document-renewals') return 'Document Renewals'
-    if (pathname === '/imports') return 'Import History'
-    if (pathname === '/bulk-actions') return 'Bulk Actions'
-    if (pathname === '/id-card-designer') return 'ID Card Designer'
-    if (pathname === '/custom-domains') return 'Custom Domains'
-    if (pathname === '/automations') return 'Workflow Automations'
-    if (pathname === '/setup-wizard') return 'Setup Wizard'
-    if (pathname === '/enterprise-health') return 'Enterprise Health'
-    if (pathname === '/launch-checklist') return 'Launch Checklist'
-    if (pathname === '/email-templates') return 'Email Templates'
-    if (pathname === '/scheduled-jobs') return 'Scheduled Jobs'
-    if (pathname === '/permission-audit') return 'Permission Audit'
-    if (pathname === '/production-readiness') return 'Production Readiness'
-    if (pathname === '/security-center') return 'Security Center'
-    if (pathname === '/onboarding-checklist') return 'Onboarding Checklist'
-    if (pathname === '/help') return 'Help Center'
-    if (pathname === '/audit-logs') return 'Audit Logs'
-    if (pathname === '/profile') return 'My Profile'
-    if (pathname === '/settings') return 'Organization Settings'
-    if (pathname === '/settings/permissions') return 'Role Permissions'
-    if (pathname === '/users') return 'Users'
-    if (pathname === '/users/invite') return 'Invite User'
-    if (pathname.startsWith('/users/') && pathname.endsWith('/edit')) return 'Edit User'
-    if (pathname.startsWith('/users/') && pathname.endsWith('/password')) return 'Reset User Password'
-    if (pathname.startsWith('/staff-ids/') && pathname.endsWith('/edit')) return 'Edit Digital ID'
-    return 'Admin Panel'
-  }, [pathname])
-
+  const staffAreaActive =
+    pathname === '/v2/staff' ||
+    pathname.startsWith('/v2/staff/') ||
+    pathname.startsWith('/v2/staff-ids/') ||
+    pathname.startsWith('/staff/') ||
+    pathname.startsWith('/staff-ids/')
   const sidebarSections = [
     {
       title: 'Workspace',
       items: [
-        permissions.canViewDashboard
-          ? {
-              href: '/dashboard',
-              label: 'Dashboard',
-              icon: <LayoutDashboard className="h-4 w-4" />,
-              active: pathname === '/dashboard',
-            }
-          : null,
+        {
+          href: '/dashboard',
+          label: 'Dashboard',
+          icon: <LayoutDashboard className="h-4 w-4" />,
+          active: pathname === '/dashboard',
+        },
         permissions.canViewStaff
           ? {
               href: '/v2/staff',
               label: 'Staff',
               icon: <Shield className="h-4 w-4" />,
-              active:
-                pathname === '/v2/staff' ||
-                pathname.startsWith('/v2/staff/') ||
-                pathname.startsWith('/staff/'),
+              active: staffAreaActive,
             }
           : null,
         permissions.canViewStaff
@@ -292,8 +234,8 @@ export default function AdminLayout({
         permissions.canViewStaff
           ? {
               href: '/notifications',
-              label: 'Notifications',
-              icon: <Bell className="h-4 w-4" />,
+              label: 'Inbox',
+              icon: <Mail className="h-4 w-4" />,
               active: pathname === '/notifications',
             }
           : null,
@@ -313,7 +255,7 @@ export default function AdminLayout({
         permissions.canViewStaff
           ? {
               href: '/expiry-alerts',
-              label: 'Expiry Alerts',
+              label: 'Expiry alerts',
               icon: <FileText className="h-4 w-4" />,
               active: pathname === '/expiry-alerts',
             }
@@ -329,120 +271,74 @@ export default function AdminLayout({
         permissions.canBulkUploadStaff
           ? {
               href: '/bulk-actions',
-              label: 'Bulk Actions',
+              label: 'Bulk actions',
               icon: <FileSpreadsheet className="h-4 w-4" />,
-              active:
-                pathname === '/bulk-actions' ||
-                pathname === '/imports' ||
-                pathname === '/v2/staff/bulk-upload',
+              active: pathname === '/bulk-actions',
             }
           : null,
       ],
     },
-    {
-      title: 'Build',
-      items: [
-        permissions.canManageSettings
-          ? {
+    permissions.canManageSettings
+      ? {
+          title: 'Build',
+          items: [
+            {
               href: '/setup-wizard',
-              label: 'Setup Wizard',
-              icon: <CheckSquare className="h-4 w-4" />,
-              active:
-                pathname === '/setup-wizard' ||
-                pathname === '/onboarding-checklist' ||
-                pathname === '/launch-checklist' ||
-                pathname === '/production-readiness',
-            }
-          : null,
-        permissions.canManageSettings
-          ? {
+              label: 'Setup wizard',
+              icon: <ListChecks className="h-4 w-4" />,
+              active: pathname === '/setup-wizard',
+            },
+            {
               href: '/id-card-designer',
-              label: 'ID Designer',
-              icon: <CreditCard className="h-4 w-4" />,
+              label: 'ID designer',
+              icon: <IdCard className="h-4 w-4" />,
               active: pathname === '/id-card-designer',
-            }
-          : null,
-        permissions.canManageSettings
-          ? {
+            },
+            {
               href: '/automations',
               label: 'Automations',
-              icon: <GitBranch className="h-4 w-4" />,
+              icon: <Workflow className="h-4 w-4" />,
               active: pathname === '/automations',
-            }
-          : null,
-      ],
-    },
-    {
-      title: 'Admin',
-      items: [
-        permissions.canViewUsers
-          ? {
-              href: '/users',
-              label: 'Users',
-              icon: <Users className="h-4 w-4" />,
-              active: pathname === '/users' || pathname.startsWith('/users/'),
-            }
-          : null,
-        permissions.canManageSettings
-          ? {
-              href: '/billing',
-              label: 'Billing',
-              icon: <BadgeDollarSign className="h-4 w-4" />,
-              active: pathname === '/billing',
-            }
-          : null,
-        permissions.canManageSettings
-          ? {
-              href: '/security-center',
-              label: 'Security',
-              icon: <ShieldCheck className="h-4 w-4" />,
-              active:
-                pathname === '/security-center' ||
-                pathname === '/permission-audit' ||
-                pathname === '/audit-logs',
-            }
-          : null,
-        permissions.canManageSettings
-          ? {
-              href: '/settings',
-              label: 'Settings',
-              icon: <Settings className="h-4 w-4" />,
-              active:
-                pathname === '/settings' ||
-                pathname === '/settings/permissions' ||
-                pathname === '/custom-domains' ||
-                pathname === '/email-templates' ||
-                pathname === '/scheduled-jobs' ||
-                pathname === '/enterprise-health',
-            }
-          : null,
-      ],
-    },
-    {
-      title: 'Support',
-      items: [
-        permissions.canViewProfile
-          ? {
-              href: '/help',
-              label: 'Docs & Tickets',
-              icon: <LifeBuoy className="h-4 w-4" />,
-              active: pathname === '/help',
-            }
-          : null,
-        permissions.canViewProfile
-          ? {
-              href: '/profile',
-              label: 'My Profile',
-              icon: <User className="h-4 w-4" />,
-              active: pathname === '/profile',
-            }
-          : null,
-      ],
-    },
+            },
+          ],
+        }
+      : null,
+    permissions.canViewUsers || permissions.canManageSettings
+      ? {
+          title: 'Admin',
+          items: [
+            permissions.canViewUsers
+              ? {
+                  href: '/users',
+                  label: 'Users',
+                  icon: <Users className="h-4 w-4" />,
+                  active: pathname.startsWith('/users'),
+                }
+              : null,
+            permissions.canManageSettings
+              ? {
+                  href: '/settings',
+                  label: 'Settings',
+                  icon: <Settings className="h-4 w-4" />,
+                  active: pathname.startsWith('/settings'),
+                }
+              : null,
+            permissions.canManageSettings
+              ? {
+                  href: '/security-center',
+                  label: 'Security',
+                  icon: <ShieldCheck className="h-4 w-4" />,
+                  active: pathname === '/security-center',
+                }
+              : null,
+          ],
+        }
+      : null,
   ]
+    .filter(Boolean)
     .map((section) => ({
-      ...section,
-      items: section.items.filter(Boolean) as Array<{
+      ...section!,
+      items: section!.items.filter(Boolean) as Array<{
         href: string
         label: string
         icon: React.ReactNode
@@ -460,9 +356,10 @@ export default function AdminLayout({
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center ">
-        <div className="rounded-[28px] bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200/80">
-          <p className="text-sm text-slate-600">Loading admin panel...</p>
+      <main className="flex min-h-screen items-center justify-center bg-[var(--dx-canvas)]">
+        <div className="flex items-center gap-3 rounded-2xl border border-[var(--dx-line)] bg-white px-5 py-4 shadow-sm">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--dx-signal)] ring-4 ring-[var(--dx-ink)]" />
+          <p className="text-sm font-bold text-[var(--dx-muted-strong)]">Opening Digital ID X…</p>
         </div>
       </main>
     )
@@ -470,8 +367,8 @@ export default function AdminLayout({
 
   return (
     <ToastProvider>
-    <main className="tenant-theme min-h-screen p-4 text-slate-900 lg:p-6" style={tenantStyle}>
-      <div className="flex min-h-[calc(100vh-2rem)] overflow-hidden rounded-[34px] border border-white/60 bg-[#f8fafcdb] shadow-[0_20px_60px_rgba(15,23,42,0.08)] lg:min-h-[calc(100vh-3rem)]">
+    <main className="min-h-screen bg-[var(--dx-canvas)] text-[var(--dx-ink)]">
+      <div className="flex min-h-screen overflow-x-hidden">
         {mobileSidebarOpen ? (
           <div
             className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-[1px] lg:hidden"
@@ -480,65 +377,59 @@ export default function AdminLayout({
         ) : null}
 
         <aside
-          className={`fixed left-0 top-0 z-50 flex h-screen w-[270px] flex-col border-r border-slate-200/70 bg-[#f8fafc] transition-transform duration-300 lg:static lg:h-auto lg:translate-x-0 ${
+          className={`fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-white/10 bg-[#111612] text-white shadow-[8px_0_30px_rgba(16,24,20,0.08)] transition-[width,transform] duration-300 lg:translate-x-0 ${
+            sidebarCollapsed ? 'lg:w-[76px]' : 'lg:w-[260px]'
+          } ${
             mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="border-b border-slate-200/70 px-5 py-5">
-            <div className="flex items-center justify-between lg:justify-center">
-              <div className="w-full">
-                <div className="flex items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
-                  <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-[var(--tenant-primary)] text-white">
-                    {organization?.logo_url ? (
-                      <NextImage
-                        unoptimized
-                        src={organization.logo_url}
-                        alt=""
-                        width={44}
-                        height={44}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <Shield className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-slate-950">
-                      Security ID
-                    </p>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                      Workspace
-                    </p>
-                  </div>
+          <div className="border-b border-white/10 px-3 py-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className={`flex h-11 items-center rounded-lg bg-white px-3 shadow-sm transition-all ${sidebarCollapsed ? 'lg:justify-center lg:px-1.5' : ''}`}>
+                  <NextImage src="/digital-id-x-logo.png" alt="Digital ID X" width={800} height={134} priority className={`h-auto w-[174px] ${sidebarCollapsed ? 'lg:hidden' : ''}`} />
+                  <NextImage src="/digital-id-x-icon.png" alt="" width={166} height={134} className={`hidden h-8 w-auto ${sidebarCollapsed ? 'lg:block' : ''}`} />
                 </div>
                 {organization ? (
-                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
-                    <p className="truncate text-sm font-bold text-slate-950">
-                      {organization.name}
-                    </p>
-                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      {organization.slug}
-                    </p>
+                  <div className={`mt-2.5 flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.055] p-2.5 transition ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`} title={sidebarCollapsed ? organization.name : undefined}>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/10 text-xs font-bold text-white">
+                      {organization.logo_url ? <NextImage unoptimized src={organization.logo_url} alt="" width={36} height={36} className="h-full w-full object-cover" /> : organization.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className={`min-w-0 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                      <p className="truncate text-sm font-semibold text-white">{organization.name}</p>
+                      <p className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.08em] text-white/40">{organization.slug}</p>
+                    </div>
                   </div>
                 ) : null}
               </div>
 
               <button
                 onClick={() => setMobileSidebarOpen(false)}
-                className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
+                aria-label="Close navigation"
+                className="rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((current) => !current)}
+              className={`mt-2.5 hidden h-8 items-center rounded-lg text-xs font-semibold text-white/55 transition hover:bg-white/[0.07] hover:text-white lg:flex ${sidebarCollapsed ? 'w-full justify-center' : 'w-full justify-between px-2.5'}`}
+              aria-label={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+              title={sidebarCollapsed ? 'Expand navigation' : undefined}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <><span>Collapse sidebar</span><PanelLeftClose className="h-4 w-4" /></>}
+            </button>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 pb-4">
+          <nav className="flex-1 overflow-y-auto px-3 pb-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]" aria-label="Workspace navigation">
             <div className="mt-4 space-y-5">
               {sidebarSections.map((section) => (
                 <div key={section.title}>
-                  <p className="px-3 pb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  <p className={`px-3 pb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-white/40 ${sidebarCollapsed ? 'lg:sr-only' : ''}`}>
                     {section.title}
                   </p>
+                  {sidebarCollapsed ? <div className="mx-auto mb-2 hidden h-px w-7 bg-white/10 lg:block" /> : null}
                   <div className="space-y-1">
                     {section.items.map((item: SidebarItem) => (
                       <SidebarLink
@@ -547,49 +438,49 @@ export default function AdminLayout({
                         label={item.label}
                         icon={item.icon}
                         active={item.active}
+                        collapsed={sidebarCollapsed}
                       />
                     ))}
                   </div>
                 </div>
               ))}
             </div>
-            <p className="mt-5 rounded-2xl bg-white px-4 py-3 text-xs font-semibold leading-5 text-slate-500 ring-1 ring-slate-200">
-              Press Ctrl K for advanced tools, imports, domains, jobs, audit logs, and launch checks.
-            </p>
           </nav>
 
-          <div className="border-t border-slate-200 p-4">
+          <div className="border-t border-white/10 p-3">
             {role === 'super_admin' && organization ? (
               <button
                 onClick={handleLeaveWorkspace}
-                className="mb-3 flex w-full items-center justify-between rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100"
+                className={`mb-3 flex w-full items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 ${sidebarCollapsed ? 'lg:justify-center lg:p-2' : ''}`}
+                title={sidebarCollapsed ? 'Exit workspace' : undefined}
               >
                 <div className="flex items-center gap-3">
-                  <div className="rounded-xl bg-amber-100 p-2">
+                  <div className="rounded-md bg-amber-100 p-2">
                     <LogIn className="h-4 w-4 rotate-180" />
                   </div>
-                  <span>Exit workspace</span>
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Exit workspace</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-amber-500" />
+                <ChevronRight className={`h-4 w-4 text-amber-500 ${sidebarCollapsed ? 'lg:hidden' : ''}`} />
               </button>
             ) : null}
 
             <button
               onClick={handleLogout}
-              className="group flex w-full items-center justify-between rounded-[22px] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className={`group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-white/70 transition hover:bg-white/[0.07] hover:text-white ${sidebarCollapsed ? 'lg:justify-center lg:p-2' : ''}`}
+              title={sidebarCollapsed ? 'Logout' : undefined}
             >
               <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-slate-100 p-2 transition group-hover:bg-slate-200">
+                <div className="rounded-md bg-white/[0.07] p-2 transition group-hover:bg-white/10">
                   <LogOut className="h-4 w-4" />
                 </div>
-                <span>Logout</span>
+                <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Logout</span>
               </div>
-              <ChevronRight className="h-4 w-4 text-slate-400" />
+              <ChevronRight className={`h-4 w-4 text-white/25 ${sidebarCollapsed ? 'lg:hidden' : ''}`} />
             </button>
           </div>
         </aside>
 
-        <div className="flex-1 lg:pl-0">
+        <div className={`min-w-0 flex-1 transition-[padding] duration-300 ${sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-[260px]'}`}>
           {role === 'super_admin' && organization ? (
             <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-amber-900 lg:px-8">
               <div className="flex flex-col gap-3 text-sm font-semibold md:flex-row md:items-center md:justify-between">
@@ -606,33 +497,30 @@ export default function AdminLayout({
             </div>
           ) : null}
 
-          <header className="border-b border-slate-200/70 bg-[#f8fafc] px-5 py-4 lg:px-8">
-            <div className="flex items-center justify-between gap-4 rounded-[26px] bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/80">
+          <header className="sticky top-0 z-30 border-b border-[var(--dx-line)] bg-white/95 px-4 py-3 backdrop-blur-xl sm:px-5 lg:px-8">
+            <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setMobileSidebarOpen(true)}
-                  className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+                  aria-label="Open navigation"
+                  className="rounded-xl border border-[var(--dx-line)] bg-white p-2 text-[var(--dx-muted-strong)] hover:bg-[var(--dx-surface-muted)] lg:hidden"
                 >
                   <Menu className="h-5 w-5" />
                 </button>
 
-                <AdminCommandBar pageTitle={pageTitle} />
+                <AdminCommandBar />
               </div>
 
               <div className="flex items-center gap-3">
-                <Link href="/email-templates" aria-label="Open email templates" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f8fafc] text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100">
-                  <Mail className="h-4 w-4" />
-                </Link>
-
-                <Link href="/notifications" aria-label="Open notifications" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f8fafc] text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100">
+                <Link href="/notifications" aria-label="Open notifications" className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--dx-line)] bg-white text-[var(--dx-muted)] transition hover:border-[var(--dx-line-strong)] hover:bg-[var(--dx-surface-muted)]">
                   <Bell className="h-4 w-4" />
                 </Link>
 
                 <Link
                   href="/profile"
-                  className="flex items-center gap-3 rounded-full bg-[#f8fafc] px-3 py-2 ring-1 ring-slate-200 transition hover:bg-slate-100"
+                  className="flex items-center gap-3 rounded-lg border border-transparent px-1.5 py-1 transition hover:border-[var(--dx-line)] hover:bg-[var(--dx-surface-muted)] sm:pr-3"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--tenant-primary)_14%,white)] text-sm font-bold text-[var(--tenant-primary)]">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--dx-signal)] text-sm font-bold text-white">
                     {profile?.full_name?.charAt(0)?.toUpperCase() || 'A'}
                   </div>
 
@@ -649,7 +537,7 @@ export default function AdminLayout({
             </div>
           </header>
 
-          <div className="px-5 py-5 lg:px-8">{children}</div>
+          <div className="px-4 py-5 sm:px-5 lg:px-8 lg:py-6">{children}</div>
           <LegalConsentBanner />
         </div>
       </div>
@@ -663,29 +551,33 @@ function SidebarLink({
   label,
   icon,
   active,
+  collapsed,
 }: {
   href: string
   label: string
   icon: React.ReactNode
   active?: boolean
+  collapsed?: boolean
 }) {
   return (
     <Link
       href={href}
-      className={`group flex items-center gap-3 rounded-[18px] px-4 py-3 text-sm font-medium transition ${
+      title={collapsed ? label : undefined}
+      aria-current={active ? 'page' : undefined}
+      className={`group relative flex min-h-10 items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-semibold transition ${collapsed ? 'lg:justify-center lg:gap-0 lg:px-2' : ''} ${
         active
-          ? 'bg-[var(--tenant-primary)] text-white shadow-sm'
-          : 'text-slate-600 hover:bg-white hover:text-slate-900'
+          ? 'bg-white/[0.09] text-white ring-1 ring-inset ring-white/10 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-r-full before:bg-[#38b66a]'
+          : 'text-white/62 hover:bg-white/[0.055] hover:text-white'
       }`}
     >
       <span
         className={`transition ${
-          active ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'
+          active ? 'text-[#38b66a]' : 'text-white/38 group-hover:text-white/75'
         }`}
       >
         {icon}
       </span>
-      <span>{label}</span>
+      <span className={collapsed ? 'lg:sr-only' : ''}>{label}</span>
     </Link>
   )
 }

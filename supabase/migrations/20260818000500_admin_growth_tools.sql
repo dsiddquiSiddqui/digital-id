@@ -23,7 +23,7 @@ create table if not exists public.organization_domains (
   status text not null default 'pending' check (status in ('pending', 'verified', 'failed', 'disabled')),
   purpose text not null default 'login' check (purpose in ('login', 'verification', 'both')),
   verification_token text not null default encode(gen_random_bytes(18), 'hex'),
-  dns_target text not null default 'security-id.app',
+  dns_target text not null default 'digitalidx.app',
   last_checked_at timestamptz,
   verified_at timestamptz,
   created_at timestamptz not null default now(),

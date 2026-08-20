@@ -190,7 +190,7 @@ export async function POST(
           ...getActorMetadata(access),
 
           module: 'Staff Management',
-          page: `/admin/staff/${id}/contacts`,
+          page: `/v2/staff/${id}/contacts`,
 
           staff_id: id,
           staff_name: existingStaff.full_name,
@@ -313,7 +313,7 @@ export async function PATCH(
           ...getActorMetadata(access),
 
           module: 'Staff Management',
-          page: `/admin/staff/${id}/contacts`,
+          page: `/v2/staff/${id}/contacts`,
 
           staff_id: id,
           staff_name: existingStaff.full_name,
@@ -409,7 +409,7 @@ export async function DELETE(
           ...getActorMetadata(access),
 
           module: 'Staff Management',
-          page: `/admin/staff/${id}/contacts`,
+          page: `/v2/staff/${id}/contacts`,
 
           staff_id: id,
           staff_name: existingStaff.full_name,

@@ -6,7 +6,7 @@ let server: ChildProcess | undefined
 
 async function isReady() {
   try {
-    const response = await fetch(`${baseUrl}/security-id-icon.svg`, { signal: AbortSignal.timeout(1000) })
+    const response = await fetch(`${baseUrl}/digital-id-x-icon.svg`, { signal: AbortSignal.timeout(1000) })
     return response.status === 200
   } catch {
     return false

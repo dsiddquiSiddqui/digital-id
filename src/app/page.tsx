@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import NextImage from 'next/image'
 import {
   ArrowRight,
   BadgeCheck,
@@ -82,13 +83,8 @@ export default function HomePage() {
     <main className="min-h-screen bg-[#fbfaf8] text-[#191919]">
       <header className="sticky top-0 z-30 border-b border-[#e8e2da] bg-[#fbfaf8]/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-3 sm:px-7">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md border border-[#dfd7cd] bg-white text-[#191919]">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-            <span className="text-[15px] font-black tracking-[-0.01em]">
-              Security ID
-            </span>
+          <Link href="/" aria-label="Digital ID X home" className="flex items-center">
+            <NextImage src="/digital-id-x-logo.png" alt="Digital ID X" width={800} height={134} priority className="h-auto w-[164px] sm:w-[184px]" />
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
@@ -411,14 +407,14 @@ export default function HomePage() {
                     <p>{formatPlanLimit(plan.staffLimit, 'staff records')}</p>
                   </div>
                   <Link
-                    href={`/signup?plan=${plan.key}`}
+                    href="/signup"
                     className={`mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-md text-sm font-black ${
                       active
                         ? 'bg-white text-[#191919] hover:bg-[#f7f4ef]'
                         : 'bg-[#191919] text-white hover:bg-black'
                     }`}
                   >
-                    Choose
+                    Start free
                   </Link>
                 </article>
               )
@@ -465,7 +461,7 @@ export default function HomePage() {
             Create a workspace your clients can trust.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg font-semibold leading-8 text-white/70">
-            Launch your branded security ID system, add your team, and keep
+            Launch your branded Digital ID X workspace, add your team, and keep
             every profile ready for inspection.
           </p>
           <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">

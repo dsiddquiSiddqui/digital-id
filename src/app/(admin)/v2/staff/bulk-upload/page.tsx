@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
+import { ArrowLeft, CheckCircle2, Download, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react'
 
 type ImportError = {
   sheet: string
@@ -86,53 +88,67 @@ export default function BulkUploadStaffPage() {
     window.open('/api/staff/bulk-upload/template', '_blank')
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Bulk Upload Staff</h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">
-          Upload staff and linked records using one Excel file. This version is matched to your
-          real tables: staff, staff_employment, staff_addresses, staff_emergency_contacts,
-          staff_bank_details, staff_ids, and staff_documents.
-        </p>
+  function downloadErrors() {
+    if (!result?.errors.length) return
+    const escape = (value: string | number | undefined) => `"${String(value ?? '').replace(/"/g, '""')}"`
+    const rows = [
+      ['Sheet', 'Row', 'PARiM Staff ID', 'Error'],
+      ...result.errors.map((item) => [item.sheet, item.row || '', item.parim_staff_id || '', item.message]),
+    ]
+    const blob = new Blob([rows.map((row) => row.map(escape).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'staff-import-errors.csv'
+    anchor.click()
+    window.URL.revokeObjectURL(url)
+  }
 
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={downloadTemplate}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Download Template
-          </button>
-        </div>
+  const phase = result ? 2 : loading ? 1 : 0
+  const linkedChanges = result ? result.stats.employmentInserted + result.stats.employmentUpdated + result.stats.addressInserted + result.stats.addressUpdated + result.stats.emergencyInserted + result.stats.emergencyUpdated + result.stats.bankInserted + result.stats.bankUpdated + result.stats.digitalIdInserted + result.stats.digitalIdUpdated + result.stats.documentsInserted + result.stats.documentsUpdated : 0
+
+  return (
+    <div className="dx-page space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/v2/staff" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--dx-muted)] hover:text-[var(--dx-ink)]"><ArrowLeft className="h-4 w-4" /> Staff directory</Link>
+        <button type="button" onClick={downloadTemplate} className="dx-button dx-button-secondary min-h-10 px-3 py-2"><Download className="h-4 w-4" /> Download template</button>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <label className="mb-2 block text-sm font-medium text-slate-700">Upload Excel file</label>
-        <input
-          type="file"
-          accept=".xlsx,.xls"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="block w-full rounded-lg border border-slate-300 p-3 text-sm"
-        />
+      <header>
+        <p className="dx-eyebrow">Bulk operations</p>
+        <h1 className="dx-page-title">Import staff records</h1>
+        <p className="dx-page-description">Use the Digital ID X workbook to create or update people, employment, contact, document and Digital ID records in one controlled import.</p>
+      </header>
 
-        {file ? (
-          <p className="mt-3 text-sm text-slate-600">
-            Selected file: <span className="font-medium">{file.name}</span>
-          </p>
-        ) : null}
+      <ol className="grid overflow-hidden rounded-xl border border-[var(--dx-line)] bg-white sm:grid-cols-3">
+        {['Prepare file', 'Import & validate', 'Review results'].map((label, index) => <li key={label} className={`flex items-center gap-3 border-[var(--dx-line)] px-4 py-3 sm:border-r sm:last:border-r-0 ${index === phase ? 'bg-[var(--dx-signal-soft)] text-[var(--dx-signal)]' : index < phase ? 'text-emerald-700' : 'text-[var(--dx-muted)]'}`}><span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${index <= phase ? 'bg-[var(--dx-signal)] text-white' : 'bg-[var(--dx-surface-muted)]'}`}>{index < phase ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}</span><span className="text-xs font-semibold">{label}</span></li>)}
+      </ol>
 
-        <div className="mt-5">
+      <section className="dx-surface p-5 sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <label className="flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[var(--dx-line-strong)] bg-[var(--dx-surface-muted)] px-5 py-8 text-center transition hover:border-[var(--dx-signal)] hover:bg-[var(--dx-signal-soft)]">
+            <UploadCloud className="h-7 w-7 text-[var(--dx-signal)]" />
+            <span className="mt-3 text-sm font-bold text-[var(--dx-ink)]">{file?.name || 'Choose an Excel workbook'}</span>
+            <span className="mt-1 text-xs text-[var(--dx-muted)]">.xlsx or .xls using the supplied template</span>
+            <input type="file" accept=".xlsx,.xls" onChange={(event) => { setFile(event.target.files?.[0] || null); setResult(null); setError('') }} className="sr-only" />
+          </label>
+          <div className="rounded-xl border border-[var(--dx-line)] p-4">
+            <FileSpreadsheet className="h-5 w-5 text-[var(--dx-muted-strong)]" />
+            <h2 className="mt-3 text-sm font-bold text-[var(--dx-ink)]">Before importing</h2>
+            <ul className="mt-3 space-y-2 text-xs leading-5 text-[var(--dx-muted)]"><li>• Keep worksheet names unchanged.</li><li>• Use PARiM Staff ID to update existing records.</li><li>• Check dates and required employee codes.</li><li>• Errors will be reported by sheet and row.</li></ul>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end">
           <button
             type="button"
             onClick={handleUpload}
             disabled={!file || loading}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="dx-button dx-button-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Importing...' : 'Start Bulk Import'}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}{loading ? 'Importing and validating…' : 'Start controlled import'}
           </button>
         </div>
-      </div>
+      </section>
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -142,32 +158,20 @@ export default function BulkUploadStaffPage() {
 
       {result ? (
         <>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Import Summary</h2>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-3 xl:grid-cols-4">
-              <StatCard label="Staff Created" value={result.stats.staffCreated} />
-              <StatCard label="Staff Updated" value={result.stats.staffUpdated} />
-              <StatCard label="Employment Inserted" value={result.stats.employmentInserted} />
-              <StatCard label="Employment Updated" value={result.stats.employmentUpdated} />
-              <StatCard label="Address Inserted" value={result.stats.addressInserted} />
-              <StatCard label="Address Updated" value={result.stats.addressUpdated} />
-              <StatCard label="Emergency Inserted" value={result.stats.emergencyInserted} />
-              <StatCard label="Emergency Updated" value={result.stats.emergencyUpdated} />
-              <StatCard label="Bank Inserted" value={result.stats.bankInserted} />
-              <StatCard label="Bank Updated" value={result.stats.bankUpdated} />
-              <StatCard label="Digital IDs Inserted" value={result.stats.digitalIdInserted} />
-              <StatCard label="Digital IDs Updated" value={result.stats.digitalIdUpdated} />
-              <StatCard label="Documents Inserted" value={result.stats.documentsInserted} />
-              <StatCard label="Documents Updated" value={result.stats.documentsUpdated} />
+          <div className="dx-surface p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-[var(--dx-ink)]">Import summary</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatCard label="Staff changed" value={result.stats.staffCreated + result.stats.staffUpdated} />
+              <StatCard label="Linked records" value={linkedChanges} />
               <StatCard label="Skipped" value={result.stats.skipped} />
               <StatCard label="Failed" value={result.stats.failed} />
             </div>
+            <details className="mt-4 rounded-lg border border-[var(--dx-line)] px-4 py-3"><summary className="cursor-pointer text-sm font-semibold text-[var(--dx-muted-strong)]">View detailed record totals</summary><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatCard label="Staff created" value={result.stats.staffCreated} /><StatCard label="Staff updated" value={result.stats.staffUpdated} /><StatCard label="Employment" value={result.stats.employmentInserted + result.stats.employmentUpdated} /><StatCard label="Addresses" value={result.stats.addressInserted + result.stats.addressUpdated} /><StatCard label="Emergency contacts" value={result.stats.emergencyInserted + result.stats.emergencyUpdated} /><StatCard label="Bank details" value={result.stats.bankInserted + result.stats.bankUpdated} /><StatCard label="Digital IDs" value={result.stats.digitalIdInserted + result.stats.digitalIdUpdated} /><StatCard label="Documents" value={result.stats.documentsInserted + result.stats.documentsUpdated} /></div></details>
           </div>
 
           {result.errors.length > 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">Import Errors</h2>
+            <div className="dx-surface p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold text-[var(--dx-ink)]">Rows requiring attention</h2><button type="button" onClick={downloadErrors} className="dx-button dx-button-secondary min-h-9 px-3 py-2"><Download className="h-4 w-4" /> Download CSV</button></div>
 
               <div className="mt-4 space-y-3">
                 {result.errors.map((item, index) => (

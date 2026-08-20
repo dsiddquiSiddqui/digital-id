@@ -2,161 +2,39 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useParams } from 'next/navigation'
-import {
-  Mail,
-  Phone,
-  Building2,
-  MapPin,
-  CreditCard,
-  TriangleAlert,
-  ChevronRight,
-  UserRound,
-  FileText,
-  ShieldCheck,
-  ClipboardCheck,
-  Clock3,
-  Gauge,
-} from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, CheckCircle2, ChevronRight, FileText, Mail, MapPin, Phone, ShieldCheck, TriangleAlert, UserRound } from 'lucide-react'
 import IdCard from '@/components/IdCard'
 
-type Staff = {
-  id: string
-  profile_id: string | null
-  parim_staff_id: string | null
-  employee_code: string
-  full_name: string
-  first_name: string | null
-  last_name: string | null
-  email: string | null
-  phone: string | null
-  second_phone: string | null
-  company_name: string | null
-  staff_type: string
-  status: string
-  photo_url: string | null
-  nationality: string | null
-  country_of_birth: string | null
-  gender: string | null
-  date_of_birth: string | null
-  access_to_car: boolean | null
-  driver_licence: boolean | null
-  notes: string | null
-  created_at: string
-}
-
-type StaffEmployment = {
-  id: string
-  staff_id: string
-  employment_type: string | null
-  contract_number: string | null
-  contract_start: string | null
-  contract_end: string | null
-  pay_schedule: string | null
-  payroll_reference: string | null
-  tax_code: string | null
-  ni_number: string | null
-  personal_pay_rate: number | null
-  is_current: boolean
-}
-
-type StaffAddress = {
-  id: string
-  staff_id: string
-  street_address: string | null
-  city: string | null
-  post_code: string | null
-  country: string | null
-  is_current: boolean
-}
-
-type StaffEmergencyContact = {
-  id: string
-  name: string
-  relationship: string | null
-  phone: string | null
-  email: string | null
-  is_primary: boolean
-}
-
-type StaffBankDetails = {
-  id: string
-  account_holder_name: string | null
-  bank_account_number: string | null
-  sort_code: string | null
-  reference_number: string | null
-  is_current?: boolean
-}
-
-type StaffIdRecord = {
-  id: string
-  id_number: string
-  role_title: string
-  site_name: string | null
-  sia_number: string | null
-  issue_date: string
-  expiry_date: string
-  is_current: boolean
-  status: string
-  qr_token: string
-}
-
-type StaffDocument = {
-  id: string
-  staff_id: string
-  document_type_id: string
-  document_number: string | null
-  issue_date: string | null
-  expiry_date: string | null
-  status: string
-  file_url: string | null
-  notes: string | null
-  created_at: string
-  document_types?: {
-    id: string
-    code: string
-    name: string
-    has_expiry: boolean
-  } | null
-}
-
-type StatusAction = {
-  key: string
-  label: string
-  className: string
-}
+type Staff = { id: string; employee_code: string; full_name: string; email: string | null; phone: string | null; nationality: string | null; date_of_birth: string | null; photo_url: string | null; created_at: string }
+type StaffEmployment = { employment_type: string | null; contract_number: string | null; contract_start: string | null; contract_end: string | null; pay_schedule: string | null; payroll_reference: string | null }
+type StaffAddress = { street_address: string | null; city: string | null; post_code: string | null; country: string | null }
+type StaffEmergencyContact = { name: string; relationship: string | null; phone: string | null; email: string | null; is_primary: boolean }
+type StaffIdRecord = { id: string; id_number: string; role_title: string; sia_number: string | null; issue_date: string; expiry_date: string; status: string; qr_token: string }
+type StaffDocument = { id: string; document_number: string | null; issue_date: string | null; expiry_date: string | null; status: string; created_at: string; document_types?: { name: string } | null }
+type NextAction = { label: string; detail: string; href: string }
 
 function formatUKDate(dateString?: string | null) {
-  if (!dateString) return '—'
-
+  if (!dateString) return 'Not provided'
   const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return 'Not provided'
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
-  if (Number.isNaN(date.getTime())) return '—'
-
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
+function titleCase(value?: string | null) {
+  if (!value) return 'Not provided'
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
 export default function V2StaffDetailPage() {
   const params = useParams()
   const id = params.id as string
-
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const [statusLoading, setStatusLoading] = useState<string | null>(null)
-  const [exportingPdf, setExportingPdf] = useState(false)
-
   const [staff, setStaff] = useState<Staff | null>(null)
   const [employment, setEmployment] = useState<StaffEmployment | null>(null)
   const [address, setAddress] = useState<StaffAddress | null>(null)
-  const [emergencyContact, setEmergencyContact] =
-    useState<StaffEmergencyContact | null>(null)
-  const [bankDetails, setBankDetails] = useState<StaffBankDetails | null>(null)
+  const [emergencyContact, setEmergencyContact] = useState<StaffEmergencyContact | null>(null)
   const [currentId, setCurrentId] = useState<StaffIdRecord | null>(null)
   const [documents, setDocuments] = useState<StaffDocument[]>([])
 
@@ -164,1013 +42,180 @@ export default function V2StaffDetailPage() {
     const loadData = async () => {
       setLoading(true)
       setError('')
-      setMessage('')
-
       try {
-        const [
-          staffRes,
-          employmentRes,
-          bankRes,
-          contactsRes,
-          documentsRes,
-          digitalIdRes,
-          addressRes,
-        ] = await Promise.all([
+        const [staffRes, employmentRes, contactsRes, documentsRes, digitalIdRes, addressRes] = await Promise.all([
           fetch(`/api/v2/staff/${id}`),
           fetch(`/api/v2/staff/${id}/employment`),
-          fetch(`/api/v2/staff/${id}/bank-details`),
           fetch(`/api/v2/staff/${id}/contacts`),
           fetch(`/api/v2/staff/${id}/documents`),
           fetch(`/api/v2/staff/${id}/digital-id`),
           fetch(`/api/v2/staff/${id}/address`),
         ])
-
-        const staffJson = await staffRes.json()
-        const employmentJson = await employmentRes.json()
-        const bankJson = await bankRes.json()
-        const contactsJson = await contactsRes.json()
-        const documentsJson = await documentsRes.json()
-        const digitalIdJson = await digitalIdRes.json()
-        const addressJson = await addressRes.json()
-
-        if (!staffRes.ok) {
+        const [staffJson, employmentJson, contactsJson, documentsJson, digitalIdJson, addressJson] = await Promise.all([
+          staffRes.json(), employmentRes.json(), contactsRes.json(), documentsRes.json(), digitalIdRes.json(), addressRes.json(),
+        ])
+        if (!staffRes.ok || !staffJson.staff) {
           setError(staffJson.error || 'Staff member not found.')
-          setLoading(false)
           return
         }
-
-        setStaff((staffJson.staff as Staff | null) || null)
+        setStaff(staffJson.staff as Staff)
         setEmployment((employmentJson.employment as StaffEmployment | null) || null)
-        setBankDetails((bankJson.bank_details as StaffBankDetails | null) || null)
         setDocuments((documentsJson.documents as StaffDocument[]) || [])
         setCurrentId((digitalIdJson.digital_id as StaffIdRecord | null) || null)
         setAddress((addressJson.address as StaffAddress | null) || null)
-
-        const allContacts =
-          (contactsJson.contacts as StaffEmergencyContact[]) || []
-        const primaryContact =
-          allContacts.find((contact) => contact.is_primary) ||
-          allContacts[0] ||
-          null
-
-        setEmergencyContact(primaryContact)
-        setLoading(false)
+        const contacts = (contactsJson.contacts as StaffEmergencyContact[]) || []
+        setEmergencyContact(contacts.find((contact) => contact.is_primary) || contacts[0] || null)
       } catch {
-        setError('Something went wrong while loading staff profile.')
+        setError('Something went wrong while loading this staff profile.')
+      } finally {
         setLoading(false)
       }
     }
-
-    if (id) loadData()
+    if (id) void loadData()
   }, [id])
 
-  const updateStatus = async (newStatus: string) => {
-    if (!staff) return
-
-    setStatusLoading(newStatus)
-    setError('')
-    setMessage('')
-
-    try {
-      const response = await fetch('/api/admin/update-staff-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          staff_id: staff.id,
-          status: newStatus,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        setError(result.error || 'Failed to update status.')
-        setStatusLoading(null)
-        return
-      }
-
-      setStaff((prev) => (prev ? { ...prev, status: newStatus } : prev))
-      setMessage(`Staff status updated to ${newStatus}.`)
-    } catch {
-      setError('Something went wrong while updating status.')
-    } finally {
-      setStatusLoading(null)
-    }
-  }
-
-  const exportIdPdf = async () => {
-    if (!staff) return
-    setExportingPdf(true)
-    setError('')
-    try {
-      const response = await fetch('/api/admin/id-card-export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staff_id: staff.id }),
-      })
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        setError(result.error || 'Unable to export ID PDF.')
-        return
-      }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `id-card-${staff.employee_code || staff.id}.pdf`
-      link.click()
-      window.URL.revokeObjectURL(url)
-      setMessage('ID PDF exported.')
-    } catch {
-      setError('Something went wrong while exporting the ID PDF.')
-    } finally {
-      setExportingPdf(false)
-    }
-  }
+  const validDocuments = documents.filter((document) => document.status?.toLowerCase() === 'valid').length
+  const problemDocuments = documents.filter((document) => ['expired', 'rejected', 'missing'].includes(document.status?.toLowerCase())).length
+  const latestDocuments = documents.slice(0, 3)
 
   const completion = useMemo(() => {
     if (!staff) return 0
+    const checks = [Boolean(staff.photo_url), Boolean(staff.email), Boolean(staff.phone), Boolean(staff.nationality), Boolean(staff.date_of_birth), Boolean(employment), Boolean(address), Boolean(emergencyContact)]
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+  }, [address, emergencyContact, employment, staff])
 
-    const checks = [
-      !!staff.photo_url,
-      !!staff.email,
-      !!staff.phone,
-      !!employment,
-      !!address,
-      !!emergencyContact,
-      !!bankDetails,
-      !!currentId,
-      documents.length > 0,
-    ]
+  const documentReadiness = documents.length ? Math.round((validDocuments / documents.length) * 100) : 0
+  const idReadiness = currentId ? (currentId.status.toLowerCase() === 'active' ? 100 : 50) : 0
 
-    const complete = checks.filter(Boolean).length
-    return Math.round((complete / checks.length) * 100)
-  }, [staff, employment, address, emergencyContact, bankDetails, currentId, documents])
+  const nextActions = useMemo<NextAction[]>(() => {
+    if (!staff) return []
+    return [
+      !currentId ? { label: 'Issue a Digital ID', detail: 'This person does not have an active identity credential.', href: `/v2/staff/${staff.id}/issue-id` } : null,
+      !employment ? { label: 'Add employment details', detail: 'Contract and payroll information is incomplete.', href: `/v2/staff/${staff.id}/employment` } : null,
+      !address ? { label: 'Add a residential address', detail: 'The contact record does not include an address.', href: `/v2/staff/${staff.id}/address` } : null,
+      !emergencyContact ? { label: 'Add an emergency contact', detail: 'No emergency contact is available.', href: `/v2/staff/${staff.id}/contacts` } : null,
+      documents.length === 0 ? { label: 'Upload required documents', detail: 'The document record is currently empty.', href: `/v2/staff/${staff.id}/documents` } : null,
+      problemDocuments > 0 ? { label: 'Resolve document issues', detail: `${problemDocuments} document${problemDocuments === 1 ? '' : 's'} need review.`, href: `/v2/staff/${staff.id}/documents` } : null,
+    ].filter(Boolean) as NextAction[]
+  }, [address, currentId, documents.length, emergencyContact, employment, problemDocuments, staff])
 
-  const statusActions = useMemo<StatusAction[]>(() => {
-    if (!staff?.status) return []
+  if (loading) return <div className="dx-surface h-72 animate-pulse bg-[var(--dx-surface-muted)]" />
+  if (error || !staff) return <div className="dx-surface p-6"><p className="text-sm font-semibold text-red-700">{error || 'Staff member not found.'}</p></div>
 
-    const currentStatus = staff.status.toLowerCase()
-
-    const actionMap: Record<string, StatusAction[]> = {
-      active: [
-        {
-          key: 'suspended',
-          label: 'Suspend',
-          className: 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
-        },
-        {
-          key: 'revoked',
-          label: 'Revoke',
-          className: 'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
-        },
-      ],
-      suspended: [
-        {
-          key: 'active',
-          label: 'Activate',
-          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
-        },
-        {
-          key: 'revoked',
-          label: 'Revoke',
-          className: 'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
-        },
-      ],
-      revoked: [
-        {
-          key: 'active',
-          label: 'Activate',
-          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
-        },
-      ],
-      inactive: [
-        {
-          key: 'active',
-          label: 'Activate',
-          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
-        },
-        {
-          key: 'suspended',
-          label: 'Suspend',
-          className: 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer',
-        },
-        {
-          key: 'revoked',
-          label: 'Revoke',
-          className: 'bg-red-600 text-white hover:bg-red-700 cursor-pointer',
-        },
-      ],
-      archived: [
-        {
-          key: 'active',
-          label: 'Activate',
-          className: 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer',
-        },
-      ],
-    }
-
-    return actionMap[currentStatus] || []
-  }, [staff?.status])
-
-  const validDocuments = documents.filter(
-    (doc) => doc.status?.toLowerCase() === 'valid'
-  ).length
-
-  const problemDocuments = documents.filter((doc) =>
-    ['expired', 'rejected', 'missing'].includes(doc.status?.toLowerCase())
-  ).length
-
-  const latestDocuments = documents.slice(0, 3)
-
-  const riskLevel = useMemo(() => {
-    if (!currentId || problemDocuments > 0 || completion < 70) return 'high'
-    if (completion < 90 || validDocuments < documents.length) return 'medium'
-    return 'low'
-  }, [completion, currentId, documents.length, problemDocuments, validDocuments])
-
-  const timeline = [
-    { label: 'Profile created', value: formatUKDate(staff?.created_at), tone: 'neutral' },
-    { label: currentId ? 'Current ID issued' : 'Digital ID missing', value: currentId ? formatUKDate(currentId.issue_date) : 'Action needed', tone: currentId ? 'good' : 'warn' },
-    { label: problemDocuments > 0 ? 'Document issue found' : 'Documents reviewed', value: problemDocuments > 0 ? `${problemDocuments} issue(s)` : `${validDocuments} valid`, tone: problemDocuments > 0 ? 'warn' : 'good' },
-  ]
-
-  if (loading) {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-slate-600">Loading staff profile...</p>
-      </div>
-    )
-  }
-
-  if (error || !staff) {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-red-600">
-          {error || 'Staff member not found.'}
-        </p>
-      </div>
-    )
-  }
+  const primaryAction = nextActions[0]
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl bg-slate-100">
-              {staff.photo_url ? (
-                <Image
-                  src={staff.photo_url}
-                  alt={staff.full_name}
-                  width={80}
-                  height={80}
-                  className="h-20 w-20 object-cover"
-                />
-              ) : (
-                <span className="text-2xl font-bold text-slate-500">
-                  {staff.full_name?.charAt(0)?.toUpperCase() || 'S'}
-                </span>
-              )}
+    <div className="space-y-5">
+      <section className={`rounded-xl border p-4 sm:p-5 ${nextActions.length ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-200 bg-emerald-50/70'}`}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${nextActions.length ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              {nextActions.length ? <TriangleAlert className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
             </div>
-
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                {staff.full_name}
-              </h1>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <StatusBadge status={staff.status} />
-                <TypeBadge value={staff.staff_type} />
-                {currentId ? (
-                  <IdBadge status={currentId.status} />
-                ) : (
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-                    No Active ID
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                <InfoLine
-                  icon={<UserRound className="h-4 w-4" />}
-                  value={`Employee Code: ${staff.employee_code}`}
-                />
-                <InfoLine
-                  icon={<Building2 className="h-4 w-4" />}
-                  value={staff.company_name || 'No company set'}
-                />
-                <InfoLine
-                  icon={<Mail className="h-4 w-4" />}
-                  value={staff.email || 'No email'}
-                />
-                <InfoLine
-                  icon={<Phone className="h-4 w-4" />}
-                  value={staff.phone || 'No phone'}
-                />
-              </div>
+              <p className={`text-sm font-bold ${nextActions.length ? 'text-amber-950' : 'text-emerald-950'}`}>{nextActions.length ? `${nextActions.length} item${nextActions.length === 1 ? '' : 's'} need attention` : 'This staff record is ready'}</p>
+              <p className={`mt-1 text-sm ${nextActions.length ? 'text-amber-800' : 'text-emerald-800'}`}>{nextActions.length ? 'Complete these items to keep the record operationally ready.' : 'No immediate profile, document, or identity action is required.'}</p>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={`/staff/${staff.id}/password`}
-              className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              Reset Password
-            </Link>
-
-            <Link
-              href={`/v2/staff/${staff.id}/edit`}
-              className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              Edit Staff
-            </Link>
-
-            {currentId ? (
-              <Link
-                href={`/staff-ids/${currentId.id}/edit`}
-                className="inline-flex cursor-pointer items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-              >
-                Edit Digital ID
+          {primaryAction ? <Link href={primaryAction.href} className="dx-button min-h-9 shrink-0 border border-amber-300 bg-white px-3 py-2 text-amber-950 hover:bg-amber-100">Resolve first item <ArrowRight className="h-4 w-4" /></Link> : null}
+        </div>
+        {nextActions.length ? (
+          <div className="mt-4 grid gap-2 border-t border-amber-200 pt-4 md:grid-cols-2 xl:grid-cols-3">
+            {nextActions.slice(0, 3).map((action) => (
+              <Link key={action.label} href={action.href} className="group flex items-start justify-between gap-3 rounded-lg bg-white/80 px-3.5 py-3 ring-1 ring-amber-200 transition hover:bg-white">
+                <span><span className="block text-sm font-semibold text-[var(--dx-ink)]">{action.label}</span><span className="mt-1 block text-xs leading-5 text-[var(--dx-muted)]">{action.detail}</span></span>
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 transition group-hover:translate-x-0.5" />
               </Link>
-            ) : (
-              <Link
-                href={`/staff/${staff.id}/issue-id`}
-                className="inline-flex cursor-pointer items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-              >
-                Issue Digital ID
-              </Link>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-          {error}
-        </div>
-      ) : null}
-
-      {message ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {message}
-        </div>
-      ) : null}
-
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-5">
-        <MiniStat title="Profile Completion" value={`${completion}%`} />
-        <MiniStat
-          title="Current ID"
-          value={currentId ? currentId.id_number : 'Missing'}
-        />
-        <MiniStat
-          title="Employment"
-          value={employment?.employment_type || 'Missing'}
-        />
-        <MiniStat
-          title="Emergency Contact"
-          value={emergencyContact ? 'Added' : 'Missing'}
-        />
-        <MiniStat title="Documents" value={`${documents.length}`} />
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <Gauge className="h-5 w-5 text-slate-500" />
-            <h2 className="text-lg font-semibold text-slate-900">Compliance Signal</h2>
-          </div>
-          <div className={`mt-5 rounded-3xl border p-5 ${riskLevel === 'low' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : riskLevel === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
-            <p className="text-3xl font-black capitalize">{riskLevel}</p>
-            <p className="mt-2 text-sm font-semibold opacity-80">
-              {riskLevel === 'low' ? 'Profile, ID, and documents look healthy.' : riskLevel === 'medium' ? 'Some profile or document data should be reviewed.' : 'Missing ID, document issues, or low completion need attention.'}
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <Clock3 className="h-5 w-5 text-slate-500" />
-            <h2 className="text-lg font-semibold text-slate-900">Profile Timeline</h2>
-          </div>
-          <div className="mt-5 space-y-3">
-            {timeline.map((item) => (
-              <div key={item.label} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
-                <span className="text-sm font-bold text-slate-700">{item.label}</span>
-                <span className={`rounded-full px-3 py-1 text-xs font-black ${item.tone === 'good' ? 'bg-emerald-100 text-emerald-700' : item.tone === 'warn' ? 'bg-amber-100 text-amber-700' : 'bg-white text-slate-500'}`}>
-                  {item.value}
-                </span>
-              </div>
             ))}
           </div>
+        ) : null}
+      </section>
+
+      <section className="dx-surface p-5">
+        <div className="mb-4"><h2 className="text-base font-bold text-[var(--dx-ink)]">Readiness</h2><p className="mt-1 text-sm text-[var(--dx-muted)]">A clear view of the four areas required for day-to-day operations.</p></div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ReadinessItem label="Profile completion" value={completion} detail={`${completion}% complete`} />
+          <ReadinessItem label="Employment" value={employment ? 100 : 0} detail={employment ? 'Current record added' : 'Details missing'} />
+          <ReadinessItem label="Documents" value={documentReadiness} detail={documents.length ? `${validDocuments} of ${documents.length} valid` : 'No documents'} />
+          <ReadinessItem label="Digital ID" value={idReadiness} detail={currentId ? titleCase(currentId.status) : 'Not issued'} />
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
-          <Card
-            title="Overview"
-            action={
-              <Link
-                href={`/v2/staff/${staff.id}/edit`}
-                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-              >
-                Manage
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            }
-          >
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <InfoBox label="Full Name" value={staff.full_name} />
-              <InfoBox label="Employee Code" value={staff.employee_code} />
-              <InfoBox label="Staff Type" value={staff.staff_type} />
-              <InfoBox label="Status" value={staff.status} />
-              <InfoBox label="Company Name" value={staff.company_name || '—'} />
-              <InfoBox label="PARiM Staff ID" value={staff.parim_staff_id || '—'} />
-              <InfoBox label="Phone" value={staff.phone || '—'} />
-              <InfoBox label="Second Phone" value={staff.second_phone || '—'} />
-              <InfoBox label="Email" value={staff.email || '—'} />
-              <InfoBox label="Nationality" value={staff.nationality || '—'} />
-              <InfoBox
-                label="Country of Birth"
-                value={staff.country_of_birth || '—'}
-              />
-              <InfoBox label="Gender" value={staff.gender || '—'} />
-              <InfoBox
-                label="Date of Birth"
-                value={formatUKDate(staff.date_of_birth)}
-              />
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,0.72fr)]">
+        <div className="space-y-5">
+          <OverviewSection title="Personal & contact" description="The details most often needed when identifying or contacting this person." icon={<UserRound className="h-4 w-4" />} actionHref={`/v2/staff/${staff.id}/edit`} actionLabel="Edit profile">
+            <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              <SnapshotItem icon={<Mail className="h-4 w-4" />} label="Email" value={staff.email || 'Not provided'} />
+              <SnapshotItem icon={<Phone className="h-4 w-4" />} label="Phone" value={staff.phone || 'Not provided'} />
+              <SnapshotItem label="Date of birth" value={formatUKDate(staff.date_of_birth)} />
+              <SnapshotItem label="Nationality" value={staff.nationality || 'Not provided'} />
+              <SnapshotItem icon={<MapPin className="h-4 w-4" />} label="Address" value={address ? [address.street_address, address.city, address.post_code].filter(Boolean).join(', ') || 'Not provided' : 'Not provided'} />
+              <SnapshotItem label="Emergency contact" value={emergencyContact ? `${emergencyContact.name}${emergencyContact.relationship ? ` · ${emergencyContact.relationship}` : ''}` : 'Not provided'} />
             </div>
-          </Card>
+          </OverviewSection>
 
-          <Card
-            title="Employment"
-            action={
-              <Link
-                href={`/v2/staff/${staff.id}/employment`}
-                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-              >
-                Manage
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            }
-          >
+          <OverviewSection title="Employment" description="Current contract and payroll assignment." icon={<BriefcaseBusiness className="h-4 w-4" />} actionHref={`/v2/staff/${staff.id}/employment`} actionLabel={employment ? 'Manage' : 'Add details'}>
             {employment ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <InfoBox
-                  label="Employment Type"
-                  value={employment.employment_type || '—'}
-                />
-                <InfoBox
-                  label="Contract Number"
-                  value={employment.contract_number || '—'}
-                />
-                <InfoBox
-                  label="Contract Start"
-                  value={formatUKDate(employment.contract_start)}
-                />
-                <InfoBox
-                  label="Contract End"
-                  value={formatUKDate(employment.contract_end)}
-                />
-                <InfoBox
-                  label="Pay Schedule"
-                  value={employment.pay_schedule || '—'}
-                />
-                <InfoBox
-                  label="Payroll Reference"
-                  value={employment.payroll_reference || '—'}
-                />
-                <InfoBox label="Tax Code" value={employment.tax_code || '—'} />
-                <InfoBox label="NI Number" value={employment.ni_number || '—'} />
+              <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                <SnapshotItem label="Employment type" value={titleCase(employment.employment_type)} />
+                <SnapshotItem label="Contract number" value={employment.contract_number || 'Not provided'} />
+                <SnapshotItem label="Contract dates" value={`${formatUKDate(employment.contract_start)} – ${formatUKDate(employment.contract_end)}`} />
+                <SnapshotItem label="Pay schedule" value={titleCase(employment.pay_schedule)} />
+                <SnapshotItem label="Payroll reference" value={employment.payroll_reference || 'Not provided'} />
               </div>
-            ) : (
-              <EmptyState text="No employment record added yet." />
-            )}
-          </Card>
+            ) : <EmptyPrompt text="No employment record has been added." href={`/v2/staff/${staff.id}/employment`} label="Add employment details" />}
+          </OverviewSection>
 
-          <Card
-            title="Documents"
-            icon={<FileText className="h-5 w-5" />}
-            action={
-              <div className="flex items-center gap-3">
-                <Link
-                  href={`/v2/staff/${staff.id}/checklist`}
-                  className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-                >
-                  <ClipboardCheck className="h-4 w-4" />
-                  Checklist
-                </Link>
-                <Link
-                  href={`/v2/staff/${staff.id}/documents`}
-                  className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-                >
-                  Manage
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
+          <OverviewSection title="Documents" description={problemDocuments ? `${problemDocuments} document${problemDocuments === 1 ? '' : 's'} need review.` : 'Recent compliance documents for this person.'} icon={<FileText className="h-4 w-4" />} actionHref={`/v2/staff/${staff.id}/documents`} actionLabel="View all">
+            {latestDocuments.length ? (
+              <div className="divide-y divide-[var(--dx-line)] rounded-lg border border-[var(--dx-line)]">
+                {latestDocuments.map((document) => (
+                  <Link key={document.id} href={`/v2/staff/${staff.id}/documents`} className="group flex items-center justify-between gap-4 px-4 py-3.5 hover:bg-[var(--dx-surface-muted)]">
+                    <div className="min-w-0"><p className="truncate text-sm font-semibold text-[var(--dx-ink)]">{document.document_types?.name || 'Document'}</p><p className="mt-1 text-xs text-[var(--dx-muted)]">Expires {formatUKDate(document.expiry_date)} · {document.document_number || 'No number'}</p></div>
+                    <div className="flex shrink-0 items-center gap-2"><DocumentStatusBadge status={document.status} /><ChevronRight className="h-4 w-4 text-[var(--dx-muted)] transition group-hover:translate-x-0.5" /></div>
+                  </Link>
+                ))}
               </div>
-            }
-          >
-            {documents.length > 0 ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <InfoBox
-                    label="Total Documents"
-                    value={String(documents.length)}
-                  />
-                  <InfoBox
-                    label="Valid Documents"
-                    value={String(validDocuments)}
-                  />
-                  <InfoBox
-                    label="Issues Found"
-                    value={String(problemDocuments)}
-                  />
-                </div>
+            ) : <EmptyPrompt text="No documents have been uploaded." href={`/v2/staff/${staff.id}/documents`} label="Upload documents" />}
+          </OverviewSection>
+        </div>
 
-                <div className="space-y-3">
-                  {latestDocuments.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="font-medium text-slate-900">
-                            {doc.document_types?.name || 'Document'}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Number: {doc.document_number || '—'}
-                          </p>
-                        </div>
-                        <DocumentStatusBadge status={doc.status} />
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 md:grid-cols-2">
-                        <p>Issue Date: {formatUKDate(doc.issue_date)}</p>
-                        <p>Expiry Date: {formatUKDate(doc.expiry_date)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <EmptyState text="No documents added yet." />
-            )}
-          </Card>
-
-          <Card
-            title="Digital ID"
-            icon={<ShieldCheck className="h-5 w-5" />}
-            action={
-              <Link
-                href={
-                  currentId
-                    ? `/staff-ids/${currentId.id}/edit`
-                    : `/staff/${staff.id}/issue-id`
-                }
-                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-              >
-                Manage
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            }
-          >
+        <aside className="space-y-5 xl:sticky xl:top-[218px] xl:self-start">
+          <OverviewSection title="Digital ID" description={currentId ? `${currentId.id_number} · ${titleCase(currentId.status)}` : 'No identity credential has been issued.'} icon={<ShieldCheck className="h-4 w-4" />} actionHref={`/v2/staff/${staff.id}/digital-id`} actionLabel="Open">
             {currentId ? (
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <InfoBox label="ID Number" value={currentId.id_number} />
-                  <InfoBox label="Role Title" value={currentId.role_title} />
-                  <InfoBox label="ID Status" value={currentId.status} />
-                  <InfoBox
-                    label="Issue Date"
-                    value={formatUKDate(currentId.issue_date)}
-                  />
-                  <InfoBox
-                    label="Expiry Date"
-                    value={formatUKDate(currentId.expiry_date)}
-                  />
-                  <InfoBox
-                    label="SIA Number"
-                    value={currentId.sia_number || '—'}
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="mb-4 text-sm font-medium text-slate-700">
-                    Digital ID Preview
-                  </p>
-
-                  <IdCard
-                    fullName={staff.full_name}
-                    employeeCode={staff.employee_code}
-                    roleTitle={currentId.role_title}
-                    idNumber={currentId.id_number}
-                    siaNumber={currentId.sia_number}
-                    qrToken={currentId.qr_token}
-                    photoUrl={staff.photo_url}
-                    issueDate={formatUKDate(currentId.issue_date)}
-                    expiryDate={formatUKDate(currentId.expiry_date)}
-                    idStatus={currentId.status}
-                  />
-                </div>
+              <div className="overflow-hidden rounded-lg border border-[var(--dx-line)] bg-[var(--dx-surface-muted)] p-3">
+                <IdCard fullName={staff.full_name} employeeCode={staff.employee_code} roleTitle={currentId.role_title} idNumber={currentId.id_number} siaNumber={currentId.sia_number} qrToken={currentId.qr_token} photoUrl={staff.photo_url} issueDate={formatUKDate(currentId.issue_date)} expiryDate={formatUKDate(currentId.expiry_date)} idStatus={currentId.status} />
               </div>
-            ) : (
-              <EmptyState text="No current digital ID assigned yet." />
-            )}
-          </Card>
-        </div>
+            ) : <EmptyPrompt text="Identity coverage is missing." href={`/v2/staff/${staff.id}/issue-id`} label="Issue Digital ID" />}
+          </OverviewSection>
 
-        <div className="space-y-6">
-          <Card title="Status Actions">
-            <div className="space-y-3">
-              {statusActions.length > 0 ? (
-                statusActions.map((action) => (
-                  <button
-                    key={action.key}
-                    type="button"
-                    onClick={() => updateStatus(action.key)}
-                    disabled={statusLoading !== null}
-                    className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60 ${action.className}`}
-                  >
-                    {statusLoading === action.key ? 'Updating...' : action.label}
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
-                  No other status actions available.
-                </div>
-              )}
-            </div>
-          </Card>
+          {primaryAction ? <section className="rounded-xl bg-[var(--dx-ink)] p-5 text-white"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">Recommended next step</p><h2 className="mt-3 text-lg font-bold">{primaryAction.label}</h2><p className="mt-2 text-sm leading-6 text-white/65">{primaryAction.detail}</p><Link href={primaryAction.href} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-white hover:text-white/80">Continue <ArrowRight className="h-4 w-4" /></Link></section> : null}
 
-          <Card title="Quick Actions">
-            <div className="grid grid-cols-1 gap-3">
-              <Link
-                href={`/v2/staff/${staff.id}/documents`}
-                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-              >
-                Manage Documents
-              </Link>
-
-              <Link
-                href={`/v2/staff/${staff.id}/employment`}
-                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-              >
-                Manage Employment
-              </Link>
-
-              <Link
-                href={`/v2/staff/${staff.id}/address`}
-                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-              >
-                Manage Address
-              </Link>
-
-              <Link
-                href={`/v2/staff/${staff.id}/contacts`}
-                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-              >
-                Manage Emergency Contact
-              </Link>
-
-              <Link
-                href={`/v2/staff/${staff.id}/bank-details`}
-                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-              >
-                Manage Bank Details
-              </Link>
-
-              {currentId ? (
-                <Link
-                  href={`/staff-ids/${currentId.id}/edit`}
-                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-                >
-                  Manage Digital ID
-                </Link>
-              ) : (
-                <Link
-                  href={`/staff/${staff.id}/issue-id`}
-                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-                >
-                  Issue Digital ID
-                </Link>
-              )}
-              <button
-                type="button"
-                onClick={exportIdPdf}
-                disabled={exportingPdf}
-                className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-60"
-              >
-                {exportingPdf ? 'Exporting PDF...' : 'Export ID PDF'}
-              </button>
-            </div>
-          </Card>
-
-          <Card
-            title="Address"
-            icon={<MapPin className="h-5 w-5" />}
-            action={
-              <Link
-                href={`/v2/staff/${staff.id}/address`}
-                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-              >
-                Manage
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            }
-          >
-            {address ? (
-              <div className="space-y-3">
-                <InfoBox
-                  label="Street Address"
-                  value={address.street_address || '—'}
-                />
-                <InfoBox label="City" value={address.city || '—'} />
-                <InfoBox label="Post Code" value={address.post_code || '—'} />
-                <InfoBox label="Country" value={address.country || '—'} />
-              </div>
-            ) : (
-              <EmptyState text="No address record added yet." />
-            )}
-          </Card>
-
-          <Card
-            title="Emergency Contact"
-            icon={<TriangleAlert className="h-5 w-5" />}
-            action={
-              <Link
-                href={`/v2/staff/${staff.id}/contacts`}
-                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-              >
-                Manage
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            }
-          >
-            {emergencyContact ? (
-              <div className="space-y-3">
-                <InfoBox label="Name" value={emergencyContact.name} />
-                <InfoBox
-                  label="Relationship"
-                  value={emergencyContact.relationship || '—'}
-                />
-                <InfoBox label="Phone" value={emergencyContact.phone || '—'} />
-                <InfoBox label="Email" value={emergencyContact.email || '—'} />
-              </div>
-            ) : (
-              <EmptyState text="No emergency contact added yet." />
-            )}
-          </Card>
-
-          <Card
-            title="Bank Details"
-            icon={<CreditCard className="h-5 w-5" />}
-            action={
-              <Link
-                href={`/v2/staff/${staff.id}/bank-details`}
-                className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-              >
-                Manage
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            }
-          >
-            {bankDetails ? (
-              <div className="space-y-3">
-                <InfoBox
-                  label="Account Holder"
-                  value={bankDetails.account_holder_name || '—'}
-                />
-                <InfoBox
-                  label="Account Number"
-                  value={maskValue(bankDetails.bank_account_number)}
-                />
-                <InfoBox label="Sort Code" value={bankDetails.sort_code || '—'} />
-                <InfoBox
-                  label="Reference Number"
-                  value={bankDetails.reference_number || '—'}
-                />
-              </div>
-            ) : (
-              <EmptyState text="No bank details added yet." />
-            )}
-          </Card>
-        </div>
+        </aside>
       </section>
     </div>
   )
 }
 
-function Card({
-  title,
-  children,
-  action,
-  icon,
-}: {
-  title: string
-  children: React.ReactNode
-  action?: React.ReactNode
-  icon?: React.ReactNode
-}) {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {icon ? <div className="text-slate-500">{icon}</div> : null}
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
+function OverviewSection({ title, description, icon, actionHref, actionLabel, children }: { title: string; description?: string; icon?: React.ReactNode; actionHref?: string; actionLabel?: string; children: React.ReactNode }) {
+  return <section className="dx-surface p-5"><div className="mb-5 flex items-start justify-between gap-4"><div className="flex min-w-0 gap-3">{icon ? <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--dx-surface-muted)] text-[var(--dx-muted-strong)]">{icon}</span> : null}<div><h2 className="text-base font-bold text-[var(--dx-ink)]">{title}</h2>{description ? <p className="mt-1 text-sm leading-5 text-[var(--dx-muted)]">{description}</p> : null}</div></div>{actionHref && actionLabel ? <Link href={actionHref} className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--dx-muted-strong)] hover:text-[var(--dx-signal)]">{actionLabel} <ChevronRight className="h-3.5 w-3.5" /></Link> : null}</div>{children}</section>
 }
 
-function InfoLine({ icon, value }: { icon: React.ReactNode; value: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-slate-400">{icon}</span>
-      <span>{value}</span>
-    </div>
-  )
+function ReadinessItem({ label, value, detail }: { label: string; value: number; detail: string }) {
+  const tone = value >= 90 ? 'bg-emerald-500' : value >= 50 ? 'bg-amber-500' : 'bg-red-500'
+  return <div className="rounded-lg border border-[var(--dx-line)] p-3.5"><div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-[var(--dx-muted-strong)]">{label}</p><p className="text-xs font-bold text-[var(--dx-ink)]">{value}%</p></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--dx-surface-muted)]"><div className={`h-full rounded-full ${tone}`} style={{ width: `${value}%` }} /></div><p className="mt-2 text-xs text-[var(--dx-muted)]">{detail}</p></div>
 }
 
-function InfoBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 break-all text-sm font-medium text-slate-900">
-        {value}
-      </p>
-    </div>
-  )
+function SnapshotItem({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+  return <div className="min-w-0"><p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--dx-muted)]">{icon}{label}</p><p className="mt-1.5 break-words text-sm font-semibold leading-5 text-[var(--dx-ink)]">{value}</p></div>
 }
 
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-      {text}
-    </div>
-  )
-}
-
-function MiniStat({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-slate-500">{title}</p>
-      <h3 className="mt-2 text-2xl font-bold text-slate-900">{value}</h3>
-    </div>
-  )
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const normalized = status?.toLowerCase()
-
-  if (normalized === 'active') {
-    return (
-      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-        Active
-      </span>
-    )
-  }
-
-  if (normalized === 'inactive') {
-    return (
-      <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
-        Inactive
-      </span>
-    )
-  }
-
-  if (normalized === 'suspended') {
-    return (
-      <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">
-        Suspended
-      </span>
-    )
-  }
-
-  if (normalized === 'revoked') {
-    return (
-      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
-        Revoked
-      </span>
-    )
-  }
-
-  if (normalized === 'archived') {
-    return (
-      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-        Archived
-      </span>
-    )
-  }
-
-  return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      {status}
-    </span>
-  )
-}
-
-function TypeBadge({ value }: { value: string }) {
-  return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium capitalize text-slate-700">
-      {value || 'other'}
-    </span>
-  )
-}
-
-function IdBadge({ status }: { status: string }) {
-  const normalized = status?.toLowerCase()
-
-  if (normalized === 'active') {
-    return (
-      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-        ID Active
-      </span>
-    )
-  }
-
-  if (normalized === 'suspended') {
-    return (
-      <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">
-        ID Suspended
-      </span>
-    )
-  }
-
-  if (normalized === 'expired') {
-    return (
-      <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
-        ID Expired
-      </span>
-    )
-  }
-
-  if (normalized === 'revoked') {
-    return (
-      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
-        ID Revoked
-      </span>
-    )
-  }
-
-  return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      {status}
-    </span>
-  )
+function EmptyPrompt({ text, href, label }: { text: string; href: string; label: string }) {
+  return <div className="rounded-lg border border-dashed border-[var(--dx-line-strong)] bg-[var(--dx-surface-muted)] p-4"><p className="text-sm text-[var(--dx-muted)]">{text}</p><Link href={href} className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-[var(--dx-signal)]">{label} <ArrowRight className="h-4 w-4" /></Link></div>
 }
 
 function DocumentStatusBadge({ status }: { status: string }) {
   const normalized = status?.toLowerCase()
-
-  if (normalized === 'valid') {
-    return (
-      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-        Valid
-      </span>
-    )
-  }
-
-  if (normalized === 'expired') {
-    return (
-      <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
-        Expired
-      </span>
-    )
-  }
-
-  if (normalized === 'rejected') {
-    return (
-      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
-        Rejected
-      </span>
-    )
-  }
-
-  if (normalized === 'missing') {
-    return (
-      <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700">
-        Missing
-      </span>
-    )
-  }
-
-  return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-      Pending
-    </span>
-  )
-}
-
-function maskValue(value?: string | null) {
-  if (!value) return '—'
-  if (value.length <= 4) return value
-  return `${'*'.repeat(value.length - 4)}${value.slice(-4)}`
+  const styles = normalized === 'valid' ? 'bg-emerald-50 text-emerald-700' : normalized === 'expired' || normalized === 'rejected' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+  return <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${styles}`}>{titleCase(status)}</span>
 }

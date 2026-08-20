@@ -283,7 +283,7 @@ export async function POST(
         metadata: {
           ...getActorMetadata(access),
           module: 'Staff Management',
-          page: `/admin/staff/${id}/documents`,
+          page: `/v2/staff/${id}/documents`,
           staff_id: id,
           staff_name: existingStaff.full_name,
           document_name: documentTypeName,
@@ -493,7 +493,7 @@ export async function PUT(
         metadata: {
           ...getActorMetadata(access),
           module: 'Staff Management',
-          page: `/admin/staff/${id}/documents`,
+          page: `/v2/staff/${id}/documents`,
           staff_id: id,
           staff_name: existingStaff.full_name,
           document_name: documentTypeName,
@@ -591,7 +591,7 @@ export async function DELETE(
         metadata: {
           ...getActorMetadata(access),
           module: 'Staff Management',
-          page: `/admin/staff/${id}/documents`,
+          page: `/v2/staff/${id}/documents`,
           staff_id: id,
           staff_name: existingStaff.full_name,
           document_name: documentName,

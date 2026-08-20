@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import { ChevronLeft, MapPin } from 'lucide-react'
 
 type StaffSummary = {
   id: string
@@ -125,34 +123,13 @@ export default function V2StaffAddressPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-slate-100 p-3">
-              <MapPin className="h-6 w-6 text-slate-700" />
-            </div>
+      <header>
+        <p className="dx-eyebrow">Contact</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[var(--dx-ink)]">Residential address</h2>
+        <p className="mt-2 text-sm text-[var(--dx-muted)]">Manage the current address for {staff?.full_name || 'this staff member'}.</p>
+      </header>
 
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Address
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                {staff ? `${staff.full_name} (${staff.employee_code})` : 'Manage address'}
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href={`/v2/staff/${id}`}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back to Staff
-          </Link>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="dx-surface p-5 sm:p-6">
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className="lg:col-span-2">
             <h2 className="text-lg font-semibold text-slate-900">

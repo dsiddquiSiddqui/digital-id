@@ -1,4 +1,4 @@
-This is a Next.js 16 security ID administration platform.
+Digital ID X is a Next.js 16 staff identity administration platform.
 
 ## Environment and integrations
 

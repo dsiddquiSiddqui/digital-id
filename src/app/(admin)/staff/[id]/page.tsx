@@ -213,14 +213,14 @@ export default function StaffDetailPage() {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/staff/${staff.id}/password`}
+              href={`/v2/staff/${staff.id}/password`}
               className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Reset Password
             </Link>
 
             <Link
-              href={`/staff/${staff.id}/edit`}
+              href={`/v2/staff/${staff.id}/edit`}
               className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Edit Staff
@@ -228,14 +228,14 @@ export default function StaffDetailPage() {
 
             {currentId ? (
               <Link
-                href={`/staff-ids/${currentId.id}/edit`}
+                href={`/v2/staff-ids/${currentId.id}/edit`}
                 className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
               >
                 Edit Digital ID
               </Link>
             ) : (
               <Link
-                href={`/staff/${staff.id}/issue-id`}
+                href={`/v2/staff/${staff.id}/issue-id`}
                 className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
               >
                 Issue Digital ID

@@ -9,14 +9,14 @@ export default function LegalConsentBanner() {
 
   useEffect(() => {
     void Promise.resolve().then(() => {
-      setVisible(window.localStorage.getItem('security-id-legal-accepted') !== '1')
+      setVisible(window.localStorage.getItem('digital-id-x-legal-accepted') !== '1')
     })
   }, [])
 
   const accept = async () => {
     setSaving(true)
     await fetch('/api/legal/accept', { method: 'POST' }).catch(() => null)
-    window.localStorage.setItem('security-id-legal-accepted', '1')
+    window.localStorage.setItem('digital-id-x-legal-accepted', '1')
     setVisible(false)
     setSaving(false)
   }

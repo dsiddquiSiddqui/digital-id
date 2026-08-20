@@ -241,7 +241,7 @@ export async function POST(req: Request) {
           actor_role: currentProfile.role,
 
           module: 'Digital ID Management',
-          page: `/admin/staff/${existing.staff_id}/ids`,
+          page: `/v2/staff/${existing.staff_id}/digital-id`,
 
           staff_id: existing.staff_id,
           staff_name: existingStaff.full_name,

@@ -3,10 +3,11 @@ import type { Metadata } from 'next'
 import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
-  title: 'Security ID Admin',
-  description: 'Admin dashboard for guard digital IDs',
+  title: 'Digital ID X',
+  description: 'Digital ID X workspace for staff identities, documents, and verification',
   icons: {
-    icon: '/security-id-icon.svg',
+    icon: '/digital-id-x-icon.png',
+    apple: '/digital-id-x-icon.png',
   },
 }
 

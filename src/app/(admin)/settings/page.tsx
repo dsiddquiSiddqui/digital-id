@@ -6,10 +6,8 @@ import NextImage from 'next/image'
 import {
   BadgeCheck,
   Building2,
-  Check,
   ExternalLink,
   Image as ImageIcon,
-  Palette,
   BadgeDollarSign,
   RotateCcw,
   Save,
@@ -17,7 +15,7 @@ import {
   UploadCloud,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { getTheme, ORGANIZATION_THEMES, type ThemeKey } from '@/lib/saas-themes'
+import { type ThemeKey } from '@/lib/saas-themes'
 import {
   BILLING_PLANS,
   formatPlanLimit,
@@ -158,24 +156,10 @@ export default function OrganizationSettingsPage() {
   }, [supabase])
 
   const previewStyle = {
-    '--settings-primary': form.primary_color,
-    '--settings-accent': form.accent_color,
-    '--settings-surface': form.surface_color,
+    '--settings-primary': '#17834b',
+    '--settings-accent': '#17202a',
+    '--settings-surface': '#f7f8fa',
   } as CSSProperties
-
-  const selectedTheme = useMemo(() => getTheme(form.theme_key), [form.theme_key])
-
-  const applyTheme = (themeKey: ThemeKey) => {
-    const theme = getTheme(themeKey)
-
-    setForm((prev) => ({
-      ...prev,
-      theme_key: theme.key,
-      primary_color: theme.primaryColor,
-      accent_color: theme.accentColor,
-      surface_color: theme.surfaceColor,
-    }))
-  }
 
   const handleNameChange = (value: string) => {
     setForm((prev) => ({
@@ -568,84 +552,26 @@ export default function OrganizationSettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-2xl bg-slate-100 p-3">
-                <Palette className="h-5 w-5 text-slate-700" />
+              <div className="rounded-xl bg-emerald-50 p-3">
+                <BadgeCheck className="h-5 w-5 text-emerald-700" />
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-950">
-                  Theme And Branding
+                  Product appearance
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Pick a preset or fine tune the colors manually.
+                  A consistent interface keeps every workspace clear and familiar.
                 </p>
               </div>
             </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {ORGANIZATION_THEMES.map((theme) => (
-                <button
-                  key={theme.key}
-                  type="button"
-                  onClick={() => applyTheme(theme.key)}
-                  className={`rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 ${
-                    form.theme_key === theme.key
-                      ? 'border-slate-950 bg-slate-50'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <span className="flex gap-2">
-                    <span
-                      className="h-8 w-8 rounded-full"
-                      style={{ backgroundColor: theme.primaryColor }}
-                    />
-                    <span
-                      className="h-8 w-8 rounded-full"
-                      style={{ backgroundColor: theme.accentColor }}
-                    />
-                    <span
-                      className="h-8 flex-1 rounded-full border border-slate-200"
-                      style={{ backgroundColor: theme.surfaceColor }}
-                    />
-                  </span>
-                  <span className="mt-3 flex items-center justify-between gap-2">
-                    <span className="text-sm font-black text-slate-950">
-                      {theme.name}
-                    </span>
-                    {form.theme_key === theme.key ? (
-                      <Check className="h-4 w-4 text-emerald-600" />
-                    ) : null}
-                  </span>
-                  <span className="mt-1 block text-xs leading-5 text-slate-500">
-                    {theme.description}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              <ColorField
-                label="Primary color"
-                value={form.primary_color}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, primary_color: value }))
-                }
-              />
-              <ColorField
-                label="Accent color"
-                value={form.accent_color}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, accent_color: value }))
-                }
-              />
-              <ColorField
-                label="Surface color"
-                value={form.surface_color}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, surface_color: value }))
-                }
-              />
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+              <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full bg-[#17834b] ring-4 ring-white" />
+              <div>
+                <p className="text-sm font-bold text-slate-900">Digital ID X standard</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">White and slate surfaces with Digital ID X green for primary actions and active states. Your organization logo and favicon remain customizable above.</p>
+              </div>
             </div>
           </div>
         </section>
@@ -698,7 +624,7 @@ export default function OrganizationSettingsPage() {
                       Dashboard
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {selectedTheme.name}
+                      Digital ID X standard
                     </p>
                   </div>
                   <span className="rounded-full bg-[var(--settings-primary)] px-3 py-1 text-xs font-black text-white">
@@ -853,37 +779,6 @@ function AssetField({
         </p>
       ) : null}
     </div>
-  )
-}
-
-function ColorField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-bold text-slate-700">
-        {label}
-      </span>
-      <span className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-        <input
-          type="color"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-10 w-12 cursor-pointer rounded-xl border-0 bg-transparent p-0"
-        />
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-950 outline-none"
-        />
-      </span>
-    </label>
   )
 }
 

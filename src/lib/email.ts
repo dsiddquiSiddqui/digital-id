@@ -25,7 +25,7 @@ const TEMPLATE_ALIASES: Record<string, string[]> = {
 }
 
 function defaultFromAddress() {
-  return process.env.EMAIL_FROM || 'noreply@security-id.local'
+  return process.env.EMAIL_FROM || 'noreply@digital-id-x.local'
 }
 
 function renderTemplate(value: string, variables: Record<string, unknown>) {

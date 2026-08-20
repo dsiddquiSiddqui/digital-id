@@ -256,7 +256,7 @@ export async function POST(
         metadata: {
           ...getActorMetadata(access),
           module: 'Staff Management',
-          page: `/admin/staff/${id}/employment`,
+          page: `/v2/staff/${id}/employment`,
           staff_id: id,
           staff_name: existingStaff.full_name,
           changes: buildChanges(existingEmployment, payload),

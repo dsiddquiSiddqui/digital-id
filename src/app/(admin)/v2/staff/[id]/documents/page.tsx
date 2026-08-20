@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ChevronLeft,
   FileText,
   Upload,
   Plus,
@@ -573,34 +572,14 @@ export default function V2StaffDocumentsPage() {
   return (
     <>
       <div className="space-y-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="rounded-2xl bg-slate-100 p-3">
-                <FileText className="h-6 w-6 text-slate-700" />
-              </div>
-
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                  Documents
-                </h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  {staff
-                    ? `${staff.full_name} (${staff.employee_code})`
-                    : 'Manage staff documents'}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href={`/v2/staff/${id}`}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Back to Staff
-            </Link>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="dx-eyebrow">Compliance</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[var(--dx-ink)]">Documents</h2>
+            <p className="mt-2 text-sm text-[var(--dx-muted)]">Upload, verify and monitor documents for {staff?.full_name || 'this staff member'}.</p>
           </div>
-        </section>
+          <Link href={`/v2/staff/${id}/checklist`} className="dx-button dx-button-secondary">View checklist</Link>
+        </header>
 
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">

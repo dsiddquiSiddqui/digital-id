@@ -103,7 +103,7 @@ export default function InviteAcceptPage() {
                   Join {organization?.name || 'your workspace'}
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-white/60">
-                  Accept your invitation and create a secure login for the Security ID admin portal.
+                  Accept your invitation and create a secure login for the Digital ID X admin portal.
                 </p>
               </div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/35">

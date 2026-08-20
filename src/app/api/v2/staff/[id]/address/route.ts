@@ -259,7 +259,7 @@ export async function POST(
 
           module: 'Staff Management',
 
-          page: `/admin/staff/${id}/address`,
+          page: `/v2/staff/${id}/address`,
 
           staff_id: id,
 

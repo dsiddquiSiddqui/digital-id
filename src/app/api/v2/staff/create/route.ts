@@ -351,7 +351,7 @@ export async function POST(request: Request) {
           actor_role: currentProfile.role,
 
           module: 'Staff Management',
-          page: `/admin/staff/new`,
+          page: `/v2/staff/new`,
 
           created_record: {
             staff_id: createdStaff.id,

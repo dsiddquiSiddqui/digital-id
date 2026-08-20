@@ -12,9 +12,17 @@ test('admin login fields have accessible names and usable controls', async ({ pa
 test('signup fields are associated with visible labels', async ({ page }) => {
   await page.goto('/signup')
 
-  await expect(page.getByLabel('Organization')).toBeEditable()
-  await expect(page.getByLabel('Owner email')).toBeEditable()
+  await expect(page.getByLabel('Full name')).toBeEditable()
+  await expect(page.getByLabel('Work email')).toBeEditable()
   await expect(page.getByLabel('Password')).toBeEditable()
+
+  await page.getByLabel('Full name').fill('Taylor Morgan')
+  await page.getByLabel('Work email').fill('taylor@example.com')
+  await page.getByLabel('Password').fill('secure-password')
+  await page.getByRole('button', { name: 'Continue' }).click()
+
+  await expect(page.getByLabel('Workspace name')).toBeEditable()
+  await expect(page.getByLabel('Team size')).toBeVisible()
 })
 
 test('malformed verification tokens return a fast real 404', async ({ page }) => {

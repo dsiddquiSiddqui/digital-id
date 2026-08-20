@@ -70,7 +70,7 @@ export async function GET(request: Request) {
       const rows = (data || []) as Array<Record<string, unknown>>
       const headers = rows[0] ? Object.keys(rows[0]) : ['empty']
       const csv = [
-        `# ${organization?.name || 'Security ID'} export`,
+        `# ${organization?.name || 'Digital ID X'} export`,
         `# Type: ${type}`,
         `# Exported: ${new Date().toISOString()}`,
         toCsv(headers, rows.length ? rows : [{ empty: 'No rows' }]),
@@ -104,7 +104,7 @@ export async function GET(request: Request) {
 
     if (format === 'pdf') {
       const pdf = buildPdf([
-        organization?.name || 'Security ID',
+        organization?.name || 'Digital ID X',
         'Branded Export Summary',
         `Type: ${type}`,
         `Generated: ${new Date().toISOString()}`,

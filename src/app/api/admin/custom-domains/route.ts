@@ -26,7 +26,7 @@ async function verifyDomainRecords(domain: string, target: string, token: string
   try {
     const txtRecords = await resolveTxt(domain)
     const flatRecords = txtRecords.map((parts) => parts.join(''))
-    txtOk = flatRecords.includes(`security-id-verification=${token}`)
+    txtOk = flatRecords.includes(`digital-id-x-verification=${token}`)
     if (!txtOk) errors.push('TXT verification record was not found.')
   } catch {
     errors.push('TXT verification record was not found.')
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
         organization_id: result.access.profile.organization_id,
         domain,
         purpose,
-        dns_target: process.env.CUSTOM_DOMAIN_TARGET || 'security-id.app',
+        dns_target: process.env.CUSTOM_DOMAIN_TARGET || 'digitalidx.app',
       })
       .select('*')
       .single()

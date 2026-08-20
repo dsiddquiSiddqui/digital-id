@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import { ChevronLeft, Phone, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { Phone, Plus, Trash2 } from 'lucide-react'
 
 type StaffSummary = {
   id: string
@@ -188,32 +187,11 @@ export default function V2StaffContactsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-slate-100 p-3">
-              <TriangleAlert className="h-6 w-6 text-slate-700" />
-            </div>
-
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Emergency Contacts
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                {staff ? `${staff.full_name} (${staff.employee_code})` : 'Manage emergency contacts'}
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href={`/v2/staff/${id}`}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back to Staff
-          </Link>
-        </div>
-      </section>
+      <header>
+        <p className="dx-eyebrow">Contact</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[var(--dx-ink)]">Emergency contacts</h2>
+        <p className="mt-2 text-sm text-[var(--dx-muted)]">Maintain trusted emergency contacts for {staff?.full_name || 'this staff member'}.</p>
+      </header>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

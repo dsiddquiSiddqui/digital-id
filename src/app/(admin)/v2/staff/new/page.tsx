@@ -1,629 +1,269 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import {
-  Upload,
-  UserPlus,
-  ChevronLeft,
-  Eye,
-  EyeOff,
-  ShieldCheck,
-  X,
-} from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Eye, EyeOff, Loader2, ShieldCheck, Upload, UserRound, X } from 'lucide-react'
+
+type StaffDraft = {
+  full_name: string
+  employee_code: string
+  parim_staff_id: string
+  email: string
+  phone: string
+  second_phone: string
+  create_login: boolean
+  company_name: string
+  staff_type: string
+  status: string
+  nationality: string
+  country_of_birth: string
+  gender: string
+  date_of_birth: string
+  access_to_car: boolean
+  driver_licence: boolean
+  notes: string
+}
+
+const INITIAL_DRAFT: StaffDraft = {
+  full_name: '', employee_code: '', parim_staff_id: '', email: '', phone: '', second_phone: '', create_login: true,
+  company_name: 'Security Services', staff_type: 'security', status: 'active', nationality: '', country_of_birth: '', gender: '', date_of_birth: '', access_to_car: false, driver_licence: false, notes: '',
+}
+
+const STEPS = [
+  { key: 'identity', title: 'Identity', description: 'Who is this person?' },
+  { key: 'access', title: 'Contact & access', description: 'How can they be reached?' },
+  { key: 'assignment', title: 'Assignment', description: 'Where do they belong?' },
+  { key: 'personal', title: 'Personal details', description: 'Optional profile information' },
+  { key: 'review', title: 'Review', description: 'Confirm and create' },
+] as const
+
+const DRAFT_KEY = 'digital-id-x.staff-draft.v1'
 
 export default function V2NewStaffPage() {
   const router = useRouter()
-
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-
-  const [fullName, setFullName] = useState('')
-  const [parimStaffId, setParimStaffId] = useState('')
-  const [employeeCode, setEmployeeCode] = useState('')
-  const [companyName, setCompanyName] = useState('Security Services')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [secondPhone, setSecondPhone] = useState('')
-  const [staffType, setStaffType] = useState('security')
-  const [status, setStatus] = useState('active')
-  const [nationality, setNationality] = useState('')
-  const [countryOfBirth, setCountryOfBirth] = useState('')
-  const [gender, setGender] = useState('')
-  const [dateOfBirth, setDateOfBirth] = useState('')
-  const [accessToCar, setAccessToCar] = useState(false)
-  const [driverLicence, setDriverLicence] = useState(false)
-  const [notes, setNotes] = useState('')
-  const [photo, setPhoto] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-
-  const [createLogin, setCreateLogin] = useState(true)
+  const [step, setStep] = useState(0)
+  const [completedSteps, setCompletedSteps] = useState<number[]>([])
+  const [draft, setDraft] = useState<StaffDraft>(INITIAL_DRAFT)
+  const [draftReady, setDraftReady] = useState(false)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const stored = window.localStorage.getItem(DRAFT_KEY)
+      if (!stored) {
+        setDraftReady(true)
+        return
+      }
+      try {
+        setDraft({ ...INITIAL_DRAFT, ...(JSON.parse(stored) as Partial<StaffDraft>) })
+      } catch {
+        window.localStorage.removeItem(DRAFT_KEY)
+      }
+      setDraftReady(true)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    if (!draftReady) return
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  }, [draft, draftReady])
 
   useEffect(() => {
     if (!photo) {
       setPhotoPreview(null)
       return
     }
-
     const objectUrl = URL.createObjectURL(photo)
     setPhotoPreview(objectUrl)
-
-    return () => {
-      URL.revokeObjectURL(objectUrl)
-    }
+    return () => URL.revokeObjectURL(objectUrl)
   }, [photo])
 
-  const resetMessages = () => {
+  const updateDraft = <Key extends keyof StaffDraft>(key: Key, value: StaffDraft[Key]) => {
+    setDraft((current) => ({ ...current, [key]: value }))
     setError('')
-    setSuccess('')
   }
 
-  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    resetMessages()
-
-    if (!fullName.trim() || !employeeCode.trim()) {
-      setError('Full name and employee code are required.')
-      setLoading(false)
-      return
-    }
-
-    if (createLogin) {
-      if (!email.trim()) {
-        setError('Email is required when creating a login account.')
-        setLoading(false)
-        return
+  const validateStep = async () => {
+    const currentStep = STEPS[step].key
+    if (currentStep === 'review') return true
+    if (currentStep === 'access' && draft.create_login) {
+      if (password.length < 8) {
+        setError('Temporary password must contain at least 8 characters.')
+        return false
       }
-
-      if (!password.trim()) {
-        setError('Temporary password is required when creating a login account.')
-        setLoading(false)
-        return
-      }
-
-      if (password.trim().length < 8) {
-        setError('Password must be at least 8 characters long.')
-        setLoading(false)
-        return
-      }
-
       if (password !== confirmPassword) {
-        setError('Password and confirm password do not match.')
-        setLoading(false)
-        return
+        setError('Temporary password and confirmation do not match.')
+        return false
       }
     }
 
-    let photoUrl: string | null = null
+    setChecking(true)
+    setError('')
+    try {
+      const response = await fetch('/api/v2/staff/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: currentStep, ...draft }),
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(result?.error || 'This step could not be validated.')
+      return true
+    } catch (validationError) {
+      setError(validationError instanceof Error ? validationError.message : 'This step could not be validated.')
+      return false
+    } finally {
+      setChecking(false)
+    }
+  }
 
+  const continueToNextStep = async () => {
+    if (!(await validateStep())) return
+    setCompletedSteps((current) => current.includes(step) ? current : [...current, step])
+    setStep((current) => Math.min(STEPS.length - 1, current + 1))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const createStaff = async () => {
+    setCreating(true)
+    setError('')
+    let photoUrl: string | null = null
     try {
       if (photo) {
-        const fileName = `${Date.now()}-${photo.name}`
-
-        const uploadRes = await fetch('/api/admin/upload-photo', {
+        const uploadResponse = await fetch('/api/admin/upload-photo', {
           method: 'POST',
           body: photo,
-          headers: {
-            'x-filename': fileName,
-          },
+          headers: { 'x-filename': `${Date.now()}-${photo.name}` },
         })
-
-        const uploadData = await uploadRes.json()
-
-        if (!uploadRes.ok) {
-          setError(uploadData.error || 'Failed to upload photo.')
-          setLoading(false)
-          return
-        }
-
-        photoUrl = uploadData.url
+        const uploadResult = await uploadResponse.json()
+        if (!uploadResponse.ok) throw new Error(uploadResult.error || 'The staff photo could not be uploaded.')
+        photoUrl = uploadResult.url
       }
 
       const response = await fetch('/api/v2/staff/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          full_name: fullName.trim(),
-          parim_staff_id: parimStaffId.trim() || null,
-          employee_code: employeeCode.trim(),
-          company_name: companyName.trim() || null,
-          email: email.trim().toLowerCase() || null,
-          password: createLogin ? password.trim() : null,
-          create_login: createLogin,
-          phone: phone.trim() || null,
-          second_phone: secondPhone.trim() || null,
-          staff_type: staffType,
-          status,
-          nationality: nationality.trim() || null,
-          country_of_birth: countryOfBirth.trim() || null,
-          gender: gender.trim() || null,
-          date_of_birth: dateOfBirth || null,
-          access_to_car: accessToCar,
-          driver_licence: driverLicence,
-          notes: notes.trim() || null,
-          photo_url: photoUrl,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...draft, password: draft.create_login ? password : null, photo_url: photoUrl }),
       })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        setError(result.error || 'Failed to create staff member.')
-        setLoading(false)
-        return
-      }
-
-      setSuccess(
-        createLogin
-          ? 'Staff member and login account created successfully.'
-          : 'Staff member created successfully.'
-      )
-
-      setTimeout(() => {
-        router.push(`/v2/staff/${result.staff_id}`)
-      }, 700)
-    } catch {
-      setError('Something went wrong while creating the staff member.')
-    } finally {
-      setLoading(false)
+      const result = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(result?.error || 'The staff record could not be created.')
+      window.localStorage.removeItem(DRAFT_KEY)
+      router.push(`/v2/staff/${result.staff_id}`)
+    } catch (creationError) {
+      setError(creationError instanceof Error ? creationError.message : 'The staff record could not be created.')
+      setCreating(false)
     }
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0] || null
-    setPhoto(selectedFile)
-  }
-
-  const clearPhoto = () => {
+  const resetDraft = () => {
+    setDraft(INITIAL_DRAFT)
+    setPassword('')
+    setConfirmPassword('')
     setPhoto(null)
-    setPhotoPreview(null)
+    setStep(0)
+    setCompletedSteps([])
+    window.localStorage.removeItem(DRAFT_KEY)
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-slate-100 p-3">
-              <UserPlus className="h-6 w-6 text-slate-700" />
-            </div>
+    <div className="dx-page">
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <Link href="/v2/staff" className="inline-flex items-center gap-2 text-xs font-black text-[var(--dx-muted)] transition hover:text-[var(--dx-ink)]"><ArrowLeft className="h-4 w-4" />Staff directory</Link>
+        <span className="text-[10px] font-black uppercase tracking-[0.13em] text-[var(--dx-muted)]">Draft saved locally</span>
+      </div>
 
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Create Staff
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Add a new staff member using the new V2 staff schema.
-              </p>
-            </div>
+      <header className="mb-6 max-w-3xl">
+        <p className="dx-eyebrow">New staff record</p>
+        <h1 className="dx-page-title">Add a person without the guesswork.</h1>
+        <p className="dx-page-description">Each stage is checked against your workspace before you continue. You can leave and return to this draft on the same device.</p>
+      </header>
+
+      <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="dx-surface h-fit p-3 lg:sticky lg:top-28">
+          <ol className="space-y-1">
+            {STEPS.map((item, index) => {
+              const active = index === step
+              const complete = completedSteps.includes(index)
+              return <li key={item.key}><button type="button" onClick={() => { if (index <= step || complete) setStep(index) }} disabled={index > step && !complete} className={`flex w-full items-start gap-3 rounded-lg p-3 text-left transition ${active ? 'bg-[var(--dx-signal-soft)] text-[var(--dx-signal)] ring-1 ring-inset ring-[#cdebd8]' : complete ? 'text-[var(--dx-ink)] hover:bg-[var(--dx-surface-muted)]' : 'cursor-not-allowed text-[var(--dx-muted)] opacity-55'}`}><span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${active ? 'bg-[var(--dx-signal)] text-white' : complete ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--dx-canvas)]'}`}>{complete ? <Check className="h-3.5 w-3.5" /> : index + 1}</span><span><span className="block text-xs font-bold">{item.title}</span><span className="mt-1 block text-[10px] leading-4 text-[var(--dx-muted)]">{complete ? 'Database check passed' : item.description}</span></span></button></li>
+            })}
+          </ol>
+          <button type="button" onClick={resetDraft} className="mt-3 w-full rounded-lg px-3 py-2 text-xs font-black text-[var(--dx-muted)] transition hover:bg-[var(--dx-surface-muted)] hover:text-[var(--dx-ink)]">Discard draft</button>
+        </aside>
+
+        <main className="dx-surface overflow-hidden">
+          <div className="border-b border-[var(--dx-line)] px-5 py-5 sm:px-7">
+            <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[var(--dx-muted)]">Step {step + 1} of {STEPS.length}</p>
+            <h2 className="mt-2 text-xl font-black tracking-[-0.035em] text-[var(--dx-ink)]">{STEPS[step].title}</h2>
           </div>
 
-          <Link
-            href="/v2/staff"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back to Staff
-          </Link>
-        </div>
-      </section>
+          <div className="p-5 sm:p-7">
+            {step === 0 ? <IdentityStep draft={draft} update={updateDraft} photo={photo} photoPreview={photoPreview} setPhoto={setPhoto} /> : null}
+            {step === 1 ? <AccessStep draft={draft} update={updateDraft} password={password} confirmPassword={confirmPassword} setPassword={setPassword} setConfirmPassword={setConfirmPassword} showPassword={showPassword} setShowPassword={setShowPassword} /> : null}
+            {step === 2 ? <AssignmentStep draft={draft} update={updateDraft} /> : null}
+            {step === 3 ? <PersonalStep draft={draft} update={updateDraft} /> : null}
+            {step === 4 ? <ReviewStep draft={draft} photoPreview={photoPreview} /> : null}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <form onSubmit={handleCreate} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <div className="lg:col-span-2">
-            <h2 className="text-lg font-semibold text-slate-900">Basic Information</h2>
+            {error ? <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
           </div>
 
-          <div className="lg:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Full Name *
-            </label>
-            <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Ali Raza"
-              required
-            />
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--dx-line)] bg-[var(--dx-surface-muted)] px-5 py-4 sm:px-7">
+            <button type="button" disabled={step === 0 || checking || creating} onClick={() => setStep((current) => Math.max(0, current - 1))} className="dx-button dx-button-secondary disabled:opacity-40"><ArrowLeft className="h-4 w-4" />Back</button>
+            {step < STEPS.length - 1 ? <button type="button" onClick={continueToNextStep} disabled={checking} className="dx-button dx-button-primary disabled:opacity-60">{checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{checking ? 'Checking…' : 'Check & continue'}<ArrowRight className="h-4 w-4" /></button> : <button type="button" onClick={createStaff} disabled={creating} className="dx-button dx-button-primary disabled:opacity-60">{creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{creating ? 'Creating staff…' : 'Create staff record'}</button>}
           </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              PARiM Staff ID
-            </label>
-            <input
-              value={parimStaffId}
-              onChange={(e) => setParimStaffId(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="PARiM ID"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Employee Code *
-            </label>
-            <input
-              value={employeeCode}
-              onChange={(e) => setEmployeeCode(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="HD-1001"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Company Name
-            </label>
-            <input
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Security Services"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Email {createLogin ? '*' : ''}
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="staff@email.com"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Phone
-            </label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="+44 7700 900000"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Second Phone
-            </label>
-            <input
-              value={secondPhone}
-              onChange={(e) => setSecondPhone(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="+44 7700 900001"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Staff Type
-            </label>
-            <select
-              value={staffType}
-              onChange={(e) => setStaffType(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-            >
-              <option value="security">security</option>
-              <option value="warehouse">warehouse</option>
-              <option value="event">event</option>
-              <option value="admin">admin</option>
-              <option value="contractor">contractor</option>
-              <option value="other">other</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Status
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-            >
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
-              <option value="suspended">suspended</option>
-              <option value="revoked">revoked</option>
-              <option value="archived">archived</option>
-            </select>
-          </div>
-
-          <div className="lg:col-span-2 pt-2">
-            <h2 className="text-lg font-semibold text-slate-900">Staff Login Account</h2>
-          </div>
-
-          <div className="lg:col-span-2 rounded-2xl border border-slate-300 px-4 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-slate-100 p-2">
-                  <ShieldCheck className="h-5 w-5 text-slate-700" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-800">
-                    Create login account
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Enable this if the staff member should be able to log in to the staff portal.
-                  </p>
-                </div>
-              </div>
-
-              <input
-                type="checkbox"
-                checked={createLogin}
-                onChange={(e) => setCreateLogin(e.target.checked)}
-                className="h-5 w-5"
-              />
-            </div>
-          </div>
-
-          {createLogin ? (
-            <>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Temporary Password *
-                </label>
-                <div className="flex items-center rounded-2xl border border-slate-300 px-4">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full py-3 outline-none"
-                    placeholder="TempPass123!"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="text-slate-500 hover:text-slate-800"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Confirm Password *
-                </label>
-                <div className="flex items-center rounded-2xl border border-slate-300 px-4">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full py-3 outline-none"
-                    placeholder="TempPass123!"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    className="text-slate-500 hover:text-slate-800"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="lg:col-span-2 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                A staff portal login will be created using the email and temporary password above.
-              </div>
-            </>
-          ) : (
-            <div className="lg:col-span-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Login account creation is disabled. This will create only the staff record.
-            </div>
-          )}
-
-          <div className="lg:col-span-2 pt-2">
-            <h2 className="text-lg font-semibold text-slate-900">Personal Details</h2>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Nationality
-            </label>
-            <input
-              value={nationality}
-              onChange={(e) => setNationality(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="British"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Country of Birth
-            </label>
-            <input
-              value={countryOfBirth}
-              onChange={(e) => setCountryOfBirth(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="United Kingdom"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Gender
-            </label>
-            <input
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Male / Female / Other"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Date of Birth
-            </label>
-            <input
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-            />
-          </div>
-
-          <div className="lg:col-span-2 pt-2">
-            <h2 className="text-lg font-semibold text-slate-900">Operational Details</h2>
-          </div>
-
-          <div className="flex items-center justify-between rounded-2xl border border-slate-300 px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Access to Car</p>
-              <p className="text-xs text-slate-500">Does this staff member have access to a car?</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={accessToCar}
-              onChange={(e) => setAccessToCar(e.target.checked)}
-              className="h-5 w-5"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-slate-300 px-4 py-3 lg:col-span-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-700">Driver Licence</p>
-                <p className="text-xs text-slate-500">
-                  Use this as a yes/no flag only.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={driverLicence}
-                onChange={(e) => setDriverLicence(e.target.checked)}
-                className="h-5 w-5"
-              />
-            </div>
-
-            {driverLicence ? (
-              <div className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                Driver licence details such as licence number, expiry date, and uploaded file
-                should be added later in the <strong>Documents</strong> section as a
-                <strong> Driving Licence</strong> document.
-              </div>
-            ) : null}
-          </div>
-
-          <div className="lg:col-span-2 pt-2">
-            <h2 className="text-lg font-semibold text-slate-900">Photo & Notes</h2>
-          </div>
-
-          <div className="lg:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Profile Photo
-            </label>
-
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600 hover:bg-slate-100">
-              <Upload className="h-4 w-4" />
-              <span>{photo ? photo.name : 'Upload staff photo'}</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoChange}
-                className="hidden"
-              />
-            </label>
-
-            {photoPreview ? (
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Image Preview</p>
-                    <p className="text-xs text-slate-500">
-                      This lets you confirm the correct image was selected before saving.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={clearPhoto}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    <X className="h-4 w-4" />
-                    Remove
-                  </button>
-                </div>
-
-                <div className="relative h-56 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                  <Image
-                    src={photoPreview}
-                    alt="Selected profile preview"
-                    fill
-                    unoptimized
-                    className="object-cover"
-                  />
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="lg:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
-              placeholder="Optional notes..."
-            />
-          </div>
-
-          {error ? (
-            <div className="lg:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {error}
-            </div>
-          ) : null}
-
-          {success ? (
-            <div className="lg:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {success}
-            </div>
-          ) : null}
-
-          <div className="lg:col-span-2 flex justify-end">
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {loading
-                ? createLogin
-                  ? 'Creating staff and login...'
-                  : 'Creating staff...'
-                : createLogin
-                ? 'Create Staff & Login'
-                : 'Create Staff'}
-            </button>
-          </div>
-        </form>
-      </section>
+        </main>
+      </div>
     </div>
   )
+}
+
+type UpdateDraft = <Key extends keyof StaffDraft>(key: Key, value: StaffDraft[Key]) => void
+
+function IdentityStep({ draft, update, photo, photoPreview, setPhoto }: { draft: StaffDraft; update: UpdateDraft; photo: File | null; photoPreview: string | null; setPhoto: (file: File | null) => void }) {
+  return <div className="grid gap-5 sm:grid-cols-2"><Field label="Full name" required value={draft.full_name} onChange={(value) => update('full_name', value)} placeholder="Alex Morgan" className="sm:col-span-2" /><Field label="Employee code" required value={draft.employee_code} onChange={(value) => update('employee_code', value)} placeholder="DX-1042" hint="Checked for duplicates before continuing." /><Field label="External / PARiM ID" value={draft.parim_staff_id} onChange={(value) => update('parim_staff_id', value)} placeholder="Optional reference" /><div className="sm:col-span-2"><FieldLabel label="Profile photo" /><label className="mt-2 flex cursor-pointer items-center gap-4 rounded-xl border border-dashed border-[var(--dx-line-strong)] bg-[var(--dx-surface-muted)] p-4 transition hover:border-[var(--dx-ink)]">{photoPreview ? <Image src={photoPreview} alt="Selected staff" width={64} height={64} unoptimized className="h-16 w-16 rounded-xl object-cover" /> : <span className="flex h-16 w-16 items-center justify-center rounded-xl bg-white text-[var(--dx-muted)]"><UserRound className="h-6 w-6" /></span>}<span className="min-w-0 flex-1"><span className="block text-sm font-black text-[var(--dx-ink)]">{photo?.name || 'Choose a staff photo'}</span><span className="mt-1 block text-xs text-[var(--dx-muted)]">A clear portrait works best on the Digital ID.</span></span><Upload className="h-5 w-5 text-[var(--dx-muted)]" /><input type="file" accept="image/*" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} /></label>{photo ? <button type="button" onClick={() => setPhoto(null)} className="mt-2 inline-flex items-center gap-1 text-xs font-black text-[var(--dx-muted)]"><X className="h-3.5 w-3.5" />Remove photo</button> : null}</div></div>
+}
+
+function AccessStep({ draft, update, password, confirmPassword, setPassword, setConfirmPassword, showPassword, setShowPassword }: { draft: StaffDraft; update: UpdateDraft; password: string; confirmPassword: string; setPassword: (value: string) => void; setConfirmPassword: (value: string) => void; showPassword: boolean; setShowPassword: (value: boolean) => void }) {
+  return <div className="grid gap-5 sm:grid-cols-2"><Field label="Email address" required={draft.create_login} type="email" value={draft.email} onChange={(value) => update('email', value)} placeholder="alex@company.com" hint="Checked across staff and system users." className="sm:col-span-2" /><Field label="Primary phone" value={draft.phone} onChange={(value) => update('phone', value)} placeholder="+44 7700 900000" /><Field label="Second phone" value={draft.second_phone} onChange={(value) => update('second_phone', value)} placeholder="Optional" /><Toggle label="Create staff portal access" description="The person can sign in and view their Digital ID." checked={draft.create_login} onChange={(value) => update('create_login', value)} className="sm:col-span-2" />{draft.create_login ? <><PasswordField label="Temporary password" value={password} onChange={setPassword} visible={showPassword} onToggle={() => setShowPassword(!showPassword)} /><PasswordField label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} visible={showPassword} onToggle={() => setShowPassword(!showPassword)} /><p className="sm:col-span-2 rounded-xl bg-blue-50 px-4 py-3 text-xs font-semibold leading-5 text-blue-700">Passwords are never stored in the local draft. They are only sent when the final staff record is created.</p></> : null}</div>
+}
+
+function AssignmentStep({ draft, update }: { draft: StaffDraft; update: UpdateDraft }) {
+  return <div className="grid gap-5 sm:grid-cols-2"><Field label="Company or team" value={draft.company_name} onChange={(value) => update('company_name', value)} placeholder="Security Services" className="sm:col-span-2" /><SelectField label="Staff type" value={draft.staff_type} onChange={(value) => update('staff_type', value)} options={[['security', 'Security'], ['warehouse', 'Warehouse'], ['event', 'Event'], ['admin', 'Admin'], ['contractor', 'Contractor'], ['other', 'Other']]} /><SelectField label="Starting status" value={draft.status} onChange={(value) => update('status', value)} options={[['active', 'Active'], ['inactive', 'Inactive'], ['suspended', 'Suspended'], ['revoked', 'Revoked'], ['archived', 'Archived']]} /><Toggle label="Access to a car" description="Useful for assignments that require travel." checked={draft.access_to_car} onChange={(value) => update('access_to_car', value)} /><Toggle label="Driving licence" description="Licence details can be added under Documents." checked={draft.driver_licence} onChange={(value) => update('driver_licence', value)} /></div>
+}
+
+function PersonalStep({ draft, update }: { draft: StaffDraft; update: UpdateDraft }) {
+  return <div className="grid gap-5 sm:grid-cols-2"><Field label="Nationality" value={draft.nationality} onChange={(value) => update('nationality', value)} placeholder="British" /><Field label="Country of birth" value={draft.country_of_birth} onChange={(value) => update('country_of_birth', value)} placeholder="United Kingdom" /><Field label="Gender" value={draft.gender} onChange={(value) => update('gender', value)} placeholder="Optional" /><Field label="Date of birth" type="date" value={draft.date_of_birth} onChange={(value) => update('date_of_birth', value)} /><label className="sm:col-span-2"><FieldLabel label="Internal notes" /><textarea value={draft.notes} onChange={(event) => update('notes', event.target.value)} rows={5} placeholder="Only add information relevant to staff operations." className="mt-2 w-full rounded-xl border border-[var(--dx-line)] bg-white px-3.5 py-3 text-sm text-[var(--dx-ink)] outline-none transition focus:border-[var(--dx-ink)]" /></label></div>
+}
+
+function ReviewStep({ draft, photoPreview }: { draft: StaffDraft; photoPreview: string | null }) {
+  const rows = [['Employee code', draft.employee_code], ['Email', draft.email || 'Not provided'], ['Company', draft.company_name || 'Not provided'], ['Staff type', draft.staff_type], ['Starting status', draft.status], ['Portal access', draft.create_login ? 'Enabled' : 'Not enabled']]
+  return <div><div className="flex items-center gap-4 rounded-xl bg-[var(--dx-surface-muted)] p-4">{photoPreview ? <Image src={photoPreview} alt="" width={64} height={64} unoptimized className="h-16 w-16 rounded-xl object-cover" /> : <span className="flex h-16 w-16 items-center justify-center rounded-xl bg-white text-[var(--dx-muted)]"><UserRound className="h-6 w-6" /></span>}<div><p className="text-lg font-black text-[var(--dx-ink)]">{draft.full_name}</p><p className="mt-1 font-mono text-xs font-bold uppercase tracking-[0.1em] text-[var(--dx-muted)]">{draft.employee_code}</p></div></div><dl className="mt-5 grid gap-px overflow-hidden rounded-xl border border-[var(--dx-line)] bg-[var(--dx-line)] sm:grid-cols-2">{rows.map(([label, value]) => <div key={label} className="bg-white p-4"><dt className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--dx-muted)]">{label}</dt><dd className="mt-1.5 text-sm font-bold capitalize text-[var(--dx-ink)]">{value}</dd></div>)}</dl><div className="mt-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-black">All previous steps passed their checks</p><p className="mt-1 text-xs leading-5 opacity-75">Digital ID X will run final safety checks again when creating the record.</p></div></div></div>
+}
+
+function Field({ label, value, onChange, required = false, type = 'text', placeholder, hint, className = '' }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; placeholder?: string; hint?: string; className?: string }) {
+  return <label className={className}><FieldLabel label={label} required={required} /><input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--dx-line)] bg-white px-3.5 text-sm font-semibold text-[var(--dx-ink)] outline-none transition placeholder:font-normal placeholder:text-[var(--dx-muted)] focus:border-[var(--dx-ink)]" />{hint ? <span className="mt-1.5 block text-[10px] font-semibold leading-4 text-[var(--dx-muted)]">{hint}</span> : null}</label>
+}
+
+function FieldLabel({ label, required = false }: { label: string; required?: boolean }) {
+  return <span className="text-xs font-black text-[var(--dx-muted-strong)]">{label}{required ? <span className="ml-1 text-red-600">*</span> : null}</span>
+}
+
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[][] }) {
+  return <label><FieldLabel label={label} /><select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--dx-line)] bg-white px-3.5 text-sm font-bold capitalize text-[var(--dx-ink)]">{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>
+}
+
+function Toggle({ label, description, checked, onChange, className = '' }: { label: string; description: string; checked: boolean; onChange: (value: boolean) => void; className?: string }) {
+  return <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[var(--dx-line)] p-4 ${className}`}><span><span className="block text-sm font-black text-[var(--dx-ink)]">{label}</span><span className="mt-1 block text-xs leading-5 text-[var(--dx-muted)]">{description}</span></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-[var(--dx-ink)]" /></label>
+}
+
+function PasswordField({ label, value, onChange, visible, onToggle }: { label: string; value: string; onChange: (value: string) => void; visible: boolean; onToggle: () => void }) {
+  return <label><FieldLabel label={label} required /><span className="mt-2 flex min-h-11 items-center rounded-xl border border-[var(--dx-line)] bg-white px-3.5"><input type={visible ? 'text' : 'password'} value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none" /><button type="button" onClick={onToggle} aria-label={visible ? 'Hide password' : 'Show password'} className="rounded-md p-1 text-[var(--dx-muted)]">{visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></label>
 }

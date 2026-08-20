@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Privacy Policy | Security ID",
-  description: "Privacy Policy for the Security ID staff identity platform.",
+  title: "Privacy Policy | Digital ID X",
+  description: "Privacy Policy for the Digital ID X staff identity platform.",
 };
 
 export default function PrivacyPolicyPage() {
@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <p className="mb-6">
-          Security ID is a staff digital identity platform designed for
+          Digital ID X is a staff digital identity platform designed for
           authorised users of registered organizations. This Privacy Policy
           explains how we collect, use, and protect information when users
           access and use the app.
@@ -118,8 +118,8 @@ export default function PrivacyPolicyPage() {
 
         <p className="font-medium">
           Email:{' '}
-          <a className="underline" href="mailto:privacy@security-id.app">
-            privacy@security-id.app
+          <a className="underline" href="mailto:privacy@digitalidx.app">
+            privacy@digitalidx.app
           </a>
         </p>
       </div>

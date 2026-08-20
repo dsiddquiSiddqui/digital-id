@@ -48,7 +48,7 @@ export async function POST(request: Request) {
           subject: `${schedule.name} is ready`,
           templateKey: 'scheduled_report',
           metadata: {
-            organization_name: organization?.name || 'Security ID',
+            organization_name: organization?.name || 'Digital ID X',
             report_name: schedule.name,
             report_type: schedule.report_type,
             report_format: schedule.format,

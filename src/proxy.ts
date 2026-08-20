@@ -35,6 +35,7 @@ const PROTECTED_PREFIXES = [
   '/api/admin',
   '/api/platform',
   '/v2/staff',
+  '/v2/staff-ids/',
   '/staff/',
   '/staff-ids/',
   '/users/',

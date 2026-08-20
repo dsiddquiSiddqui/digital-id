@@ -17,7 +17,7 @@ const STARTER_TEMPLATES = [
     name: 'Document expiry alert',
     subject: '{{staff_name}} has a document expiring soon',
     preview_text: 'Review the staff document before it expires.',
-    body_html: '<p>{{staff_name}} has a document expiring on {{expiry_date}}.</p><p>Please review the record in Security ID.</p>',
+    body_html: '<p>{{staff_name}} has a document expiring on {{expiry_date}}.</p><p>Please review the record in Digital ID X.</p>',
     body_text: '{{staff_name}} has a document expiring on {{expiry_date}}.',
   },
   {

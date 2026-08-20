@@ -211,7 +211,7 @@ export async function POST(
           actor_role: currentProfile.role,
 
           module: 'Staff Management',
-          page: `/admin/staff/${id}`,
+          page: `/v2/staff/${id}`,
 
           staff_id: id,
           staff_name: full_name,

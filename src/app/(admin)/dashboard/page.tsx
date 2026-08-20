@@ -3,14 +3,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
+  ArrowRight,
   Users,
   Shield,
   IdCard,
   Bell,
   FileText,
   Plus,
+  CheckCircle2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import {
+  MetricCard,
+  PageHeader,
+  PrimaryAction,
+  SecondaryAction,
+  SectionHeading,
+  StatusPill,
+  Surface,
+} from '@/components/admin/AdminUi'
 
 type Profile = {
   id: string
@@ -172,7 +183,7 @@ export default function DashboardPage() {
       items.push({
         title: 'Users',
         value: stats.users,
-        icon: <Users className="h-5 w-5" />,
+        icon: Users,
         highlight: false,
       })
     }
@@ -181,7 +192,7 @@ export default function DashboardPage() {
       items.push({
         title: 'Staff',
         value: stats.staff,
-        icon: <Shield className="h-5 w-5" />,
+        icon: Shield,
         highlight: true,
       })
     }
@@ -189,7 +200,7 @@ export default function DashboardPage() {
     items.push({
       title: 'Digital IDs',
       value: stats.ids,
-      icon: <IdCard className="h-5 w-5" />,
+      icon: IdCard,
       highlight: false,
     })
 
@@ -197,7 +208,7 @@ export default function DashboardPage() {
       items.push({
         title: 'Alerts',
         value: stats.alerts,
-        icon: <Bell className="h-5 w-5" />,
+        icon: Bell,
         highlight: false,
       })
     }
@@ -317,24 +328,36 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
-        <p className="text-sm text-slate-500">Loading dashboard...</p>
+      <div className="dx-page space-y-6" aria-busy="true" aria-label="Loading dashboard">
+        <div className="h-28 animate-pulse rounded-[18px] bg-white/60" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-40 animate-pulse rounded-[18px] border border-[var(--dx-line)] bg-white/75" />
+          ))}
+        </div>
       </div>
     )
   }
 
+  const firstName = profile?.full_name?.trim().split(/\s+/)[0] || 'there'
+  const identityCoverage = stats.staff > 0 ? Math.min(100, Math.round((stats.ids / stats.staff) * 100)) : 0
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold">Dashboard</h2>
-        <p className="mt-1 text-slate-500">
-          {organization?.name ? `${organization.name} - ` : ''}
-          {welcomeText}
-        </p>
-      </div>
+    <div className="dx-page space-y-5 pb-8">
+      <PageHeader
+        eyebrow={organization?.name || 'Workspace overview'}
+        title={`Welcome back, ${firstName}`}
+        description={welcomeText}
+        actions={
+          <>
+            <SecondaryAction href="/reports">View reports</SecondaryAction>
+            {permissions.canCreateStaff ? <PrimaryAction href="/v2/staff/new">Add staff member</PrimaryAction> : null}
+          </>
+        }
+      />
 
       <div
-        className={`grid gap-4 ${
+        className={`grid gap-3 ${
           statCards.length === 1
             ? 'grid-cols-1'
             : statCards.length === 2
@@ -345,164 +368,106 @@ export default function DashboardPage() {
         }`}
       >
         {statCards.map((card) => (
-          <Card
+          <MetricCard
             key={card.title}
-            title={card.title}
+            label={card.title}
             value={card.value}
             icon={card.icon}
-            highlight={card.highlight}
+            href={card.title === 'Users' ? '/users' : card.title === 'Alerts' ? '/alerts' : '/v2/staff'}
+            detail={card.title === 'Digital IDs' ? `${identityCoverage}% of staff covered` : 'Open workspace records'}
+            signal={card.highlight}
           />
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-2xl bg-white p-6 shadow">
-            <h3 className="text-lg font-semibold">Overview</h3>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.7fr)]">
+        <div className="space-y-5">
+          <Surface className="p-5 sm:p-6">
+            <SectionHeading
+              title="Identity coverage"
+              description="How much of your active staff directory has a digital identity issued."
+              action={<StatusPill tone={identityCoverage >= 90 ? 'success' : identityCoverage >= 60 ? 'warning' : 'neutral'}>{identityCoverage}% covered</StatusPill>}
+            />
 
-            <div
-              className={`mt-4 grid gap-4 ${
-                overviewItems.length === 1
-                  ? 'grid-cols-1'
-                  : overviewItems.length === 2
-                  ? 'grid-cols-2'
-                  : overviewItems.length === 3
-                  ? 'grid-cols-1 md:grid-cols-3'
-                  : 'grid-cols-2 md:grid-cols-4'
-              }`}
-            >
-              {overviewItems.map((item) => (
-                <Mini key={item.label} label={item.label} value={item.value} />
-              ))}
-            </div>
-          </div>
+            <div className="mt-7 grid gap-6 md:grid-cols-[180px_1fr] md:items-center">
+              <div className="relative mx-auto flex h-40 w-40 items-center justify-center rounded-full" style={{ background: `conic-gradient(var(--dx-signal) ${identityCoverage}%, var(--dx-canvas) 0)` }}>
+                <div className="flex h-[126px] w-[126px] flex-col items-center justify-center rounded-full bg-white">
+                  <strong className="text-4xl font-black tracking-[-0.06em] text-[var(--dx-ink)]">{identityCoverage}%</strong>
+                  <span className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--dx-muted)]">Issued</span>
+                </div>
+              </div>
 
-          {managementPanels.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {managementPanels.map((panel) => (
-                <Panel
-                  key={panel.href}
-                  title={panel.title}
-                  desc={panel.desc}
-                  href={panel.href}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="space-y-6">
-          {quickActions.length > 0 ? (
-            <div className="rounded-2xl bg-white p-6 shadow">
-              <h3 className="font-semibold">Quick Actions</h3>
-
-              <div className="mt-4 space-y-3">
-                {quickActions.map((action) => (
-                  <Action
-                    key={action.href}
-                    href={action.href}
-                    label={action.label}
-                    icon={action.icon}
-                  />
-                ))}
+              <div>
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[var(--dx-line)] bg-[var(--dx-line)] sm:grid-cols-4">
+                  {overviewItems.map((item) => (
+                    <div key={item.label} className="bg-[var(--dx-surface-muted)] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--dx-muted)]">{item.label}</p>
+                      <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--dx-ink)]">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-sm leading-6 text-[var(--dx-muted)]">
+                  {stats.staff === 0
+                    ? 'Add your first staff member to begin issuing secure digital identities.'
+                    : stats.ids < stats.staff
+                      ? `${stats.staff - stats.ids} staff record${stats.staff - stats.ids === 1 ? '' : 's'} still need a digital ID.`
+                      : 'Every staff record currently has a digital ID.'}
+                </p>
               </div>
             </div>
+          </Surface>
+
+          {managementPanels.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {managementPanels.map((panel) => (
+                <Link key={panel.href} href={panel.href} className="group flex min-h-32 items-end justify-between gap-5 rounded-[18px] border border-[var(--dx-line)] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[var(--dx-line-strong)] hover:shadow-[0_14px_30px_rgba(23,25,21,0.07)]">
+                  <div>
+                    <p className="text-lg font-black tracking-[-0.025em] text-[var(--dx-ink)]">{panel.title}</p>
+                    <p className="mt-1 max-w-xs text-sm leading-6 text-[var(--dx-muted)]">{panel.desc}</p>
+                  </div>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--dx-canvas)] text-[var(--dx-ink)] transition group-hover:bg-[var(--dx-signal)]">
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="space-y-5">
+          {quickActions.length > 0 ? (
+            <Surface className="p-5">
+              <SectionHeading title="Quick actions" description="Continue common workspace tasks." />
+              <div className="mt-4 space-y-2">
+                {quickActions.map((action) => (
+                  <Link key={action.href} href={action.href} className="group flex min-h-12 items-center justify-between gap-3 rounded-xl px-3 text-sm font-bold text-[var(--dx-muted-strong)] transition hover:bg-[var(--dx-surface-muted)] hover:text-[var(--dx-ink)]">
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--dx-canvas)] text-[var(--dx-muted)] group-hover:bg-[var(--dx-signal)] group-hover:text-[var(--dx-ink)]">{action.icon}</span>
+                      {action.label}
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-[var(--dx-line-strong)] transition group-hover:translate-x-0.5 group-hover:text-[var(--dx-ink)]" aria-hidden="true" />
+                  </Link>
+                ))}
+              </div>
+            </Surface>
           ) : null}
 
-          <div
-            className="rounded-2xl p-6 text-white"
-            style={{ backgroundColor: organization?.accent_color || '#081a33' }}
-          >
-            <h3 className="text-lg font-semibold">Digital Identity</h3>
-            <p className="mt-2 text-sm opacity-70">
-              Verified IDs across system
-            </p>
-
-            <h2 className="mt-4 text-4xl font-bold">{stats.ids}</h2>
-          </div>
+          <section className="relative overflow-hidden rounded-[18px] bg-[var(--dx-ink)] p-5 text-white">
+            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full border-[18px] border-[var(--dx-signal)]/15" />
+            <div className="relative">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--dx-signal)] text-[var(--dx-ink)]">
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <p className="mt-7 text-[10px] font-black uppercase tracking-[0.16em] text-white/50">Workspace signal</p>
+              <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">Identity operations, in one place.</h2>
+              <p className="mt-3 text-sm leading-6 text-white/60">Review records, issue IDs, and resolve alerts without losing context.</p>
+              <Link href="/v2/staff" className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--dx-signal)]">
+                Open staff directory <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
+          </section>
         </div>
       </div>
     </div>
-  )
-}
-
-function Card({
-  title,
-  value,
-  icon,
-  highlight = false,
-}: {
-  title: string
-  value: number
-  icon: React.ReactNode
-  highlight?: boolean
-}) {
-  return (
-    <div
-      className={`rounded-2xl p-5 shadow ${
-        highlight ? 'bg-[var(--tenant-primary,#0094e0)] text-white' : 'bg-white'
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">{title}</p>
-        {icon}
-      </div>
-      <h2 className="mt-4 text-3xl font-bold">{value}</h2>
-    </div>
-  )
-}
-
-function Mini({
-  label,
-  value,
-}: {
-  label: string
-  value: number
-}) {
-  return (
-    <div className="rounded-xl bg-slate-100 p-4 text-center">
-      <p className="text-xs text-slate-500">{label}</p>
-      <h3 className="text-xl font-bold">{value}</h3>
-    </div>
-  )
-}
-
-function Panel({
-  title,
-  desc,
-  href,
-}: {
-  title: string
-  desc: string
-  href: string
-}) {
-  return (
-    <Link
-      href={href}
-      className="block rounded-2xl bg-white p-5 shadow transition hover:shadow-md"
-    >
-      <h3 className="font-semibold">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500">{desc}</p>
-    </Link>
-  )
-}
-
-function Action({
-  href,
-  label,
-  icon,
-}: {
-  href: string
-  label: string
-  icon: React.ReactNode
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-3 rounded-xl bg-slate-100 p-3 text-sm transition hover:bg-slate-200"
-    >
-      <span className="text-slate-500">{icon}</span>
-      <span>{label}</span>
-    </Link>
   )
 }

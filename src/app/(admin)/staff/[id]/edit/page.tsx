@@ -134,7 +134,7 @@ export default function EditStaffPage() {
       setSuccess('Staff member updated successfully.')
 
       setTimeout(() => {
-        router.push(`/staff/${id}`)
+        router.push(`/v2/staff/${id}`)
         router.refresh()
       }, 700)
     } catch {
@@ -174,7 +174,7 @@ export default function EditStaffPage() {
           </div>
 
           <Link
-            href={`/staff/${id}`}
+            href={`/v2/staff/${id}`}
             className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Back to Staff
