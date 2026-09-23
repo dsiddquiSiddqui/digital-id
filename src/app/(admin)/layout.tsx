@@ -14,7 +14,6 @@ import {
   Menu,
   X,
   Users,
-  Mail,
   ChevronRight,
   Settings,
   ClipboardCheck,
@@ -50,6 +49,7 @@ type Profile = {
     primary_color: string
     accent_color: string
     surface_color: string
+    role_permissions?: Record<string, Record<string, boolean>> | null
   } | null
 }
 
@@ -76,6 +76,7 @@ export default function AdminLayout({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -92,7 +93,7 @@ export default function AdminLayout({
         const { data: profileData, error } = await supabase
           .from('profiles')
           .select(
-            '*, organizations:organizations(id, name, slug, logo_url, background_image_url, theme_key, primary_color, accent_color, surface_color)'
+            '*, organizations:organizations(id, name, slug, logo_url, background_image_url, theme_key, primary_color, accent_color, surface_color, role_permissions)'
           )
           .eq('auth_user_id', user.id)
           .single()
@@ -141,6 +142,33 @@ export default function AdminLayout({
     return () => window.clearInterval(timer)
   }, [profile])
 
+  useEffect(() => {
+    if (!profile) return
+
+    const refreshUnread = async () => {
+      try {
+        const response = await fetch('/api/admin/notifications', { cache: 'no-store' })
+        const result = await response.json().catch(() => null)
+        if (response.ok) setUnreadNotifications(Number(result?.unread) || 0)
+      } catch {
+        // The inbox page shows actionable errors; the shell badge can fail quietly.
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshUnread()
+    }
+
+    void refreshUnread()
+    const timer = window.setInterval(refreshUnread, 60_000)
+    window.addEventListener('notifications:changed', refreshUnread)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('notifications:changed', refreshUnread)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [profile])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -162,6 +190,11 @@ export default function AdminLayout({
     const isHr = role === 'hr'
     const isOperationManager = role === 'operation_manager'
     const isOperationTeam = role === 'operation_team'
+    const savedPermissions = organization?.role_permissions?.[role]
+    const reportRoleDefault = isSuperAdmin || isAdmin || isHrManager || isOperationManager || role === 'manager'
+    const canViewReports = typeof savedPermissions?.view_reports === 'boolean'
+      ? savedPermissions.view_reports
+      : reportRoleDefault
 
     return {
       canViewDashboard: true,
@@ -188,6 +221,7 @@ export default function AdminLayout({
       canViewUsers: !['operation_manager', 'operation_team'].includes(role),
 
       canViewProfile: true,
+      canViewReports,
       canManageSettings: isSuperAdmin || isAdmin,
 
       isSuperAdmin,
@@ -197,7 +231,7 @@ export default function AdminLayout({
       isOperationManager,
       isOperationTeam,
     }
-  }, [role])
+  }, [organization?.role_permissions, role])
 
   const staffAreaActive =
     pathname === '/v2/staff' ||
@@ -223,7 +257,7 @@ export default function AdminLayout({
               active: staffAreaActive,
             }
           : null,
-        permissions.canViewStaff
+        permissions.canViewReports
           ? {
               href: '/reports',
               label: 'Reports',
@@ -234,8 +268,8 @@ export default function AdminLayout({
         permissions.canViewStaff
           ? {
               href: '/notifications',
-              label: 'Inbox',
-              icon: <Mail className="h-4 w-4" />,
+              label: 'Notifications',
+              icon: <Bell className="h-4 w-4" />,
               active: pathname === '/notifications',
             }
           : null,
@@ -512,8 +546,9 @@ export default function AdminLayout({
               </div>
 
               <div className="flex items-center gap-3">
-                <Link href="/notifications" aria-label="Open notifications" className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--dx-line)] bg-white text-[var(--dx-muted)] transition hover:border-[var(--dx-line-strong)] hover:bg-[var(--dx-surface-muted)]">
+                <Link href="/notifications" aria-label={unreadNotifications ? `Open notifications, ${unreadNotifications} unread` : 'Open notifications'} className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--dx-line)] bg-white text-[var(--dx-muted)] transition hover:border-[var(--dx-line-strong)] hover:bg-[var(--dx-surface-muted)]">
                   <Bell className="h-4 w-4" />
+                  {unreadNotifications > 0 ? <span className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
                 </Link>
 
                 <Link

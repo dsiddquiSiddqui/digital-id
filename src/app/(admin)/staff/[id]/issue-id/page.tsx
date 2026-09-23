@@ -4,10 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-function generateQrToken() {
-  return crypto.randomUUID()
-}
-
 function formatDateInput(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -77,7 +73,7 @@ type StaffRow = {
 }
 
 export default function IssueIdPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -228,66 +224,32 @@ export default function IssueIdPage() {
       return
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    try {
+      const response = await fetch(`/api/v2/staff/${id}/digital-id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_number: idNumber.trim(),
+          issue_date: issueDate,
+          expiry_date: expiryDate,
+          role_title: roleTitle.trim(),
+          sia_number: requiresSia ? siaNumber.trim() : null,
+        }),
+      })
+      const result = await response.json()
 
-    if (!user) {
-      setError('You must be logged in.')
+      if (!response.ok) {
+        setError(result.error || 'Failed to issue the Digital ID.')
+        return
+      }
+
+      router.push(`/v2/staff/${id}/digital-id`)
+      router.refresh()
+    } catch {
+      setError('Unable to reach the server. Please try again.')
+    } finally {
       setLoading(false)
-      return
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single()
-
-    if (profileError || !profile) {
-      setError(profileError?.message || 'Admin profile not found.')
-      setLoading(false)
-      return
-    }
-
-    const { error: updateOldIdsError } = await supabase
-      .from('staff_ids')
-      .update({ is_current: false, status: 'revoked' })
-      .eq('staff_id', id)
-      .eq('is_current', true)
-
-    if (updateOldIdsError) {
-      setError(updateOldIdsError.message)
-      setLoading(false)
-      return
-    }
-
-    const { error: insertError } = await supabase.from('staff_ids').insert([
-      {
-        staff_id: id,
-        id_number: idNumber.trim(),
-        issue_date: issueDate,
-        expiry_date: expiryDate,
-        site_name: null,
-        role_title: roleTitle.trim(),
-        sia_number: requiresSia ? siaNumber.trim() : null,
-        qr_token: generateQrToken(),
-        watermark_text: 'Internal Digital ID',
-        is_current: true,
-        status: 'active',
-        created_by: profile.id,
-      },
-    ])
-
-    setLoading(false)
-
-    if (insertError) {
-      setError(insertError.message)
-      return
-    }
-
-    router.push(`/v2/staff/${id}`)
-    router.refresh()
   }
 
   return (

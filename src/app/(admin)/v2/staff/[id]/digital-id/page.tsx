@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { CalendarDays, Download, IdCard as IdCardIcon, ShieldCheck } from 'lucide-react'
 import IdCard from '@/components/IdCard'
+import { useIdCardTemplate } from '@/hooks/use-id-card-template'
 
 type StaffRecord = {
   id: string
@@ -37,6 +38,7 @@ export default function StaffDigitalIdPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [exporting, setExporting] = useState(false)
+  const { template, organization } = useIdCardTemplate()
 
   useEffect(() => {
     const load = async () => {
@@ -133,7 +135,7 @@ export default function StaffDigitalIdPage() {
 
           <section className="dx-surface overflow-hidden p-5 sm:p-6">
             <p className="mb-4 text-sm font-semibold text-[var(--dx-muted-strong)]">Credential preview</p>
-            <IdCard fullName={staff.full_name} employeeCode={staff.employee_code} roleTitle={digitalId.role_title} idNumber={digitalId.id_number} siaNumber={digitalId.sia_number} qrToken={digitalId.qr_token} photoUrl={staff.photo_url} issueDate={formatDate(digitalId.issue_date)} expiryDate={formatDate(digitalId.expiry_date)} idStatus={digitalId.status} />
+            <IdCard fullName={staff.full_name} employeeCode={staff.employee_code} roleTitle={digitalId.role_title} idNumber={digitalId.id_number} siaNumber={digitalId.sia_number} qrToken={digitalId.qr_token} photoUrl={staff.photo_url} issueDate={formatDate(digitalId.issue_date)} expiryDate={formatDate(digitalId.expiry_date)} idStatus={digitalId.status} template={template} organizationName={organization.name} organizationLogoUrl={organization.logo_url} />
           </section>
         </div>
       ) : (

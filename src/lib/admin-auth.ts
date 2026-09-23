@@ -28,6 +28,7 @@ export const MANAGER_ROLES = [
   'hr',
   'operation_manager',
 ]
+export const WORKSPACE_ROLES = [...MANAGER_ROLES, 'operation_team']
 
 export async function requireAdminAccess(allowedRoles = ADMIN_ROLES) {
   const supabase = await createClient()

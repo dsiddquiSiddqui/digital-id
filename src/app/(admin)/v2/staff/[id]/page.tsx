@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, ChevronRight, FileText, Mail, MapPin, Phone, ShieldCheck, TriangleAlert, UserRound } from 'lucide-react'
 import IdCard from '@/components/IdCard'
+import { useIdCardTemplate } from '@/hooks/use-id-card-template'
 
 type Staff = { id: string; employee_code: string; full_name: string; email: string | null; phone: string | null; nationality: string | null; date_of_birth: string | null; photo_url: string | null; created_at: string }
 type StaffEmployment = { employment_type: string | null; contract_number: string | null; contract_start: string | null; contract_end: string | null; pay_schedule: string | null; payroll_reference: string | null }
@@ -29,6 +30,7 @@ function titleCase(value?: string | null) {
 export default function V2StaffDetailPage() {
   const params = useParams()
   const id = params.id as string
+  const { template, organization } = useIdCardTemplate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [staff, setStaff] = useState<Staff | null>(null)
@@ -184,7 +186,7 @@ export default function V2StaffDetailPage() {
           <OverviewSection title="Digital ID" description={currentId ? `${currentId.id_number} · ${titleCase(currentId.status)}` : 'No identity credential has been issued.'} icon={<ShieldCheck className="h-4 w-4" />} actionHref={`/v2/staff/${staff.id}/digital-id`} actionLabel="Open">
             {currentId ? (
               <div className="overflow-hidden rounded-lg border border-[var(--dx-line)] bg-[var(--dx-surface-muted)] p-3">
-                <IdCard fullName={staff.full_name} employeeCode={staff.employee_code} roleTitle={currentId.role_title} idNumber={currentId.id_number} siaNumber={currentId.sia_number} qrToken={currentId.qr_token} photoUrl={staff.photo_url} issueDate={formatUKDate(currentId.issue_date)} expiryDate={formatUKDate(currentId.expiry_date)} idStatus={currentId.status} />
+                <IdCard fullName={staff.full_name} employeeCode={staff.employee_code} roleTitle={currentId.role_title} idNumber={currentId.id_number} siaNumber={currentId.sia_number} qrToken={currentId.qr_token} photoUrl={staff.photo_url} issueDate={formatUKDate(currentId.issue_date)} expiryDate={formatUKDate(currentId.expiry_date)} idStatus={currentId.status} template={template} organizationName={organization.name} organizationLogoUrl={organization.logo_url} />
               </div>
             ) : <EmptyPrompt text="Identity coverage is missing." href={`/v2/staff/${staff.id}/issue-id`} label="Issue Digital ID" />}
           </OverviewSection>

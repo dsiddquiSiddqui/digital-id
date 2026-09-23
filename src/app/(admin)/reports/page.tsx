@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Download, FileBarChart, Shield, Users, FileWarning } from 'lucide-react'
+import { useToast } from '@/components/admin/ToastProvider'
 
 type ReportsData = {
   usage: {
@@ -9,9 +10,11 @@ type ReportsData = {
     plan: { name: string }
   }
   metrics: { activeStaff: number; expiredDocuments: number; revokedIds: number }
+  capabilities: { canExportAudit: boolean; canExportBackup: boolean }
 }
 
 export default function ReportsPage() {
+  const { notify } = useToast()
   const [data, setData] = useState<ReportsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -62,12 +65,12 @@ export default function ReportsPage() {
       </div>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <ExportCard title="Staff report" desc="Staff directory with status, contact, and company fields." href="/api/admin/reports?format=csv&type=staff" />
-        <ExportCard title="Expired documents" desc="All expired documents with staff reference and expiry date." href="/api/admin/reports?format=csv&type=expired-documents" />
-        <ExportCard title="Organization backup" desc="JSON export of core tenant data for backup and migration." href="/api/admin/exports" />
-        <ExportCard title="Audit log CSV" desc="CSV export of audit activity for compliance review." href="/api/admin/exports?format=csv&type=audit_logs" />
-        <ExportCard title="Branded staff PDF" desc="Branded PDF summary for staff reporting." href="/api/admin/exports?format=pdf&type=staff" />
-        <ExportCard title="Branded audit PDF" desc="Branded PDF summary for audit reporting." href="/api/admin/exports?format=pdf&type=audit_logs" />
+        <ExportCard title="Staff report" desc="Staff directory with status, contact, and company fields." href="/api/admin/reports?format=csv&type=staff" notify={notify} />
+        <ExportCard title="Expired documents" desc="All expired documents with staff reference and expiry date." href="/api/admin/reports?format=csv&type=expired-documents" notify={notify} />
+        {data.capabilities.canExportBackup ? <ExportCard title="Organization backup" desc="JSON export of core tenant data for backup and migration." href="/api/admin/exports" notify={notify} /> : null}
+        {data.capabilities.canExportAudit ? <ExportCard title="Audit log CSV" desc="CSV export of audit activity for compliance review." href="/api/admin/exports?format=csv&type=audit_logs" notify={notify} /> : null}
+        <ExportCard title="Branded staff PDF" desc="Branded PDF summary for staff reporting." href="/api/admin/exports?format=pdf&type=staff" notify={notify} />
+        {data.capabilities.canExportAudit ? <ExportCard title="Branded audit PDF" desc="Branded PDF summary for audit reporting." href="/api/admin/exports?format=pdf&type=audit_logs" notify={notify} /> : null}
       </section>
     </div>
   )
@@ -89,16 +92,47 @@ function Metric({ icon, label, value, danger = false }: { icon: React.ReactNode;
   )
 }
 
-function ExportCard({ title, desc, href }: { title: string; desc: string; href: string }) {
+type Notify = (toast: { tone: 'success' | 'error'; title: string; body?: string }) => void
+
+function ExportCard({ title, desc, href, notify }: { title: string; desc: string; href: string; notify: Notify }) {
+  const [downloading, setDownloading] = useState(false)
+
+  const download = async () => {
+    setDownloading(true)
+    try {
+      const response = await fetch(href)
+      if (!response.ok) {
+        const result = await response.json().catch(() => null)
+        throw new Error(result?.error || 'The report could not be generated.')
+      }
+      const blob = await response.blob()
+      const disposition = response.headers.get('content-disposition') || ''
+      const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'report-download'
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = filename
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      notify({ tone: 'success', title: 'Report downloaded', body: filename })
+    } catch (reason) {
+      notify({ tone: 'error', title: 'Report not downloaded', body: reason instanceof Error ? reason.message : 'Try again.' })
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
-    <a href={href} className="flex items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-slate-400">
+    <button type="button" onClick={download} disabled={downloading} className="flex w-full items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-slate-400 disabled:cursor-wait disabled:opacity-70">
       <div>
         <h2 className="text-lg font-black text-slate-950">{title}</h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">{desc}</p>
       </div>
-      <span className="rounded-2xl bg-slate-950 p-3 text-white">
-        <Download className="h-5 w-5" />
+      <span className="shrink-0 rounded-2xl bg-slate-950 p-3 text-white">
+        <Download className={`h-5 w-5 ${downloading ? 'animate-bounce' : ''}`} />
       </span>
-    </a>
+    </button>
   )
 }

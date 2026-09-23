@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import IdCard from '@/components/IdCard'
+import { useIdCardTemplate } from '@/hooks/use-id-card-template'
 import {
   BadgeCheck,
   Eye,
@@ -87,6 +88,7 @@ type TabKey = 'id' | 'documents' | 'password'
 export default function MyIdPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const { template, organization } = useIdCardTemplate()
 
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
@@ -600,6 +602,9 @@ export default function MyIdPage() {
                     issueDate={formatUKDate(staffId.issue_date)}
                     expiryDate={formatUKDate(staffId.expiry_date)}
                     idStatus={staffId.status ?? 'active'}
+                    template={template}
+                    organizationName={organization.name}
+                    organizationLogoUrl={organization.logo_url}
                   />
                 </div>
               )}

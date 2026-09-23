@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { ADMIN_ROLES, requireAdminAccess } from '@/lib/admin-auth'
+import { ADMIN_ROLES, MANAGER_ROLES, requireAdminAccess } from '@/lib/admin-auth'
 import { toCsv } from '@/lib/csv'
 import { writeAuditLog } from '@/lib/audit'
-import { requirePermission } from '@/lib/permissions'
+import { hasPermission, requirePermission } from '@/lib/permissions'
 
 const TABLES = [
   'profiles',
@@ -41,7 +41,7 @@ function buildPdf(lines: string[]) {
 
 export async function GET(request: Request) {
   try {
-    const result = await requireAdminAccess(ADMIN_ROLES)
+    const result = await requireAdminAccess(MANAGER_ROLES)
 
     if (result.error || !result.access) {
       return NextResponse.json({ error: result.error }, { status: result.status })
@@ -54,18 +54,38 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const type = url.searchParams.get('type') || 'backup'
     const format = url.searchParams.get('format') || 'json'
-    const { data: organization } = await result.access.adminSupabase
+    const { data: organization, error: organizationError } = await result.access.adminSupabase
       .from('organizations')
       .select('name, slug, logo_url, support_email')
       .eq('id', organizationId)
       .single()
 
+    if (organizationError) {
+      console.error('Export organization query error:', organizationError)
+      return NextResponse.json({ error: 'Unable to load organization details for this export.' }, { status: 500 })
+    }
+
+    const isAdmin = ADMIN_ROLES.includes(result.access.profile.role)
+    const canExportAudit = await hasPermission(result.access, 'view_audit')
+    if (type === 'audit_logs' && !canExportAudit) {
+      return NextResponse.json({ error: 'Missing permission: view_audit.' }, { status: 403 })
+    }
+
     if (format === 'csv' && TABLES.includes(type as (typeof TABLES)[number])) {
-      const { data } = await result.access.adminSupabase
+      if (!isAdmin && !['staff', 'audit_logs'].includes(type)) {
+        return NextResponse.json({ error: 'This export is restricted to administrators.' }, { status: 403 })
+      }
+
+      const { data, error } = await result.access.adminSupabase
         .from(type)
         .select('*')
         .eq('organization_id', organizationId)
         .limit(5000)
+
+      if (error) {
+        console.error(`${type} export query error:`, error)
+        return NextResponse.json({ error: 'Unable to generate this export.' }, { status: 500 })
+      }
 
       const rows = (data || []) as Array<Record<string, unknown>>
       const headers = rows[0] ? Object.keys(rows[0]) : ['empty']
@@ -103,6 +123,9 @@ export async function GET(request: Request) {
     }
 
     if (format === 'pdf') {
+      if (!['staff', 'audit_logs'].includes(type)) {
+        return NextResponse.json({ error: 'Unsupported PDF report type.' }, { status: 400 })
+      }
       const pdf = buildPdf([
         organization?.name || 'Digital ID X',
         'Branded Export Summary',
@@ -128,15 +151,28 @@ export async function GET(request: Request) {
       })
     }
 
+    if (format !== 'json' || type !== 'backup') {
+      return NextResponse.json({ error: 'Unsupported export format or type.' }, { status: 400 })
+    }
+
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Organization backups are restricted to administrators.' }, { status: 403 })
+    }
+
     const exportData: Record<string, unknown> = {}
     let rowCount = 0
 
     for (const table of TABLES) {
-      const { data } = await result.access.adminSupabase
+      const { data, error } = await result.access.adminSupabase
         .from(table)
         .select('*')
         .eq('organization_id', organizationId)
         .limit(5000)
+
+      if (error) {
+        console.error(`${table} backup query error:`, error)
+        return NextResponse.json({ error: 'Unable to generate the organization backup.' }, { status: 500 })
+      }
 
       exportData[table] = data || []
       rowCount += data?.length || 0

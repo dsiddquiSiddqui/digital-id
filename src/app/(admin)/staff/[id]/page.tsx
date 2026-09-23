@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import IdCard from '@/components/IdCard'
+import { useIdCardTemplate } from '@/hooks/use-id-card-template'
 
 type Staff = {
   id: string
@@ -49,6 +50,7 @@ export default function StaffDetailPage() {
   const supabase = useMemo(() => createClient(), [])
   const params = useParams()
   const id = params.id as string
+  const { template, organization } = useIdCardTemplate()
 
   const [staff, setStaff] = useState<Staff | null>(null)
   const [staffIds, setStaffIds] = useState<StaffId[]>([])
@@ -342,6 +344,9 @@ export default function StaffDetailPage() {
                       issueDate={formatUKDate(item.issue_date)}
                       expiryDate={formatUKDate(item.expiry_date)}
                       idStatus={item.status}
+                      template={template}
+                      organizationName={organization.name}
+                      organizationLogoUrl={organization.logo_url}
                     />
                   </div>
                 ))

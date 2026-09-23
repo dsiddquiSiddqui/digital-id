@@ -3,37 +3,13 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { BadgeCheck, IdCard, Printer, Save } from 'lucide-react'
-
-type Template = {
-  layout: 'classic' | 'compact' | 'bold'
-  orientation: 'portrait' | 'landscape'
-  primaryColor: string
-  accentColor: string
-  showLogo: boolean
-  showQr: boolean
-  showSia: boolean
-  showIssueDate: boolean
-  showExpiryDate: boolean
-  headerText: string
-  footerText: string
-}
-
-const DEFAULT_TEMPLATE: Template = {
-  layout: 'classic',
-  orientation: 'portrait',
-  primaryColor: '#081a33',
-  accentColor: '#0094e0',
-  showLogo: true,
-  showQr: true,
-  showSia: true,
-  showIssueDate: true,
-  showExpiryDate: true,
-  headerText: 'Digital Staff ID',
-  footerText: 'Verified Digital Identity',
-}
+import {
+  DEFAULT_ID_CARD_TEMPLATE,
+  type IdCardTemplate,
+} from '@/lib/id-card-template'
 
 export default function IdCardDesignerPage() {
-  const [template, setTemplate] = useState<Template>(DEFAULT_TEMPLATE)
+  const [template, setTemplate] = useState<IdCardTemplate>(DEFAULT_ID_CARD_TEMPLATE)
   const [organization, setOrganization] = useState<{ name?: string; logo_url?: string | null }>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -48,7 +24,7 @@ export default function IdCardDesignerPage() {
       const result = await response.json()
       if (!response.ok) setError(result.error || 'Unable to load ID template.')
       else {
-        setTemplate({ ...DEFAULT_TEMPLATE, ...result.template })
+        setTemplate({ ...DEFAULT_ID_CARD_TEMPLATE, ...result.template })
         setOrganization(result.organization || {})
       }
       setLoading(false)
@@ -68,7 +44,7 @@ export default function IdCardDesignerPage() {
     const result = await response.json()
     if (!response.ok) setError(result.error || 'Unable to save template.')
     else {
-      setTemplate({ ...DEFAULT_TEMPLATE, ...result.template })
+      setTemplate({ ...DEFAULT_ID_CARD_TEMPLATE, ...result.template })
       setMessage('ID card template saved.')
     }
     setSaving(false)
@@ -96,8 +72,8 @@ export default function IdCardDesignerPage() {
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-black text-slate-950">Layout</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <SelectField label="Layout style" value={template.layout} onChange={(value) => setTemplate((prev) => ({ ...prev, layout: value as Template['layout'] }))} options={['classic', 'compact', 'bold']} />
-            <SelectField label="Orientation" value={template.orientation} onChange={(value) => setTemplate((prev) => ({ ...prev, orientation: value as Template['orientation'] }))} options={['portrait', 'landscape']} />
+            <SelectField label="Layout style" value={template.layout} onChange={(value) => setTemplate((prev) => ({ ...prev, layout: value as IdCardTemplate['layout'] }))} options={['classic', 'compact', 'bold']} />
+            <SelectField label="Orientation" value={template.orientation} onChange={(value) => setTemplate((prev) => ({ ...prev, orientation: value as IdCardTemplate['orientation'] }))} options={['portrait', 'landscape']} />
             <TextField label="Header text" value={template.headerText} onChange={(value) => setTemplate((prev) => ({ ...prev, headerText: value }))} />
             <TextField label="Footer text" value={template.footerText} onChange={(value) => setTemplate((prev) => ({ ...prev, footerText: value }))} />
           </div>
@@ -157,7 +133,7 @@ export default function IdCardDesignerPage() {
   )
 }
 
-function CardPreview({ template, organization, side, scale }: { template: Template; organization: { name?: string; logo_url?: string | null }; side: 'front' | 'back'; scale: number }) {
+function CardPreview({ template, organization, side, scale }: { template: IdCardTemplate; organization: { name?: string; logo_url?: string | null }; side: 'front' | 'back'; scale: number }) {
   const landscape = template.orientation === 'landscape'
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

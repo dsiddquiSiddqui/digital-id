@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { requireAdminAccess, MANAGER_ROLES } from '@/lib/admin-auth'
+import { ADMIN_ROLES, requireAdminAccess, MANAGER_ROLES } from '@/lib/admin-auth'
 import { getOrganizationPlanUsage } from '@/lib/plan-usage'
-import { requirePermission } from '@/lib/permissions'
+import { hasPermission, requirePermission } from '@/lib/permissions'
 
 function csvEscape(value: unknown) {
   const text = value === null || value === undefined ? '' : String(value)
@@ -33,11 +33,16 @@ export async function GET(request: Request) {
 
     if (format === 'csv') {
       if (type === 'staff') {
-        const { data } = await result.access.adminSupabase
+        const { data, error } = await result.access.adminSupabase
           .from('staff')
           .select('employee_code, full_name, email, phone, company_name, status, created_at')
           .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Staff report query error:', error)
+          return NextResponse.json({ error: 'Unable to generate the staff report.' }, { status: 500 })
+        }
 
         const csv = toCsv(
           ['employee_code', 'full_name', 'email', 'phone', 'company_name', 'status', 'created_at'],
@@ -53,12 +58,17 @@ export async function GET(request: Request) {
 
       if (type === 'expired-documents') {
         const today = new Date().toISOString().slice(0, 10)
-        const { data } = await result.access.adminSupabase
+        const { data, error } = await result.access.adminSupabase
           .from('staff_documents')
           .select('expiry_date, status, document_number, custom_document_name, staff(full_name, employee_code)')
           .eq('organization_id', organizationId)
           .lt('expiry_date', today)
           .order('expiry_date', { ascending: true })
+
+        if (error) {
+          console.error('Expired documents report query error:', error)
+          return NextResponse.json({ error: 'Unable to generate the expired documents report.' }, { status: 500 })
+        }
 
         const rows = (data || []).map((row) => {
           const staff = Array.isArray(row.staff) ? row.staff[0] : row.staff
@@ -82,11 +92,13 @@ export async function GET(request: Request) {
           },
         })
       }
+
+      return NextResponse.json({ error: 'Unsupported CSV report type.' }, { status: 400 })
     }
 
     const usage = await getOrganizationPlanUsage(result.access.adminSupabase, organizationId)
     const today = new Date().toISOString().slice(0, 10)
-    const [{ count: expiredDocuments }, { count: revokedIds }, { count: activeStaff }] =
+    const [expiredResult, revokedResult, activeResult] =
       await Promise.all([
         result.access.adminSupabase
           .from('staff_documents')
@@ -105,12 +117,24 @@ export async function GET(request: Request) {
           .eq('status', 'active'),
       ])
 
+    const metricsError = expiredResult.error || revokedResult.error || activeResult.error
+    if (metricsError) {
+      console.error('Report metrics query error:', metricsError)
+      return NextResponse.json({ error: 'Unable to load report metrics.' }, { status: 500 })
+    }
+
+    const canExportAudit = await hasPermission(result.access, 'view_audit')
+
     return NextResponse.json({
       usage,
       metrics: {
-        activeStaff: activeStaff || 0,
-        expiredDocuments: expiredDocuments || 0,
-        revokedIds: revokedIds || 0,
+        activeStaff: activeResult.count || 0,
+        expiredDocuments: expiredResult.count || 0,
+        revokedIds: revokedResult.count || 0,
+      },
+      capabilities: {
+        canExportAudit,
+        canExportBackup: ADMIN_ROLES.includes(result.access.profile.role),
       },
     })
   } catch (error) {
