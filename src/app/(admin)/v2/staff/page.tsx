@@ -220,7 +220,16 @@ function StaffMobileCard({ member, currentId }: { member: StaffRow; currentId: S
 }
 
 function StaffIdentity({ member }: { member: StaffRow }) {
-  return <div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--dx-canvas)]">{member.photo_url ? <Image src={member.photo_url} alt="" width={44} height={44} className="h-full w-full object-cover" /> : <span className="text-sm font-black text-[var(--dx-muted-strong)]">{member.full_name.charAt(0).toUpperCase()}</span>}</div><div className="min-w-0"><Link href={`/v2/staff/${member.id}`} className="block truncate text-sm font-black text-[var(--dx-ink)] hover:underline">{member.full_name}</Link><p className="mt-1 truncate font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--dx-muted)]">{member.employee_code}</p></div></div>
+  return <div className="flex min-w-0 items-center gap-3"><StaffAvatar name={member.full_name} photoUrl={member.photo_url} /><div className="min-w-0"><Link href={`/v2/staff/${member.id}`} className="block truncate text-sm font-black text-[var(--dx-ink)] hover:underline">{member.full_name}</Link><p className="mt-1 truncate font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--dx-muted)]">{member.employee_code}</p></div></div>
+}
+
+function StaffAvatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const initials = name.trim().split(/\s+/).map((part) => part.charAt(0)).slice(0, 2).join('').toUpperCase() || '?'
+
+  return <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--dx-canvas)]">
+    {photoUrl && !imageFailed ? <Image src={photoUrl} alt={`${name}'s profile photo`} width={44} height={44} unoptimized onError={() => setImageFailed(true)} className="h-full w-full object-cover" /> : <span aria-label={`${name}'s initials`} className="text-sm font-black text-[var(--dx-muted-strong)]">{initials}</span>}
+  </div>
 }
 
 function StaffStatus({ status }: { status: string }) {
