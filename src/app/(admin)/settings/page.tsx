@@ -2,7 +2,6 @@
 
 import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import NextImage from 'next/image'
 import {
   BadgeCheck,
   Building2,
@@ -66,6 +65,15 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48)
+}
+
+function safeAssetUrl(value: string) {
+  try {
+    const url = new URL(value.trim())
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null
+  } catch {
+    return null
+  }
 }
 
 export default function OrganizationSettingsPage() {
@@ -160,6 +168,7 @@ export default function OrganizationSettingsPage() {
     '--settings-accent': '#17202a',
     '--settings-surface': '#f7f8fa',
   } as CSSProperties
+  const safeBackgroundImageUrl = safeAssetUrl(form.background_image_url)
 
   const handleNameChange = (value: string) => {
     setForm((prev) => ({
@@ -518,6 +527,8 @@ export default function OrganizationSettingsPage() {
                 label="Logo"
                 value={form.logo_url}
                 accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                guidance="Recommended: 800 × 240 px, PNG or SVG, transparent background, up to 8 MB."
+                previewStyle="logo"
                 uploading={uploadingField === 'logo_url'}
                 onUpload={(file) => handleBrandAssetUpload('logo_url', file)}
                 onUrlChange={(value) =>
@@ -529,6 +540,8 @@ export default function OrganizationSettingsPage() {
                 label="Favicon"
                 value={form.favicon_url}
                 accept="image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon"
+                guidance="Recommended: 512 × 512 px PNG (or ICO). Use a simple mark that remains clear at 16 px."
+                previewStyle="favicon"
                 uploading={uploadingField === 'favicon_url'}
                 onUpload={(file) => handleBrandAssetUpload('favicon_url', file)}
                 onUrlChange={(value) =>
@@ -540,6 +553,8 @@ export default function OrganizationSettingsPage() {
                 label="Background"
                 value={form.background_image_url}
                 accept="image/png,image/jpeg,image/webp"
+                guidance="Recommended: 1920 × 1080 px JPG or WebP, landscape orientation, up to 8 MB."
+                previewStyle="background"
                 uploading={uploadingField === 'background_image_url'}
                 onUpload={(file) =>
                   handleBrandAssetUpload('background_image_url', file)
@@ -584,9 +599,9 @@ export default function OrganizationSettingsPage() {
             <div
               className="bg-[var(--settings-accent)] bg-cover bg-center p-6 text-white"
               style={
-                form.background_image_url
+                safeBackgroundImageUrl
                   ? {
-                      backgroundImage: `linear-gradient(rgba(15,23,42,0.62), rgba(15,23,42,0.62)), url(${form.background_image_url})`,
+                      backgroundImage: `linear-gradient(rgba(15,23,42,0.62), rgba(15,23,42,0.62)), url("${safeBackgroundImageUrl}")`,
                     }
                   : undefined
               }
@@ -600,18 +615,7 @@ export default function OrganizationSettingsPage() {
                   <p className="mt-2 text-sm text-white/70">/{form.slug || 'workspace'}</p>
                 </div>
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/10">
-                  {form.logo_url ? (
-                    <NextImage
-                      unoptimized
-                      src={form.logo_url}
-                      alt=""
-                      width={56}
-                      height={56}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <BadgeCheck className="h-6 w-6 text-white/70" />
-                  )}
+                  <SafeAssetImage src={form.logo_url} alt={`${form.name || 'Organization'} logo`} className="h-full w-full object-contain p-1" fallback={<BadgeCheck className="h-6 w-6 text-white/70" />} />
                 </div>
               </div>
             </div>
@@ -642,18 +646,7 @@ export default function OrganizationSettingsPage() {
                     </p>
                   </div>
                   <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
-                    {form.favicon_url ? (
-                      <NextImage
-                        unoptimized
-                        src={form.favicon_url}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon className="h-5 w-5 text-slate-400" />
-                    )}
+                    <SafeAssetImage src={form.favicon_url} alt="Workspace favicon" className="h-full w-full object-contain p-1" fallback={<ImageIcon className="h-5 w-5 text-slate-400" />} />
                   </div>
                 </div>
 
@@ -742,6 +735,8 @@ function AssetField({
   onUpload,
   onUrlChange,
   placeholder,
+  guidance,
+  previewStyle,
 }: {
   label: string
   value: string
@@ -750,29 +745,38 @@ function AssetField({
   onUpload: (file: File | null) => void
   onUrlChange: (value: string) => void
   placeholder: string
+  guidance: string
+  previewStyle: 'logo' | 'favicon' | 'background'
 }) {
+  const validUrl = safeAssetUrl(value)
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-        <TextField
-          label={`${label} URL`}
-          value={value}
-          onChange={onUrlChange}
-          placeholder={placeholder}
-          className="flex-1"
-        />
-        <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800">
-          <UploadCloud className="h-4 w-4" />
-          {uploading ? 'Uploading...' : 'Upload'}
-          <input
-            type="file"
-            accept={accept}
-            disabled={uploading}
-            onChange={(event) => onUpload(event.target.files?.[0] ?? null)}
-            className="sr-only"
+      <div className="grid gap-4 lg:grid-cols-[1fr_168px]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <TextField
+            label={`${label} URL`}
+            value={value}
+            onChange={onUrlChange}
+            placeholder={placeholder}
+            className="flex-1"
           />
-        </label>
+          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800">
+            <UploadCloud className="h-4 w-4" />
+            {uploading ? 'Uploading...' : 'Upload'}
+            <input
+              type="file"
+              accept={accept}
+              disabled={uploading}
+              onChange={(event) => onUpload(event.target.files?.[0] ?? null)}
+              className="sr-only"
+            />
+          </label>
+        </div>
+        <AssetPreview label={label} src={value} style={previewStyle} />
       </div>
+      <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">{guidance}</p>
+      {value && !validUrl ? <p role="alert" className="mt-2 text-xs font-bold text-amber-700">Enter a complete http:// or https:// image URL, or upload a file.</p> : null}
       {value ? (
         <p className="mt-3 truncate text-xs font-semibold text-slate-500">
           Current file: {value}
@@ -780,6 +784,26 @@ function AssetField({
       ) : null}
     </div>
   )
+}
+
+function AssetPreview({ label, src, style }: { label: string; src: string; style: 'logo' | 'favicon' | 'background' }) {
+  const frameClass = style === 'background' ? 'h-24' : style === 'favicon' ? 'h-20 w-20' : 'h-20'
+  const fitClass = style === 'background' ? 'object-cover' : 'object-contain p-2'
+
+  return <div className={`relative flex ${frameClass} items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white`}>
+    <SafeAssetImage src={src} alt={`${label} preview`} className={`h-full w-full ${fitClass}`} fallback={<span className="text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{label}<br />preview</span>} />
+  </div>
+}
+
+function SafeAssetImage({ src, alt, className, fallback }: { src: string; alt: string; className: string; fallback: React.ReactNode }) {
+  const [failedSource, setFailedSource] = useState<string | null>(null)
+  const safeSrc = safeAssetUrl(src)
+  const failed = failedSource === src
+
+  if (!safeSrc || failed) return <>{fallback}</>
+  // This intentionally uses a native image so a user-entered URL cannot invoke the Next image optimizer while it is incomplete or untrusted.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={safeSrc} alt={alt} className={className} onError={() => setFailedSource(src)} />
 }
 
 function PreviewMetric({ label, value }: { label: string; value: string }) {
