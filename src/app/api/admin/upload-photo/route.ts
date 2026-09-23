@@ -37,6 +37,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Only administrators can upload branding assets.' }, { status: 403 })
     }
 
+    const bucket = category === 'branding' ? 'brand-assets' : 'guard-photos'
+
     if (file.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json({ error: 'File is larger than 8MB.' }, { status: 400 })
     }
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
     )
 
     const { data, error } = await supabase.storage
-      .from('guard-photos')
+      .from(bucket)
       .upload(storagePath, file, {
         contentType: file.type,
       })
@@ -62,14 +64,14 @@ export async function POST(req: Request) {
     }
 
     const { data: publicUrl } = supabase.storage
-      .from('guard-photos')
+      .from(bucket)
       .getPublicUrl(data.path)
 
     await supabase.from('file_assets').upsert(
       {
         organization_id: profile.organization_id,
         uploaded_by: profile.id,
-        bucket: 'guard-photos',
+        bucket,
         path: data.path,
         public_url: publicUrl.publicUrl,
         content_type: file.type || null,
