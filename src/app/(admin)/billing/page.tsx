@@ -238,8 +238,11 @@ export default function BillingPage() {
             const isEnterprise = plan.key === 'enterprise'
             const usesPortal = hasSubscription && !isEnterprise && !isFree
             const isLocalFree = isCurrent && isFree && !hasSubscription
+            const isCurrentPaidSubscription = isCurrent && !isFree && !isEnterprise && hasSubscription
             const actionLabel = isLocalFree
               ? 'Current plan · No expiry'
+              : isCurrentPaidSubscription
+              ? 'Cancel subscription'
               : isCurrent
               ? 'Current subscription'
               : isEnterprise
@@ -249,7 +252,11 @@ export default function BillingPage() {
                   : usesPortal
                   ? `Change to ${plan.name}`
                   : `Start ${plan.name} — GBP ${plan.monthlyPrice}/mo`
-            const action = isFree && hasSubscription ? cancelSubscription : usesPortal ? openPortal : () => startCheckout(plan.key)
+            const action = (isFree && (hasSubscription || data.plan.key !== 'free')) || isCurrentPaidSubscription
+              ? cancelSubscription
+              : usesPortal
+                ? openPortal
+                : () => startCheckout(plan.key)
 
             return (
             <div
@@ -280,9 +287,11 @@ export default function BillingPage() {
               ) : (
                 <button
                   onClick={action}
-                  disabled={isCurrent || actionLoading === plan.key || (isFree && actionLoading === 'cancel') || (usesPortal && actionLoading === 'portal')}
+                  disabled={isLocalFree || (isCurrent && !isCurrentPaidSubscription) || actionLoading === plan.key || ((isFree || isCurrentPaidSubscription) && actionLoading === 'cancel') || (usesPortal && !isCurrentPaidSubscription && actionLoading === 'portal')}
                   className={`mt-4 w-full rounded-xl px-3 py-2 text-xs font-black ${
-                    isCurrent
+                    isCurrentPaidSubscription
+                      ? 'bg-red-600 text-white hover:bg-red-500'
+                      : isCurrent
                       ? 'bg-white/15 text-current'
                       : 'bg-slate-950 text-white'
                   } disabled:opacity-60`}
