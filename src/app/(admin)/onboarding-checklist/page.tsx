@@ -14,7 +14,7 @@ const LINKS: Record<string, string> = {
   brand: '/settings',
   favicon: '/settings',
   background: '/settings',
-  package: '/settings',
+  package: '/billing',
   users: '/users/invite',
   staff: '/v2/staff/new',
   digital_id: '/v2/staff',

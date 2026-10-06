@@ -9,7 +9,11 @@ npm run check:env
 npm run check:env:production
 ```
 
-The production check deliberately fails when Supabase, custom-domain, cron, or error-tracking configuration is absent. Resend variables are required when `EMAIL_PROVIDER=resend`; billing credentials are required when a non-manual billing provider is selected. Secrets must never be committed.
+The production check deliberately fails when Supabase, Stripe, custom-domain, cron, or error-tracking configuration is absent. Resend variables are required when `EMAIL_PROVIDER=resend`. Secrets must never be committed.
+
+### Stripe subscriptions
+
+Create recurring GBP prices in Stripe for Free (£0), Starter, Growth, and Scale, then copy their `price_...` IDs into the matching variables in `.env.local`. Stripe Checkout creates automatically renewing subscriptions. Every workspace starts with the Free subscription once, then uses the Stripe Customer Portal for upgrades, downgrades, and cancellation. Register `/api/billing/webhook` as a Stripe webhook endpoint and subscribe it to `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted`. Put the endpoint signing secret in `STRIPE_WEBHOOK_SECRET`, enable subscription updates and cancellation in the Stripe Customer Portal, and set `NEXT_PUBLIC_APP_URL` to the deployed application origin.
 
 ## Database migrations
 

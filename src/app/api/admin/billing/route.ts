@@ -20,6 +20,7 @@ export async function GET() {
       .from('organization_subscriptions')
       .select('*')
       .eq('organization_id', organizationId)
+      .eq('provider', 'stripe')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()

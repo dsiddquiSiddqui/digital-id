@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BadgeDollarSign, CheckCircle2, ExternalLink, Users, Shield, HardDrive } from 'lucide-react'
+import { BadgeDollarSign, CalendarClock, CheckCircle2, ExternalLink, RefreshCw, Users, Shield, HardDrive } from 'lucide-react'
 import { BILLING_PLANS, formatPlanLimit } from '@/lib/billing-plans'
 
 type BillingData = {
@@ -11,7 +11,7 @@ type BillingData = {
   limits: { users: number | null; staff: number | null; storageMb: number }
   percentages: { users: number; staff: number; storage: number }
   isOverLimit: { users: boolean; staff: boolean }
-  subscription: { status: string; current_period_end: string | null } | null
+  subscription: { status: string; current_period_end: string | null; cancel_at_period_end: boolean } | null
 }
 
 export default function BillingPage() {
@@ -45,32 +45,43 @@ export default function BillingPage() {
     setActionLoading(plan)
     setError('')
     setMessage('')
-    const response = await fetch('/api/admin/billing/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan }),
-    })
-    const result = await response.json()
-    if (!response.ok) setError(result.error || 'Unable to start checkout.')
-    else if (result.checkout_url) window.location.href = result.checkout_url
-    else setMessage(result.message || 'Billing provider setup is required.')
-    setActionLoading('')
+    try {
+      const response = await fetch('/api/admin/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      const result = await response.json()
+      if (!response.ok) setError(result.error || 'Unable to start checkout.')
+      else if (result.checkout_url) window.location.href = result.checkout_url
+      else setMessage(result.message || 'Billing provider setup is required.')
+    } catch {
+      setError('Unable to connect to checkout. Please try again.')
+    } finally {
+      setActionLoading('')
+    }
   }
 
   const openPortal = async () => {
     setActionLoading('portal')
     setError('')
     setMessage('')
-    const response = await fetch('/api/admin/billing/portal', { method: 'POST' })
-    const result = await response.json()
-    if (!response.ok) setError(result.error || 'Unable to open billing portal.')
-    else if (result.portal_url) window.location.href = result.portal_url
-    else setMessage(result.message || 'Payment portal setup is required.')
-    setActionLoading('')
+    try {
+      const response = await fetch('/api/admin/billing/portal', { method: 'POST' })
+      const result = await response.json()
+      if (!response.ok) setError(result.error || 'Unable to open billing portal.')
+      else if (result.portal_url) window.location.href = result.portal_url
+      else setMessage(result.message || 'Payment portal setup is required.')
+    } catch {
+      setError('Unable to connect to the billing portal. Please try again.')
+    } finally {
+      setActionLoading('')
+    }
   }
 
+  const hasSubscription = Boolean(data?.subscription && !['cancelled', 'incomplete_expired'].includes(data.subscription.status))
+
   if (loading) return <Panel>Loading billing...</Panel>
-  if (error) return <Panel tone="danger">{error}</Panel>
   if (!data) return null
 
   return (
@@ -85,8 +96,8 @@ export default function BillingPage() {
               {data.plan.name} package
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Monitor package usage before users or staff records hit the limit.
-              Admins can change the package from organization settings.
+              Review usage and manage your subscription from one place. Existing
+              subscribers can upgrade or downgrade securely in Stripe.
             </p>
           </div>
           <div className="rounded-2xl bg-slate-950 px-5 py-4 text-white">
@@ -97,15 +108,24 @@ export default function BillingPage() {
               {data.plan.monthlyPrice === null ? 'Custom' : `GBP ${data.plan.monthlyPrice}`}
             </p>
             <button
-              onClick={openPortal}
-              disabled={actionLoading === 'portal'}
+              onClick={hasSubscription ? openPortal : () => startCheckout(data.plan.key)}
+              disabled={data.plan.key === 'enterprise' || actionLoading === 'portal' || actionLoading === data.plan.key}
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-60"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Manage
+              {hasSubscription ? 'Manage subscription' : data.plan.key === 'free' ? 'Start Free subscription' : 'Start subscription'}
             </button>
           </div>
         </div>
+        {data.subscription?.current_period_end ? (
+          <div className={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 ${data.subscription.cancel_at_period_end ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+            {data.subscription.cancel_at_period_end ? <CalendarClock className="mt-0.5 h-5 w-5 shrink-0" /> : <RefreshCw className="mt-0.5 h-5 w-5 shrink-0" />}
+            <div>
+              <p className="text-sm font-black">{data.subscription.cancel_at_period_end ? `Subscription ends ${formatSubscriptionDate(data.subscription.current_period_end)}` : `Auto-renews ${formatSubscriptionDate(data.subscription.current_period_end)}`}</p>
+              <p className="mt-1 text-sm leading-5 opacity-75">{data.subscription.cancel_at_period_end ? 'Access remains active until then. You can resume it in the Stripe billing portal.' : 'Your payment method will be charged automatically on this date unless you change or cancel the subscription.'}</p>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -115,6 +135,7 @@ export default function BillingPage() {
       </div>
 
       {message ? <Panel tone="success">{message}</Panel> : null}
+      {error ? <Panel tone="danger">{error}</Panel> : null}
 
       <section className="grid gap-4 lg:grid-cols-3">
         <UsageBar
@@ -146,19 +167,39 @@ export default function BillingPage() {
           <BadgeDollarSign className="h-5 w-5 text-slate-500" />
           <h2 className="text-lg font-black text-slate-950">Packages</h2>
         </div>
+        <p className="-mt-2 mb-5 text-sm leading-6 text-slate-500">
+          Changes to an active subscription—including downgrading to Free—open the Stripe billing portal.
+        </p>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {BILLING_PLANS.map((plan) => (
+          {BILLING_PLANS.map((plan) => {
+            const isCurrent = plan.key === data.plan.key
+            const isFree = plan.key === 'free'
+            const isEnterprise = plan.key === 'enterprise'
+            const usesPortal = hasSubscription && !isEnterprise
+            const isUnsubscribedFree = isCurrent && isFree && !hasSubscription
+            const actionLabel = isUnsubscribedFree
+              ? 'Start Free subscription'
+              : isCurrent
+              ? 'Current subscription'
+              : isEnterprise
+                ? 'Contact sales'
+                : usesPortal
+                  ? isFree ? 'Downgrade in portal' : 'Change in portal'
+                  : 'Start subscription'
+            const action = usesPortal ? openPortal : () => startCheckout(plan.key)
+
+            return (
             <div
               key={plan.key}
               className={`rounded-2xl border p-4 ${
-                plan.key === data.plan.key
+                isCurrent
                   ? 'border-slate-950 bg-slate-950 text-white'
                   : 'border-slate-200 bg-slate-50 text-slate-950'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-black">{plan.name}</h3>
-                {plan.key === data.plan.key ? <CheckCircle2 className="h-4 w-4" /> : null}
+                {isCurrent ? <CheckCircle2 className="h-4 w-4" /> : null}
               </div>
               <p className="mt-2 text-sm opacity-70">{plan.description}</p>
               <p className="mt-4 text-xs font-bold opacity-70">
@@ -167,18 +208,19 @@ export default function BillingPage() {
                 {formatPlanLimit(plan.staffLimit, 'staff')}
               </p>
               <button
-                onClick={() => startCheckout(plan.key)}
-                disabled={actionLoading === plan.key || plan.key === data.plan.key}
+                onClick={action}
+                disabled={(!isUnsubscribedFree && isCurrent) || isEnterprise || actionLoading === plan.key || (usesPortal && actionLoading === 'portal')}
                 className={`mt-4 w-full rounded-xl px-3 py-2 text-xs font-black ${
-                  plan.key === data.plan.key
+                  isCurrent
                     ? 'bg-white/15 text-current'
                     : 'bg-slate-950 text-white'
                 } disabled:opacity-60`}
               >
-                {plan.key === data.plan.key ? 'Current' : 'Select'}
+                {actionLabel}
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
       </section>
     </div>
@@ -197,6 +239,12 @@ function Panel({ children, tone = 'default' }: { children: React.ReactNode; tone
       {children}
     </div>
   )
+}
+
+function formatSubscriptionDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'on the next billing date'
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
 }
 
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {

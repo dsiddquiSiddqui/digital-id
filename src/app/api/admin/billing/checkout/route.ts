@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { ADMIN_ROLES, requireAdminAccess } from '@/lib/admin-auth'
 import { writeAuditLog } from '@/lib/audit'
 import { isBillingPlanKey } from '@/lib/billing-plans'
+import { getStripe, getStripePriceId } from '@/lib/stripe'
+
+export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
   try {
@@ -13,38 +16,59 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const plan = typeof body.plan === 'string' && isBillingPlanKey(body.plan) ? body.plan : ''
-    const provider = process.env.BILLING_PROVIDER || 'manual'
-
     if (!plan) {
       return NextResponse.json({ error: 'Choose a valid package.' }, { status: 400 })
     }
 
-    if (provider === 'manual' || !process.env.BILLING_CHECKOUT_URL) {
-      await result.access.adminSupabase.from('billing_events').insert({
-        organization_id: result.access.profile.organization_id,
-        provider: 'manual',
-        event_type: 'checkout_requested',
-        status: 'setup_required',
-        payload: { plan },
-      })
-
-      await writeAuditLog({
-        access: result.access,
-        action: 'billing_checkout_requested',
-        entityType: 'organization',
-        entityId: result.access.profile.organization_id,
-        module: 'Billing',
-        page: '/billing',
-        metadata: { plan, provider: 'manual' },
-      })
-
-      return NextResponse.json({
-        setup_required: true,
-        message: 'Billing provider is not configured. Add Stripe/Paddle checkout integration credentials.',
-      })
+    if (plan === 'enterprise') {
+      return NextResponse.json(
+        { error: 'Contact sales for an Enterprise package.' },
+        { status: 400 }
+      )
     }
 
-    const checkoutUrl = `${process.env.BILLING_CHECKOUT_URL}?org=${result.access.profile.organization_id}&plan=${plan}`
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: 'Stripe is not configured yet. Add the Stripe keys and recurring Price IDs to the application environment.' },
+        { status: 503 }
+      )
+    }
+
+    const priceId = getStripePriceId(plan)
+    if (!priceId) {
+      return NextResponse.json({ error: `Stripe price for ${plan} is not configured.` }, { status: 503 })
+    }
+
+    const organizationId = result.access.profile.organization_id!
+    const { data: organization } = await result.access.adminSupabase
+      .from('organizations')
+      .select('name')
+      .eq('id', organizationId)
+      .single()
+    const { data: subscription } = await result.access.adminSupabase
+      .from('organization_subscriptions')
+      .select('provider_customer_id')
+      .eq('organization_id', organizationId)
+      .eq('provider', 'stripe')
+      .not('provider_customer_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin).replace(/\/$/, '')
+    const stripe = getStripe()
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${appUrl}/billing?checkout=success`,
+      cancel_url: `${appUrl}/billing?checkout=cancelled`,
+      client_reference_id: organizationId,
+      ...(subscription?.provider_customer_id
+        ? { customer: subscription.provider_customer_id }
+        : { customer_email: result.access.user.email || undefined }),
+      metadata: { organization_id: organizationId, plan },
+      subscription_data: { metadata: { organization_id: organizationId, plan } },
+    })
 
     await writeAuditLog({
       access: result.access,
@@ -53,10 +77,10 @@ export async function POST(request: Request) {
       entityId: result.access.profile.organization_id,
       module: 'Billing',
       page: '/billing',
-      metadata: { plan, provider },
+      metadata: { plan, provider: 'stripe', organization_name: organization?.name },
     })
 
-    return NextResponse.json({ checkout_url: checkoutUrl })
+    return NextResponse.json({ checkout_url: session.url })
   } catch (error) {
     console.error('Checkout start error:', error)
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 })

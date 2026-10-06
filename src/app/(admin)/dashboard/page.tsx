@@ -8,7 +8,9 @@ import {
   Shield,
   IdCard,
   Bell,
+  CalendarClock,
   FileText,
+  ListTodo,
   Plus,
   CheckCircle2,
 } from 'lucide-react'
@@ -49,6 +51,13 @@ type Stats = {
   alerts: number
 }
 
+type OperationalData = {
+  expiring_documents: Array<{ id: string; expiry_date: string }>
+  pending_renewals: number
+  unread_notifications: number
+  open_tasks: number
+}
+
 export default function DashboardPage() {
   const supabase = createClient()
 
@@ -59,6 +68,12 @@ export default function DashboardPage() {
     staff: 0,
     ids: 0,
     alerts: 0,
+  })
+  const [operations, setOperations] = useState<OperationalData>({
+    expiring_documents: [],
+    pending_renewals: 0,
+    unread_notifications: 0,
+    open_tasks: 0,
   })
 
   useEffect(() => {
@@ -127,11 +142,12 @@ export default function DashboardPage() {
                 .select('*', { count: 'exact', head: true })
           : Promise.resolve({ count: 0 })
 
-        const [u, s, i, a] = await Promise.all([
+        const [u, s, i, a, operationsResponse] = await Promise.all([
           usersQuery,
           staffQuery,
           idsQuery,
           alertsQuery,
+          fetch('/api/admin/dashboard/operations'),
         ])
 
         setStats({
@@ -140,6 +156,7 @@ export default function DashboardPage() {
           ids: i?.count || 0,
           alerts: a?.count || 0,
         })
+        if (operationsResponse.ok) setOperations(await operationsResponse.json())
       } catch (error) {
         console.error('Dashboard load error:', error)
       } finally {
@@ -341,6 +358,12 @@ export default function DashboardPage() {
 
   const firstName = profile?.full_name?.trim().split(/\s+/)[0] || 'there'
   const identityCoverage = stats.staff > 0 ? Math.min(100, Math.round((stats.ids / stats.staff) * 100)) : 0
+  const workItems = [
+    { label: 'Expiring in 30 days', value: operations.expiring_documents.length, href: '/expiry-alerts', icon: CalendarClock },
+    { label: 'Renewals to review', value: operations.pending_renewals, href: '/document-renewals', icon: FileText },
+    { label: 'Unread updates', value: operations.unread_notifications, href: '/notifications', icon: Bell },
+    { label: 'Open admin tasks', value: operations.open_tasks, href: '/onboarding-checklist', icon: ListTodo },
+  ].filter((item) => item.value > 0)
 
   return (
     <div className="dx-page space-y-5 pb-8">
@@ -432,6 +455,25 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : null}
+
+          <Surface className="p-5 sm:p-6">
+            <SectionHeading title="Needs attention" description="The next few workspace tasks worth resolving." />
+            {workItems.length ? (
+              <div className="mt-4 divide-y divide-[var(--dx-line)] rounded-2xl border border-[var(--dx-line)]">
+                {workItems.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <Link key={item.label} href={item.href} className="flex items-center justify-between gap-4 px-4 py-3.5 transition hover:bg-[var(--dx-surface-muted)]">
+                      <span className="flex items-center gap-3 text-sm font-bold text-[var(--dx-ink)]"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--dx-signal-soft)] text-[var(--dx-success)]"><Icon className="h-4 w-4" /></span>{item.label}</span>
+                      <span className="flex items-center gap-2 text-sm font-black text-[var(--dx-ink)]">{item.value}<ArrowRight className="h-4 w-4" /></span>
+                    </Link>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="mt-4 rounded-2xl bg-[var(--dx-surface-muted)] px-4 py-5 text-sm leading-6 text-[var(--dx-muted)]">Everything is clear right now. New security, document, and workspace updates will appear here.</p>
+            )}
+          </Surface>
         </div>
 
         <div className="space-y-5">

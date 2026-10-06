@@ -1,33 +1,29 @@
 'use client'
 
 import type { CSSProperties } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BadgeCheck,
   Building2,
+  ChevronRight,
   ExternalLink,
+  Globe2,
   Image as ImageIcon,
-  BadgeDollarSign,
+  LifeBuoy,
+  Palette,
   RotateCcw,
   Save,
-  Settings,
+  Sparkles,
   UploadCloud,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { type ThemeKey } from '@/lib/saas-themes'
-import {
-  BILLING_PLANS,
-  formatPlanLimit,
-  getBillingPlan,
-  type BillingPlanKey,
-} from '@/lib/billing-plans'
+import { ORGANIZATION_THEMES, type ThemeKey } from '@/lib/saas-themes'
 
 type Organization = {
   id: string
   name: string
   slug: string
   status: string
-  plan: BillingPlanKey
   logo_url: string | null
   favicon_url: string | null
   background_image_url: string | null
@@ -81,7 +77,6 @@ export default function OrganizationSettingsPage() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [savingPlan, setSavingPlan] = useState(false)
   const [allowed, setAllowed] = useState(false)
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [message, setMessage] = useState('')
@@ -91,7 +86,6 @@ export default function OrganizationSettingsPage() {
   const [form, setForm] = useState({
     name: '',
     slug: '',
-    plan: 'free' as BillingPlanKey,
     logo_url: '',
     favicon_url: '',
     background_image_url: '',
@@ -122,7 +116,7 @@ export default function OrganizationSettingsPage() {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(
-          'id, role, organization_id, organizations:organizations(id, name, slug, status, plan, logo_url, favicon_url, background_image_url, support_email, support_phone, verification_title, theme_key, primary_color, accent_color, surface_color)'
+          'id, role, organization_id, organizations:organizations(id, name, slug, status, logo_url, favicon_url, background_image_url, support_email, support_phone, verification_title, theme_key, primary_color, accent_color, surface_color)'
         )
         .eq('auth_user_id', user.id)
         .single<Profile>()
@@ -143,7 +137,6 @@ export default function OrganizationSettingsPage() {
         setForm({
           name: org.name || '',
           slug: org.slug || '',
-          plan: org.plan || 'free',
           logo_url: org.logo_url || '',
           favicon_url: org.favicon_url || '',
           background_image_url: org.background_image_url || '',
@@ -164,9 +157,9 @@ export default function OrganizationSettingsPage() {
   }, [supabase])
 
   const previewStyle = {
-    '--settings-primary': '#17834b',
-    '--settings-accent': '#17202a',
-    '--settings-surface': '#f7f8fa',
+    '--settings-primary': form.primary_color,
+    '--settings-accent': form.accent_color,
+    '--settings-surface': form.surface_color,
   } as CSSProperties
   const safeBackgroundImageUrl = safeAssetUrl(form.background_image_url)
 
@@ -181,6 +174,18 @@ export default function OrganizationSettingsPage() {
     }))
   }
 
+  const applyTheme = (themeKey: ThemeKey) => {
+    const theme = ORGANIZATION_THEMES.find((candidate) => candidate.key === themeKey)
+    if (!theme) return
+    setForm((prev) => ({
+      ...prev,
+      theme_key: theme.key,
+      primary_color: theme.primaryColor,
+      accent_color: theme.accentColor,
+      surface_color: theme.surfaceColor,
+    }))
+  }
+
   const resetToSaved = () => {
     if (!organization) return
 
@@ -189,7 +194,6 @@ export default function OrganizationSettingsPage() {
     setForm({
       name: organization.name || '',
       slug: organization.slug || '',
-      plan: organization.plan || 'free',
       logo_url: organization.logo_url || '',
       favicon_url: organization.favicon_url || '',
       background_image_url: organization.background_image_url || '',
@@ -201,37 +205,6 @@ export default function OrganizationSettingsPage() {
       accent_color: organization.accent_color || '#10b981',
       surface_color: organization.surface_color || '#f8fafc',
     })
-  }
-
-  const selectedPlan = useMemo(() => getBillingPlan(form.plan), [form.plan])
-
-  const handlePlanChange = async (plan: BillingPlanKey) => {
-    setSavingPlan(true)
-    setMessage('')
-    setError('')
-
-    try {
-      const response = await fetch('/api/admin/organization-plan', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        setError(result.error || 'Unable to update package.')
-        return
-      }
-
-      setOrganization(result.organization)
-      setForm((prev) => ({ ...prev, plan: result.organization.plan }))
-      setMessage(`Package changed to ${getBillingPlan(plan).name}.`)
-    } catch {
-      setError('Something went wrong while updating the package.')
-    } finally {
-      setSavingPlan(false)
-    }
   }
 
   const handleBrandAssetUpload = async (
@@ -331,198 +304,53 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-slate-100 p-3">
-              <Settings className="h-5 w-5 text-slate-700" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-950">
-                Organization Settings
-              </h1>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-                Manage workspace identity, URL slug, and the theme used across
-                the admin dashboard, staff portal, and verification screens.
-              </p>
-            </div>
+    <div className="mx-auto max-w-7xl pb-12">
+      <section className="relative overflow-hidden rounded-[2rem] bg-[#12251f] px-6 py-8 text-white shadow-2xl shadow-emerald-950/15 sm:px-8 lg:px-10">
+        <div className="absolute -right-24 -top-28 h-80 w-80 rounded-full border border-emerald-300/20" />
+        <div className="absolute right-16 top-10 h-40 w-40 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-emerald-200/75"><Sparkles className="h-3.5 w-3.5" /> Workspace control</p>
+            <h1 className="mt-4 text-4xl font-black tracking-[-0.04em] sm:text-5xl">Make this workspace<br className="hidden sm:block" /> unmistakably yours.</h1>
+            <p className="mt-4 max-w-xl text-sm leading-6 text-emerald-50/70">Set the public identity your team, staff, and verification visitors experience—then review it live before saving.</p>
           </div>
-
-          {organization ? (
-            <a
-              href={`/login?workspace=${organization.slug}`}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-400"
-            >
-              View login
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          ) : null}
+          {organization ? <a href={`/login?workspace=${organization.slug}`} className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-black transition hover:bg-white hover:text-[#12251f]">Open workspace <ExternalLink className="h-4 w-4" /></a> : null}
         </div>
       </section>
 
-      <form onSubmit={handleSubmit} className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-2xl bg-slate-100 p-3">
-                <Building2 className="h-5 w-5 text-slate-700" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Workspace Details
-                </h2>
-                <p className="text-sm text-slate-500">
-                  These values identify the organization in the app.
-                </p>
-              </div>
-            </div>
+      <form onSubmit={handleSubmit} className="mt-6 grid gap-6 xl:grid-cols-[180px_minmax(0,1fr)_360px]">
+        <nav className="hidden xl:block">
+          <div className="sticky top-6 space-y-1 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+            <p className="px-3 pb-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">In this page</p>
+            <SettingsNav href="#identity" icon={<Building2 className="h-4 w-4" />} label="Identity" />
+            <SettingsNav href="#support" icon={<LifeBuoy className="h-4 w-4" />} label="Verification" />
+            <SettingsNav href="#assets" icon={<ImageIcon className="h-4 w-4" />} label="Brand assets" />
+            <SettingsNav href="#appearance" icon={<Palette className="h-4 w-4" />} label="Appearance" />
+          </div>
+        </nav>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextField
-                label="Organization name"
-                value={form.name}
-                onChange={handleNameChange}
-                placeholder="Acme Security Services"
-                required
-              />
-              <TextField
-                label="Workspace slug"
-                value={form.slug}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, slug: slugify(value) }))
-                }
-                placeholder="acme-security"
-                required
-              />
+        <section className="space-y-5">
+          <div id="identity" className="scroll-mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <SectionHeading eyebrow="01 / Workspace" title="The essentials" description="The name and address that anchor this workspace across Digital ID X." icon={<Building2 className="h-5 w-5" />} />
+            <div className="mt-7 grid gap-5 md:grid-cols-2">
+              <TextField label="Organization name" value={form.name} onChange={handleNameChange} placeholder="Acme Security Services" required />
+              <TextField label="Workspace slug" value={form.slug} onChange={(value) => setForm((prev) => ({ ...prev, slug: slugify(value) }))} placeholder="acme-security" required />
+            </div>
+            <div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500"><Globe2 className="h-4 w-4 text-emerald-700" /><span>Workspace sign-in: <span className="font-black text-slate-800">/login?workspace={form.slug || 'your-workspace'}</span></span></div>
+          </div>
+
+          <div id="support" className="scroll-mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <SectionHeading eyebrow="02 / Public verification" title="Give visitors a clear way to reach you" description="These details appear when someone verifies a staff identity." icon={<BadgeCheck className="h-5 w-5" />} />
+            <div className="mt-7 grid gap-5 md:grid-cols-2">
+              <TextField label="Verification page title" value={form.verification_title} onChange={(value) => setForm((prev) => ({ ...prev, verification_title: value }))} placeholder="Acme Staff Verification" className="md:col-span-2" />
+              <TextField label="Support email" value={form.support_email} onChange={(value) => setForm((prev) => ({ ...prev, support_email: value }))} placeholder="support@example.com" />
+              <TextField label="Support phone" value={form.support_phone} onChange={(value) => setForm((prev) => ({ ...prev, support_phone: value }))} placeholder="+44 20 0000 0000" />
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-2xl bg-slate-100 p-3">
-                <BadgeCheck className="h-5 w-5 text-slate-700" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Verification Support
-                </h2>
-                <p className="text-sm text-slate-500">
-                  These details appear on public staff ID verification pages.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextField
-                label="Verification page title"
-                value={form.verification_title}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, verification_title: value }))
-                }
-                placeholder="Acme Staff Verification"
-                className="md:col-span-2"
-              />
-              <TextField
-                label="Support email"
-                value={form.support_email}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, support_email: value }))
-                }
-                placeholder="support@example.com"
-              />
-              <TextField
-                label="Support phone"
-                value={form.support_phone}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, support_phone: value }))
-                }
-                placeholder="+44 20 0000 0000"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-2xl bg-slate-100 p-3">
-                <BadgeDollarSign className="h-5 w-5 text-slate-700" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Package
-                </h2>
-                <p className="text-sm text-slate-500">
-                  Only organization admins can change the active package.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              {BILLING_PLANS.map((plan) => {
-                const active = form.plan === plan.key
-
-                return (
-                  <button
-                    key={plan.key}
-                    type="button"
-                    disabled={savingPlan || active}
-                    onClick={() => handlePlanChange(plan.key)}
-                    className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
-                      active
-                        ? 'border-slate-950 bg-slate-950 text-white'
-                        : 'border-slate-200 bg-white text-slate-950 hover:border-slate-400'
-                    }`}
-                  >
-                    <span className="text-sm font-black">{plan.name}</span>
-                    <span className="mt-2 block text-2xl font-black">
-                      {plan.monthlyPrice === null ? 'Custom' : `GBP ${plan.monthlyPrice}`}
-                    </span>
-                    <span
-                      className={`mt-2 block text-xs font-semibold leading-5 ${
-                        active ? 'text-white/65' : 'text-slate-500'
-                      }`}
-                    >
-                      {formatPlanLimit(plan.userLimit, 'admin users')}
-                      <br />
-                      {formatPlanLimit(plan.staffLimit, 'staff records')}
-                    </span>
-                    <span
-                      className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-black ${
-                        active
-                          ? 'bg-white text-slate-950'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {active ? 'Current package' : 'Change package'}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
-              Current package: {selectedPlan.name}. Limit enforcement should be
-              added before paid launch so organizations cannot exceed their plan
-              by API or bulk upload.
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-2xl bg-slate-100 p-3">
-                <ImageIcon className="h-5 w-5 text-slate-700" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Brand Assets
-                </h2>
-                <p className="text-sm text-slate-500">
-                  Upload brand files or paste hosted URLs for this workspace.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4">
+          <div id="assets" className="scroll-mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <SectionHeading eyebrow="03 / Brand library" title="The marks people recognise" description="Upload a file or connect a trusted hosted image. The preview updates as you work." icon={<ImageIcon className="h-5 w-5" />} />
+            <div className="mt-7 grid gap-4">
               <AssetField
                 label="Logo"
                 value={form.logo_url}
@@ -534,6 +362,7 @@ export default function OrganizationSettingsPage() {
                 onUrlChange={(value) =>
                   setForm((prev) => ({ ...prev, logo_url: value }))
                 }
+                onRemove={() => setForm((prev) => ({ ...prev, logo_url: '' }))}
                 placeholder="https://example.com/logo.png"
               />
               <AssetField
@@ -547,6 +376,7 @@ export default function OrganizationSettingsPage() {
                 onUrlChange={(value) =>
                   setForm((prev) => ({ ...prev, favicon_url: value }))
                 }
+                onRemove={() => setForm((prev) => ({ ...prev, favicon_url: '' }))}
                 placeholder="https://example.com/favicon.png"
               />
               <AssetField
@@ -562,38 +392,43 @@ export default function OrganizationSettingsPage() {
                 onUrlChange={(value) =>
                   setForm((prev) => ({ ...prev, background_image_url: value }))
                 }
+                onRemove={() => setForm((prev) => ({ ...prev, background_image_url: '' }))}
                 placeholder="https://example.com/background.jpg"
               />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-xl bg-emerald-50 p-3">
-                <BadgeCheck className="h-5 w-5 text-emerald-700" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Product appearance
-                </h2>
-                <p className="text-sm text-slate-500">
-                  A consistent interface keeps every workspace clear and familiar.
-                </p>
-              </div>
+          <div id="appearance" className="scroll-mt-6 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-start justify-between gap-5 bg-[#f2f7f4] p-6 sm:p-8">
+              <SectionHeading eyebrow="04 / Interface" title="Choose the workspace look" description="Pick a foundation, then fine-tune the three colour tokens below. The live preview changes immediately." icon={<Palette className="h-5 w-5" />} />
             </div>
-            <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-              <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full bg-[#17834b] ring-4 ring-white" />
-              <div>
-                <p className="text-sm font-bold text-slate-900">Digital ID X standard</p>
-                <p className="mt-1 text-sm leading-6 text-slate-600">White and slate surfaces with Digital ID X green for primary actions and active states. Your organization logo and favicon remain customizable above.</p>
+            <div className="p-6 sm:p-8">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Foundation palette</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {ORGANIZATION_THEMES.map((theme) => {
+                  const active = form.theme_key === theme.key
+                  return <button key={theme.key} type="button" onClick={() => applyTheme(theme.key)} className={`rounded-2xl border p-4 text-left transition ${active ? 'border-emerald-700 bg-emerald-50 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'}`}>
+                    <span className="flex items-center gap-2"><span className="h-5 w-5 rounded-full" style={{ backgroundColor: theme.primaryColor }} /><span className="h-5 w-5 rounded-full" style={{ backgroundColor: theme.accentColor }} /><span className="h-5 w-5 rounded-full border border-slate-200" style={{ backgroundColor: theme.surfaceColor }} /></span>
+                    <span className="mt-3 block text-sm font-black text-slate-950">{theme.name}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">{theme.description}</span>
+                  </button>
+                })}
+              </div>
+              <div className="mt-7 border-t border-slate-100 pt-6">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Fine tune colours</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <ColorField label="Primary action" value={form.primary_color} onChange={(value) => setForm((prev) => ({ ...prev, primary_color: value }))} />
+                  <ColorField label="Accent / header" value={form.accent_color} onChange={(value) => setForm((prev) => ({ ...prev, accent_color: value }))} />
+                  <ColorField label="Workspace surface" value={form.surface_color} onChange={(value) => setForm((prev) => ({ ...prev, surface_color: value }))} />
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <aside className="space-y-6">
+        <aside className="space-y-5 xl:sticky xl:top-6 xl:self-start">
           <section
-            className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+            className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-lg shadow-slate-200/50"
             style={previewStyle}
           >
             <div
@@ -611,7 +446,7 @@ export default function OrganizationSettingsPage() {
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-white/55">
                     Live Preview
                   </p>
-                  <h2 className="mt-3 text-3xl font-black">{form.name || 'Organization'}</h2>
+                  <h2 className="mt-3 text-3xl font-black tracking-tight">{form.name || 'Organization'}</h2>
                   <p className="mt-2 text-sm text-white/70">/{form.slug || 'workspace'}</p>
                 </div>
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/10">
@@ -660,7 +495,7 @@ export default function OrganizationSettingsPage() {
           </section>
 
           {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {error}
             </div>
           ) : null}
@@ -671,11 +506,11 @@ export default function OrganizationSettingsPage() {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">
+          <div className="rounded-[1.5rem] bg-slate-950 p-3 shadow-xl shadow-slate-950/15">
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3.5 text-sm font-black text-emerald-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
               {saving ? 'Saving...' : 'Save settings'}
@@ -684,7 +519,7 @@ export default function OrganizationSettingsPage() {
               type="button"
               onClick={resetToSaved}
               disabled={saving || !organization}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-black text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RotateCcw className="h-4 w-4" />
               Reset
@@ -693,6 +528,41 @@ export default function OrganizationSettingsPage() {
         </aside>
       </form>
     </div>
+  )
+}
+
+function SettingsNav({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+  return (
+    <a href={href} className="group flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-900">
+      <span className="text-slate-400 transition group-hover:text-emerald-700">{icon}</span>
+      <span>{label}</span>
+      <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+    </a>
+  )
+}
+
+function SectionHeading({ eyebrow, title, description, icon }: { eyebrow: string; title: string; description: string; icon: React.ReactNode }) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">{icon}</div>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">{eyebrow}</p>
+        <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">{title}</h2>
+        <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-500">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <span className="text-xs font-black text-slate-700">{label}</span>
+      <span className="mt-3 flex items-center gap-3 rounded-xl bg-white p-2 shadow-sm">
+        <input aria-label={`${label} colour`} type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-8 w-8 cursor-pointer rounded-md border-0 bg-transparent p-0" />
+        <input value={value} onChange={(event) => onChange(event.target.value)} pattern="^#[0-9a-fA-F]{6}$" className="min-w-0 flex-1 bg-transparent text-sm font-bold uppercase text-slate-700 outline-none" />
+      </span>
+    </label>
   )
 }
 
@@ -734,6 +604,7 @@ function AssetField({
   uploading,
   onUpload,
   onUrlChange,
+  onRemove,
   placeholder,
   guidance,
   previewStyle,
@@ -744,6 +615,7 @@ function AssetField({
   uploading: boolean
   onUpload: (file: File | null) => void
   onUrlChange: (value: string) => void
+  onRemove: () => void
   placeholder: string
   guidance: string
   previewStyle: 'logo' | 'favicon' | 'background'
@@ -751,17 +623,23 @@ function AssetField({
   const validUrl = safeAssetUrl(value)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="grid gap-4 lg:grid-cols-[1fr_168px]">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+      <div className="grid gap-5 lg:grid-cols-[132px_minmax(0,1fr)]">
+        <AssetPreview label={label} src={value} style={previewStyle} />
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><p className="text-sm font-black text-slate-950">{label}</p><p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{guidance}</p></div>
+            {value ? <button type="button" onClick={onRemove} className="text-xs font-black text-slate-500 transition hover:text-red-700">Remove</button> : null}
+          </div>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
           <TextField
-            label={`${label} URL`}
+            label="Hosted image URL"
             value={value}
             onChange={onUrlChange}
             placeholder={placeholder}
             className="flex-1"
           />
-          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800">
+          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 sm:shrink-0">
             <UploadCloud className="h-4 w-4" />
             {uploading ? 'Uploading...' : 'Upload'}
             <input
@@ -773,15 +651,10 @@ function AssetField({
             />
           </label>
         </div>
-        <AssetPreview label={label} src={value} style={previewStyle} />
+        {value && !validUrl ? <p role="alert" className="mt-3 text-xs font-bold text-amber-700">Enter a complete http:// or https:// image URL, or upload a file.</p> : null}
+        {value ? <p className="mt-3 truncate text-xs font-semibold text-slate-500">Connected: {value}</p> : <p className="mt-3 text-xs font-semibold text-slate-400">No file connected yet.</p>}
+        </div>
       </div>
-      <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">{guidance}</p>
-      {value && !validUrl ? <p role="alert" className="mt-2 text-xs font-bold text-amber-700">Enter a complete http:// or https:// image URL, or upload a file.</p> : null}
-      {value ? (
-        <p className="mt-3 truncate text-xs font-semibold text-slate-500">
-          Current file: {value}
-        </p>
-      ) : null}
     </div>
   )
 }

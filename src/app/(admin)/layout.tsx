@@ -25,6 +25,7 @@ import {
   Workflow,
   PanelLeftClose,
   PanelLeftOpen,
+  CreditCard,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import LegalConsentBanner from '@/components/LegalConsentBanner'
@@ -354,7 +355,23 @@ export default function AdminLayout({
                   href: '/settings',
                   label: 'Settings',
                   icon: <Settings className="h-4 w-4" />,
-                  active: pathname.startsWith('/settings'),
+                  active: pathname === '/settings' || pathname === '/settings/permissions',
+                }
+              : null,
+            permissions.canManageSettings
+              ? {
+                  href: '/settings/notifications',
+                  label: 'Notifications',
+                  icon: <Bell className="h-4 w-4" />,
+                  active: pathname === '/settings/notifications',
+                }
+              : null,
+            permissions.canManageSettings
+              ? {
+                  href: '/billing',
+                  label: 'Plans & billing',
+                  icon: <CreditCard className="h-4 w-4" />,
+                  active: pathname.startsWith('/billing'),
                 }
               : null,
             permissions.canManageSettings

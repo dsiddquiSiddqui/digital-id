@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { ADMIN_ROLES, requireAdminAccess } from '@/lib/admin-auth'
+import { getStripe } from '@/lib/stripe'
+
+export const runtime = 'nodejs'
 
 export async function POST() {
   try {
@@ -9,20 +12,28 @@ export async function POST() {
       return NextResponse.json({ error: result.error }, { status: result.status })
     }
 
-    const { data: organization } = await result.access.adminSupabase
-      .from('organizations')
-      .select('payment_portal_url')
-      .eq('id', result.access.profile.organization_id!)
-      .single()
+    const organizationId = result.access.profile.organization_id!
+    const { data: subscription } = await result.access.adminSupabase
+      .from('organization_subscriptions')
+      .select('provider_customer_id')
+      .eq('organization_id', organizationId)
+      .eq('provider', 'stripe')
+      .not('provider_customer_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (!organization?.payment_portal_url) {
-      return NextResponse.json({
-        setup_required: true,
-        message: 'Payment portal is not configured for this organization.',
-      })
+    if (!subscription?.provider_customer_id) {
+      return NextResponse.json({ error: 'Start your Free subscription first, then manage every package in the billing portal.' }, { status: 400 })
     }
 
-    return NextResponse.json({ portal_url: organization.payment_portal_url })
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: subscription.provider_customer_id,
+      return_url: `${appUrl}/billing`,
+    })
+
+    return NextResponse.json({ portal_url: session.url })
   } catch (error) {
     console.error('Billing portal error:', error)
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 })

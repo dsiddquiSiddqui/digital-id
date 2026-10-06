@@ -46,3 +46,5 @@ next-start-*.err
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.env*
