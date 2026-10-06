@@ -27,6 +27,13 @@ export async function POST(request: Request) {
       )
     }
 
+    if (plan === 'free') {
+      return NextResponse.json(
+        { error: 'The Free plan does not require Stripe. Cancel an active paid subscription to return to Free.' },
+        { status: 400 }
+      )
+    }
+
     if (!process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json(
         { error: 'Stripe is not configured yet. Add the Stripe keys and recurring Price IDs to the application environment.' },

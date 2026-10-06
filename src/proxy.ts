@@ -7,6 +7,7 @@ const PROTECTED_EXACT_PATHS = new Set([
   '/alerts',
   '/expiry-alerts',
   '/billing',
+  '/contact-sales',
   '/reports',
   '/notifications',
   '/document-renewals',

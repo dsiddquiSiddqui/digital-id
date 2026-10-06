@@ -80,6 +80,35 @@ export default function BillingPage() {
     }
   }
 
+  const cancelSubscription = async () => {
+    if (!window.confirm('Cancel this subscription at the end of the current billing period? Your workspace will return to Free after that date.')) return
+    setActionLoading('cancel')
+    setError('')
+    setMessage('')
+    try {
+      const response = await fetch('/api/admin/billing/cancel', { method: 'POST' })
+      const result = await response.json()
+      if (!response.ok) {
+        setError(result.error || 'Unable to cancel the subscription.')
+      } else {
+        setMessage(result.message)
+        setData((current) => current?.subscription ? {
+          ...current,
+          subscription: {
+            ...current.subscription,
+            status: result.status,
+            cancel_at_period_end: true,
+            current_period_end: result.current_period_end,
+          },
+        } : current)
+      }
+    } catch {
+      setError('Unable to cancel the subscription. Please try again.')
+    } finally {
+      setActionLoading('')
+    }
+  }
+
   const hasSubscription = Boolean(data?.subscription && !['cancelled', 'incomplete_expired'].includes(data.subscription.status))
   const renewalDate = data?.subscription?.current_period_end
     ? formatSubscriptionDate(data.subscription.current_period_end)
@@ -113,12 +142,16 @@ export default function BillingPage() {
             </p>
             {data.plan.key === 'enterprise' ? (
               <Link
-                href="/help#support-ticket"
+                href="/contact-sales"
                 className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Contact sales
               </Link>
+            ) : data.plan.key === 'free' && !hasSubscription ? (
+              <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white">
+                Free forever · No card · No expiry
+              </p>
             ) : (
               <button
                 onClick={hasSubscription ? openPortal : () => startCheckout(data.plan.key)}
@@ -126,7 +159,7 @@ export default function BillingPage() {
                 className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-60"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                {hasSubscription ? 'Change or cancel subscription' : data.plan.key === 'free' ? 'Start Free subscription' : `Start ${data.plan.name}`}
+                {hasSubscription ? 'Manage subscription' : `Start ${data.plan.name}`}
               </button>
             )}
           </div>
@@ -145,14 +178,12 @@ export default function BillingPage() {
                   ? 'Access remains active until the end date. Open the Stripe portal to resume before then.'
                   : 'Subscriptions renew monthly. Open the Stripe portal to change packages, update payment details, or cancel at the end of the current billing period.'}
               </p>
-              <button
-                onClick={openPortal}
-                disabled={actionLoading === 'portal'}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-current/20 bg-white/70 px-3 py-2 text-xs font-black disabled:opacity-60"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                {data.subscription.cancel_at_period_end ? 'Resume or manage in Stripe' : 'Cancel or manage in Stripe'}
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={openPortal} disabled={actionLoading === 'portal'} className="inline-flex items-center gap-2 rounded-xl border border-current/20 bg-white/70 px-3 py-2 text-xs font-black disabled:opacity-60"><ExternalLink className="h-3.5 w-3.5" />Manage payment</button>
+                {!data.subscription.cancel_at_period_end ? (
+                  <button onClick={cancelSubscription} disabled={actionLoading === 'cancel'} className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white disabled:opacity-60">{actionLoading === 'cancel' ? 'Cancelling…' : 'Cancel subscription'}</button>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}
@@ -198,25 +229,27 @@ export default function BillingPage() {
           <h2 className="text-lg font-black text-slate-950">Packages</h2>
         </div>
         <p className="-mt-2 mb-5 text-sm leading-6 text-slate-500">
-          Changes to an active subscription—including downgrading to Free—open the Stripe billing portal.
+          Free never uses Stripe and never expires. Paid plans renew monthly until you cancel.
         </p>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {BILLING_PLANS.map((plan) => {
             const isCurrent = plan.key === data.plan.key
             const isFree = plan.key === 'free'
             const isEnterprise = plan.key === 'enterprise'
-            const usesPortal = hasSubscription && !isEnterprise
-            const isUnsubscribedFree = isCurrent && isFree && !hasSubscription
-            const actionLabel = isUnsubscribedFree
-              ? 'Start Free subscription'
+            const usesPortal = hasSubscription && !isEnterprise && !isFree
+            const isLocalFree = isCurrent && isFree && !hasSubscription
+            const actionLabel = isLocalFree
+              ? 'Current plan · No expiry'
               : isCurrent
               ? 'Current subscription'
               : isEnterprise
                 ? 'Contact sales'
-                : usesPortal
-                  ? isFree ? 'Downgrade in portal' : `Change to ${plan.name}`
+                : isFree && hasSubscription
+                  ? 'Cancel paid plan to Free'
+                  : usesPortal
+                  ? `Change to ${plan.name}`
                   : `Start ${plan.name} — GBP ${plan.monthlyPrice}/mo`
-            const action = usesPortal ? openPortal : () => startCheckout(plan.key)
+            const action = isFree && hasSubscription ? cancelSubscription : usesPortal ? openPortal : () => startCheckout(plan.key)
 
             return (
             <div
@@ -239,7 +272,7 @@ export default function BillingPage() {
               </p>
               {isEnterprise ? (
                 <Link
-                  href="/help#support-ticket"
+                  href="/contact-sales"
                   className="mt-4 block w-full rounded-xl bg-slate-950 px-3 py-2 text-center text-xs font-black text-white"
                 >
                   {actionLabel}
@@ -247,7 +280,7 @@ export default function BillingPage() {
               ) : (
                 <button
                   onClick={action}
-                  disabled={(!isUnsubscribedFree && isCurrent) || actionLoading === plan.key || (usesPortal && actionLoading === 'portal')}
+                  disabled={isCurrent || actionLoading === plan.key || (isFree && actionLoading === 'cancel') || (usesPortal && actionLoading === 'portal')}
                   className={`mt-4 w-full rounded-xl px-3 py-2 text-xs font-black ${
                     isCurrent
                       ? 'bg-white/15 text-current'
