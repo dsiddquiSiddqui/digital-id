@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdminAccess, ADMIN_ROLES } from '@/lib/admin-auth'
 import { getOrganizationPlanUsage } from '@/lib/plan-usage'
+import { getStripe } from '@/lib/stripe'
 
 export async function GET() {
   try {
@@ -16,7 +17,7 @@ export async function GET() {
       organizationId
     )
 
-    const { data: subscription } = await result.access.adminSupabase
+    const { data: storedSubscription } = await result.access.adminSupabase
       .from('organization_subscriptions')
       .select('*')
       .eq('organization_id', organizationId)
@@ -24,6 +25,36 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    let subscription = storedSubscription
+    if (storedSubscription?.provider_subscription_id && process.env.STRIPE_SECRET_KEY) {
+      try {
+        const stripeSubscription = await getStripe().subscriptions.retrieve(
+          storedSubscription.provider_subscription_id
+        )
+        const periodEnd = stripeSubscription.items.data[0]?.current_period_end
+        const refreshedSubscription = {
+          ...storedSubscription,
+          status: stripeSubscription.status,
+          current_period_end: periodEnd
+            ? new Date(periodEnd * 1000).toISOString()
+            : storedSubscription.current_period_end,
+          cancel_at_period_end: stripeSubscription.cancel_at_period_end,
+        }
+
+        subscription = refreshedSubscription
+        await result.access.adminSupabase
+          .from('organization_subscriptions')
+          .update({
+            status: refreshedSubscription.status,
+            current_period_end: refreshedSubscription.current_period_end,
+            cancel_at_period_end: refreshedSubscription.cancel_at_period_end,
+          })
+          .eq('id', storedSubscription.id)
+      } catch (error) {
+        console.error('Stripe subscription refresh error:', error)
+      }
+    }
 
     return NextResponse.json({
       ...planUsage,

@@ -144,7 +144,7 @@ export default function HelpPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <form onSubmit={submitTicket} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <form id="support-ticket" onSubmit={submitTicket} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm scroll-mt-6">
           <div className="flex items-center gap-3">
             <span className="rounded-2xl bg-slate-100 p-3 text-slate-700">
               <MessageSquare className="h-5 w-5" />

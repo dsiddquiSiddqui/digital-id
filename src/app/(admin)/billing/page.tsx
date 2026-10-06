@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { BadgeDollarSign, CalendarClock, CheckCircle2, ExternalLink, RefreshCw, Users, Shield, HardDrive } from 'lucide-react'
 import { BILLING_PLANS, formatPlanLimit } from '@/lib/billing-plans'
 
@@ -80,6 +81,9 @@ export default function BillingPage() {
   }
 
   const hasSubscription = Boolean(data?.subscription && !['cancelled', 'incomplete_expired'].includes(data.subscription.status))
+  const renewalDate = data?.subscription?.current_period_end
+    ? formatSubscriptionDate(data.subscription.current_period_end)
+    : null
 
   if (loading) return <Panel>Loading billing...</Panel>
   if (!data) return null
@@ -107,22 +111,48 @@ export default function BillingPage() {
             <p className="mt-1 text-2xl font-black">
               {data.plan.monthlyPrice === null ? 'Custom' : `GBP ${data.plan.monthlyPrice}`}
             </p>
-            <button
-              onClick={hasSubscription ? openPortal : () => startCheckout(data.plan.key)}
-              disabled={data.plan.key === 'enterprise' || actionLoading === 'portal' || actionLoading === data.plan.key}
-              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-60"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              {hasSubscription ? 'Manage subscription' : data.plan.key === 'free' ? 'Start Free subscription' : 'Start subscription'}
-            </button>
+            {data.plan.key === 'enterprise' ? (
+              <Link
+                href="/help#support-ticket"
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Contact sales
+              </Link>
+            ) : (
+              <button
+                onClick={hasSubscription ? openPortal : () => startCheckout(data.plan.key)}
+                disabled={actionLoading === 'portal' || actionLoading === data.plan.key}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-60"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {hasSubscription ? 'Change or cancel subscription' : data.plan.key === 'free' ? 'Start Free subscription' : `Start ${data.plan.name}`}
+              </button>
+            )}
           </div>
         </div>
-        {data.subscription?.current_period_end ? (
+        {data.subscription ? (
           <div className={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 ${data.subscription.cancel_at_period_end ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
             {data.subscription.cancel_at_period_end ? <CalendarClock className="mt-0.5 h-5 w-5 shrink-0" /> : <RefreshCw className="mt-0.5 h-5 w-5 shrink-0" />}
             <div>
-              <p className="text-sm font-black">{data.subscription.cancel_at_period_end ? `Subscription ends ${formatSubscriptionDate(data.subscription.current_period_end)}` : `Auto-renews ${formatSubscriptionDate(data.subscription.current_period_end)}`}</p>
-              <p className="mt-1 text-sm leading-5 opacity-75">{data.subscription.cancel_at_period_end ? 'Access remains active until then. You can resume it in the Stripe billing portal.' : 'Your payment method will be charged automatically on this date unless you change or cancel the subscription.'}</p>
+              <p className="text-sm font-black">
+                {data.subscription.cancel_at_period_end
+                  ? renewalDate ? `Subscription ends ${renewalDate}` : 'Cancellation scheduled'
+                  : renewalDate ? `Next renewal: ${renewalDate}` : 'Next renewal date is being confirmed'}
+              </p>
+              <p className="mt-1 text-sm leading-5 opacity-75">
+                {data.subscription.cancel_at_period_end
+                  ? 'Access remains active until the end date. Open the Stripe portal to resume before then.'
+                  : 'Subscriptions renew monthly. Open the Stripe portal to change packages, update payment details, or cancel at the end of the current billing period.'}
+              </p>
+              <button
+                onClick={openPortal}
+                disabled={actionLoading === 'portal'}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-current/20 bg-white/70 px-3 py-2 text-xs font-black disabled:opacity-60"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {data.subscription.cancel_at_period_end ? 'Resume or manage in Stripe' : 'Cancel or manage in Stripe'}
+              </button>
             </div>
           </div>
         ) : null}
@@ -184,8 +214,8 @@ export default function BillingPage() {
               : isEnterprise
                 ? 'Contact sales'
                 : usesPortal
-                  ? isFree ? 'Downgrade in portal' : 'Change in portal'
-                  : 'Start subscription'
+                  ? isFree ? 'Downgrade in portal' : `Change to ${plan.name}`
+                  : `Start ${plan.name} — GBP ${plan.monthlyPrice}/mo`
             const action = usesPortal ? openPortal : () => startCheckout(plan.key)
 
             return (
@@ -207,17 +237,26 @@ export default function BillingPage() {
                 <br />
                 {formatPlanLimit(plan.staffLimit, 'staff')}
               </p>
-              <button
-                onClick={action}
-                disabled={(!isUnsubscribedFree && isCurrent) || isEnterprise || actionLoading === plan.key || (usesPortal && actionLoading === 'portal')}
-                className={`mt-4 w-full rounded-xl px-3 py-2 text-xs font-black ${
-                  isCurrent
-                    ? 'bg-white/15 text-current'
-                    : 'bg-slate-950 text-white'
-                } disabled:opacity-60`}
-              >
-                {actionLabel}
-              </button>
+              {isEnterprise ? (
+                <Link
+                  href="/help#support-ticket"
+                  className="mt-4 block w-full rounded-xl bg-slate-950 px-3 py-2 text-center text-xs font-black text-white"
+                >
+                  {actionLabel}
+                </Link>
+              ) : (
+                <button
+                  onClick={action}
+                  disabled={(!isUnsubscribedFree && isCurrent) || actionLoading === plan.key || (usesPortal && actionLoading === 'portal')}
+                  className={`mt-4 w-full rounded-xl px-3 py-2 text-xs font-black ${
+                    isCurrent
+                      ? 'bg-white/15 text-current'
+                      : 'bg-slate-950 text-white'
+                  } disabled:opacity-60`}
+                >
+                  {actionLabel}
+                </button>
+              )}
             </div>
             )
           })}
