@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     const usage = await getOrganizationPlanUsage(result.access.adminSupabase, organizationId)
 
     if (
+      role !== 'staff' &&
       usage.limits.users !== null &&
       usage.usage.users >= usage.limits.users
     ) {

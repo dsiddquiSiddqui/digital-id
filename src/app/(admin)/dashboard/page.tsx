@@ -110,7 +110,11 @@ export default function DashboardPage() {
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .eq('organization_id', organizationId)
-            : supabase.from('profiles').select('*', { count: 'exact', head: true })
+                .neq('role', 'staff')
+            : supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true })
+                .neq('role', 'staff')
           : Promise.resolve({ count: 0 })
 
         const staffQuery = organizationId

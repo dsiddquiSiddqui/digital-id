@@ -34,7 +34,8 @@ export async function getOrganizationPlanUsage(
     supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('organization_id', organizationId),
+      .eq('organization_id', organizationId)
+      .neq('role', 'staff'),
     supabase
       .from('staff')
       .select('*', { count: 'exact', head: true })

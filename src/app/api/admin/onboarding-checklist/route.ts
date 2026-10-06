@@ -19,7 +19,8 @@ export async function GET() {
       result.access.adminSupabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId),
+        .eq('organization_id', organizationId)
+        .neq('role', 'staff'),
       result.access.adminSupabase
         .from('staff')
         .select('*', { count: 'exact', head: true })

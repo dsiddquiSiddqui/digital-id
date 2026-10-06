@@ -53,7 +53,8 @@ export async function GET() {
           adminSupabase
             .from('profiles')
             .select('*', { count: 'exact', head: true })
-            .eq('organization_id', organization.id),
+            .eq('organization_id', organization.id)
+            .neq('role', 'staff'),
           adminSupabase
             .from('staff')
             .select('*', { count: 'exact', head: true })

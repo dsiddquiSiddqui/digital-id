@@ -113,6 +113,7 @@ export async function POST(req: Request) {
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', currentProfile.organization_id)
+        .neq('role', 'staff')
 
       if ((currentUserCount || 0) >= billingPlan.userLimit) {
         return NextResponse.json(

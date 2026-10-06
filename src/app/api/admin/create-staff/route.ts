@@ -88,22 +88,6 @@ export async function POST(request: Request) {
       }
     }
 
-    if (billingPlan.userLimit !== null) {
-      const { count: currentUserCount } = await adminSupabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', currentProfile.organization_id)
-
-      if ((currentUserCount || 0) >= billingPlan.userLimit) {
-        return NextResponse.json(
-          {
-            error: `${billingPlan.name} plan allows ${billingPlan.userLimit} users. Upgrade the organization plan to add more staff logins.`,
-          },
-          { status: 403 }
-        )
-      }
-    }
-
     const { data: existingStaff } = await adminSupabase
       .from('staff')
       .select('id')
