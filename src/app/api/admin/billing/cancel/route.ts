@@ -13,6 +13,11 @@ export async function POST() {
     }
 
     const organizationId = result.access.profile.organization_id!
+    const { data: organization } = await result.access.adminSupabase
+      .from('organizations')
+      .select('plan')
+      .eq('id', organizationId)
+      .single()
     const { data: subscription } = await result.access.adminSupabase
       .from('organization_subscriptions')
       .select('id, provider_subscription_id, status')
@@ -24,7 +29,32 @@ export async function POST() {
       .maybeSingle()
 
     if (!subscription?.provider_subscription_id || ['canceled', 'cancelled', 'incomplete_expired'].includes(subscription.status)) {
-      return NextResponse.json({ error: 'There is no active paid subscription to cancel.' }, { status: 400 })
+      if (!organization?.plan || organization.plan === 'free') {
+        return NextResponse.json({ error: 'There is no active paid subscription to cancel.' }, { status: 400 })
+      }
+
+      await result.access.adminSupabase
+        .from('organizations')
+        .update({ plan: 'free' })
+        .eq('id', organizationId)
+
+      await writeAuditLog({
+        access: result.access,
+        action: 'billing_plan_downgraded_to_free',
+        entityType: 'organization',
+        entityId: organizationId,
+        module: 'Billing',
+        page: '/billing',
+        metadata: { previous_plan: organization.plan, effective_immediately: true },
+      })
+
+      return NextResponse.json({
+        message: 'Your paid plan has been cancelled and the workspace is now on Free.',
+        current_period_end: null,
+        cancel_at_period_end: false,
+        status: 'canceled',
+        effective_immediately: true,
+      })
     }
 
     const stripeSubscription = await getStripe().subscriptions.update(

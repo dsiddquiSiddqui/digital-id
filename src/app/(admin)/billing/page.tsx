@@ -91,6 +91,10 @@ export default function BillingPage() {
       if (!response.ok) {
         setError(result.error || 'Unable to cancel the subscription.')
       } else {
+        if (result.effective_immediately) {
+          window.location.reload()
+          return
+        }
         setMessage(result.message)
         setData((current) => current?.subscription ? {
           ...current,
@@ -109,7 +113,8 @@ export default function BillingPage() {
     }
   }
 
-  const hasSubscription = Boolean(data?.subscription && !['cancelled', 'incomplete_expired'].includes(data.subscription.status))
+  const hasSubscription = Boolean(data?.subscription && !['canceled', 'cancelled', 'incomplete_expired'].includes(data.subscription.status))
+  const isCurrentPlanPaid = data?.plan.key !== 'free' && data?.plan.key !== 'enterprise'
   const renewalDate = data?.subscription?.current_period_end
     ? formatSubscriptionDate(data.subscription.current_period_end)
     : null
@@ -152,6 +157,14 @@ export default function BillingPage() {
               <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white">
                 Free forever · No card · No expiry
               </p>
+            ) : isCurrentPlanPaid ? (
+              <button
+                onClick={cancelSubscription}
+                disabled={actionLoading === 'cancel'}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white hover:bg-red-500 disabled:opacity-60"
+              >
+                {actionLoading === 'cancel' ? 'Cancelling…' : 'Cancel subscription'}
+              </button>
             ) : (
               <button
                 onClick={hasSubscription ? openPortal : () => startCheckout(data.plan.key)}
@@ -238,7 +251,7 @@ export default function BillingPage() {
             const isEnterprise = plan.key === 'enterprise'
             const usesPortal = hasSubscription && !isEnterprise && !isFree
             const isLocalFree = isCurrent && isFree && !hasSubscription
-            const isCurrentPaidSubscription = isCurrent && !isFree && !isEnterprise && hasSubscription
+            const isCurrentPaidSubscription = isCurrent && !isFree && !isEnterprise
             const actionLabel = isLocalFree
               ? 'Current plan · No expiry'
               : isCurrentPaidSubscription
