@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'guard']
+import { isSystemUserRole } from '@/lib/user-roles'
 
 function buildChanges(
   beforeData: Record<string, unknown>,
@@ -54,7 +53,7 @@ export async function POST(req: Request) {
       )
     }
 
-    if (!ALLOWED_ROLES.includes(role)) {
+    if (!isSystemUserRole(role)) {
       return NextResponse.json(
         { error: 'Invalid role.' },
         { status: 400 }
@@ -140,6 +139,13 @@ export async function POST(req: Request) {
     const { error: authUpdateError } =
       await adminSupabase.auth.admin.updateUserById(existing.auth_user_id, {
         email,
+        app_metadata: {
+          organization_id: currentProfile.organization_id,
+          role,
+        },
+        user_metadata: {
+          full_name,
+        },
       })
 
     if (authUpdateError) {

@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getBillingPlan } from '@/lib/billing-plans'
-
-const ALLOWED_ROLES = ['super_admin', 'admin', 'guard']
+import { isSystemUserRole } from '@/lib/user-roles'
 
 export async function POST(req: Request) {
   try {
@@ -33,7 +32,7 @@ export async function POST(req: Request) {
       )
     }
 
-    if (!ALLOWED_ROLES.includes(role)) {
+    if (!isSystemUserRole(role)) {
       return NextResponse.json(
         { error: 'Invalid role.' },
         { status: 400 }
@@ -130,9 +129,12 @@ export async function POST(req: Request) {
         email,
         password,
         email_confirm: true,
+        app_metadata: {
+          organization_id: currentProfile.organization_id,
+          role,
+        },
         user_metadata: {
           full_name,
-          role,
         },
       })
 

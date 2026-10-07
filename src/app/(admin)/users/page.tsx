@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search, Plus, Users, UserCheck, UserX } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import type { SystemUserRole as Role } from '@/lib/user-roles'
 
 type Profile = {
   id: string
@@ -16,14 +17,6 @@ type Profile = {
   is_active: boolean
   created_at?: string
 }
-
-type Role =
-  | 'super_admin'
-  | 'admin'
-  | 'operation_manager'
-  | 'operation_team'
-  | 'hr_manager'
-  | 'hr'
 
 type RoleFilter = 'all' | Role
 type StatusFilter = 'all' | 'active' | 'inactive'
