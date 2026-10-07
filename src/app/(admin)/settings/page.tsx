@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react'
 import {
   BadgeCheck,
   Building2,
+  Check,
   ChevronRight,
+  Copy,
   ExternalLink,
   Globe2,
   Image as ImageIcon,
@@ -81,6 +83,7 @@ export default function OrganizationSettingsPage() {
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [copiedOrganizationId, setCopiedOrganizationId] = useState(false)
   const [uploadingField, setUploadingField] = useState<BrandAssetField | null>(null)
 
   const [form, setForm] = useState({
@@ -172,6 +175,18 @@ export default function OrganizationSettingsPage() {
           ? slugify(value)
           : prev.slug,
     }))
+  }
+
+  const copyOrganizationId = async () => {
+    if (!organization?.id) return
+
+    try {
+      await navigator.clipboard.writeText(organization.id)
+      setCopiedOrganizationId(true)
+      window.setTimeout(() => setCopiedOrganizationId(false), 1800)
+    } catch {
+      setError('Unable to copy the Organization ID. Select it and copy it manually.')
+    }
   }
 
   const applyTheme = (themeKey: ThemeKey) => {
@@ -335,6 +350,19 @@ export default function OrganizationSettingsPage() {
             <div className="mt-7 grid gap-5 md:grid-cols-2">
               <TextField label="Organization name" value={form.name} onChange={handleNameChange} placeholder="Acme Security Services" required />
               <TextField label="Workspace slug" value={form.slug} onChange={(value) => setForm((prev) => ({ ...prev, slug: slugify(value) }))} placeholder="acme-security" required />
+            </div>
+            <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Organization ID</p>
+                  <p className="mt-2 break-all font-mono text-sm font-bold text-slate-950">{organization?.id || 'Not assigned'}</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Your permanent workspace identifier for support requests, integrations, and audit references. It cannot be edited.</p>
+                </div>
+                <button type="button" onClick={() => void copyOrganizationId()} disabled={!organization?.id} aria-label="Copy Organization ID" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-xs font-black text-emerald-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50">
+                  {copiedOrganizationId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copiedOrganizationId ? 'Copied' : 'Copy ID'}
+                </button>
+              </div>
             </div>
             <div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500"><Globe2 className="h-4 w-4 text-emerald-700" /><span>Workspace sign-in: <span className="font-black text-slate-800">/login?workspace={form.slug || 'your-workspace'}</span></span></div>
           </div>
