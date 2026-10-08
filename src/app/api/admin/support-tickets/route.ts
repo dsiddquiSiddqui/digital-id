@@ -48,6 +48,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Subject and message are required.' }, { status: 400 })
     }
 
+    const slaHours = priority === 'urgent' ? { response: 1, resolution: 8 } : priority === 'high' ? { response: 4, resolution: 24 } : priority === 'low' ? { response: 24, resolution: 120 } : { response: 8, resolution: 72 }
+    const openedAt = Date.now()
     const { data, error } = await result.access.adminSupabase
       .from('support_tickets')
       .insert({
@@ -57,11 +59,16 @@ export async function POST(request: Request) {
         message,
         category,
         priority,
+        first_response_due_at: new Date(openedAt + slaHours.response * 60 * 60 * 1000).toISOString(),
+        resolution_due_at: new Date(openedAt + slaHours.resolution * 60 * 60 * 1000).toISOString(),
+        last_customer_response_at: new Date(openedAt).toISOString(),
       })
       .select('id, ticket_number, subject, category, priority, status, message, created_at')
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    await result.access.adminSupabase.from('support_ticket_messages').insert({ ticket_id: data.id, author_profile_id: result.access.profile.id, author_type: 'customer', visibility: 'customer', message })
 
     await writeAuditLog({
       access: result.access,

@@ -20,6 +20,7 @@ import {
   LockKeyhole,
   LogOut,
   Mail,
+  MessageSquareText,
   PauseCircle,
   Phone,
   Plus,
@@ -63,8 +64,16 @@ type PortalUser = {
   email: string
   role: string
   is_active: boolean
+  platform_role: string | null
+  platform_access_scope: string
+  platform_permissions: string[]
+  portal_last_active_at: string | null
   created_at: string
 }
+
+type SupportMessage = { id: string; ticket_id: string; author_profile_id: string | null; author_type: string; visibility: string; message: string; created_at: string; author: { full_name: string; email: string | null } | null }
+type SupportTicket = { id: string; ticket_number: number; organization_id: string; assigned_to_profile_id: string | null; subject: string; message: string; category: string; priority: string; status: string; response_summary: string | null; first_response_due_at: string | null; resolution_due_at: string | null; first_response_at: string | null; escalation_reason: string | null; created_at: string; updated_at: string; organization: { id: string; name: string; slug: string } | null; creator: { full_name: string; email: string | null } | null; assignee: { full_name: string; email: string | null } | null; messages: SupportMessage[] }
+type SupportAgent = { id: string; full_name: string; email: string | null; platform_role: string | null; is_active: boolean }
 
 type Metrics = {
   organizations: number
@@ -141,13 +150,20 @@ export default function PortalPage() {
   const [creatingUser, setCreatingUser] = useState(false)
   const [organizations, setOrganizations] = useState<OrganizationRow[]>([])
   const [portalUsers, setPortalUsers] = useState<PortalUser[]>([])
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([])
+  const [supportAgents, setSupportAgents] = useState<SupportAgent[]>([])
+  const [selectedTicketId, setSelectedTicketId] = useState('')
+  const [supportCanManage, setSupportCanManage] = useState(false)
+  const [supportReply, setSupportReply] = useState('')
+  const [supportVisibility, setSupportVisibility] = useState<'customer' | 'internal'>('customer')
+  const [supportSaving, setSupportSaving] = useState(false)
   const [metrics, setMetrics] = useState<Metrics>({ organizations: 0, activeOrganizations: 0, suspendedOrganizations: 0, cancelledSubscriptions: 0, monthlyRevenue: 0, annualRevenue: 0, users: 0, staff: 0 })
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [userForm, setUserForm] = useState({ full_name: '', email: '', password: '' })
+  const [userForm, setUserForm] = useState({ full_name: '', email: '', password: '', platform_role: 'support_agent', platform_access_scope: 'all_organizations' })
   const [selectedOrganization, setSelectedOrganization] = useState<OrganizationRow | null>(null)
   const [organizationDetail, setOrganizationDetail] = useState<OrganizationDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -157,16 +173,22 @@ export default function PortalPage() {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/portal/summary', { cache: 'no-store' })
-      const result = await response.json()
-      if (!response.ok) {
-        if (response.status === 403) router.replace('/portal/login')
+      const [summaryResponse, supportResponse] = await Promise.all([fetch('/api/portal/summary', { cache: 'no-store' }), fetch('/api/portal/support', { cache: 'no-store' })])
+      const [result, supportResult] = await Promise.all([summaryResponse.json(), supportResponse.json()])
+      if (!summaryResponse.ok) {
+        if (summaryResponse.status === 403) router.replace('/portal/login')
         setError(result.error || 'Unable to load portal.')
         return
       }
       setOrganizations(result.organizations || [])
       setPortalUsers(result.portalUsers || [])
       setMetrics(result.metrics)
+      if (supportResponse.ok) {
+        setSupportTickets(supportResult.tickets || [])
+        setSupportAgents(supportResult.agents || [])
+        setSupportCanManage(Boolean(supportResult.canManage))
+        setSelectedTicketId((current) => current || supportResult.tickets?.[0]?.id || '')
+      }
       setLastUpdated(new Date())
     } catch {
       setError('Something went wrong while loading the portal.')
@@ -250,7 +272,7 @@ export default function PortalPage() {
       const result = await response.json()
       if (!response.ok) { setError(result.error || 'Unable to create portal user.'); return }
       setPortalUsers((current) => [result.profile, ...current])
-      setUserForm({ full_name: '', email: '', password: '' })
+      setUserForm({ full_name: '', email: '', password: '', platform_role: 'support_agent', platform_access_scope: 'all_organizations' })
       setMessage('Portal user created.')
     } catch {
       setError('Something went wrong while creating portal user.')
@@ -259,7 +281,37 @@ export default function PortalPage() {
     }
   }
 
+  const updatePortalUser = async (profile: PortalUser, changes: { is_active?: boolean; platform_role?: string; platform_access_scope?: string }) => {
+    if (!window.confirm(`Confirm access changes for ${profile.full_name}. This action will be audited.`)) return
+    setError(''); setMessage('')
+    const response = await fetch('/api/portal/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: profile.id, confirmation: 'CONFIRM', ...changes }) })
+    const result = await response.json()
+    if (!response.ok) { setError(result.error || 'Unable to update portal user.'); return }
+    setPortalUsers((current) => current.map((user) => user.id === profile.id ? result.profile : user))
+    setMessage(`${profile.full_name}'s portal access was updated.`)
+  }
+
+  const updateSupportTicket = async (ticket: SupportTicket, changes: { status?: string; priority?: string; assigned_to_profile_id?: string | null }) => {
+    setSupportSaving(true); setError(''); setMessage('')
+    const response = await fetch('/api/portal/support', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ticket.id, confirmation: 'CONFIRM', ...changes }) })
+    const result = await response.json(); setSupportSaving(false)
+    if (!response.ok) { setError(result.error || 'Unable to update support ticket.'); return }
+    setMessage(`Ticket #${ticket.ticket_number} updated.`); await loadPortal()
+  }
+
+  const sendSupportMessage = async (ticket: SupportTicket) => {
+    if (supportReply.trim().length < 2) return
+    setSupportSaving(true); setError(''); setMessage('')
+    const response = await fetch('/api/portal/support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: ticket.id, message: supportReply, visibility: supportVisibility }) })
+    const result = await response.json(); setSupportSaving(false)
+    if (!response.ok) { setError(result.error || 'Unable to send support message.'); return }
+    setSupportReply(''); setMessage(supportVisibility === 'internal' ? 'Internal note added.' : 'Customer reply recorded.'); await loadPortal()
+  }
+
   const logout = async () => { await supabase.auth.signOut(); router.replace('/portal/login') }
+  const selectedTicket = supportTickets.find((ticket) => ticket.id === selectedTicketId) || supportTickets[0] || null
+  const openSupportCount = supportTickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length
+  const breachedSupportCount = supportTickets.filter((ticket) => !ticket.first_response_at && ticket.first_response_due_at && new Date(ticket.first_response_due_at).getTime() < Date.now()).length
 
   return (
     <main className="min-h-screen bg-[#0c1210] px-3 py-3 text-white sm:px-5 sm:py-5 lg:px-7">
@@ -323,17 +375,23 @@ export default function PortalPage() {
             </aside>
           </section>
 
-          <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.65fr)]">
+          <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
             <div className="rounded-[26px] border border-white/10 bg-[#121c18] p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#b8f43d]">Privileged access</p><h2 className="mt-1 text-xl font-black">Portal administrators</h2><p className="mt-1 text-sm text-white/45">Platform-level users who can view and control every tenant.</p></div><UserRoundCog className="h-5 w-5 text-white/40" /></div>
-              <div className="mt-5 grid gap-3 md:grid-cols-2">{portalUsers.map((user) => <div key={user.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#b8f43d] text-sm font-black text-[#10150f]">{user.full_name?.charAt(0)?.toUpperCase() || 'P'}</span><div className="min-w-0"><p className="truncate text-sm font-black">{user.full_name}</p><p className="mt-1 truncate text-xs text-white/45">{user.email}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#b8f43d]">{user.is_active ? 'Active platform owner' : 'Inactive'}</p></div></div>)}</div>
+              <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#b8f43d]">Privileged access</p><h2 className="mt-1 text-xl font-black">Portal user management</h2><p className="mt-1 text-sm text-white/45">Role, scope, status, and activity for every platform operator.</p></div><UserRoundCog className="h-5 w-5 text-white/40" /></div>
+              <div className="mt-5 space-y-3">{portalUsers.map((user) => <article key={user.id} className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 lg:grid-cols-[minmax(180px,1fr)_170px_190px_auto] lg:items-center"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#b8f43d] text-sm font-black text-[#10150f]">{user.full_name?.charAt(0)?.toUpperCase() || 'P'}</span><div className="min-w-0"><p className="truncate text-sm font-black">{user.full_name}</p><p className="mt-1 truncate text-xs text-white/45">{user.email}</p><p className={`mt-1 text-[10px] font-bold uppercase tracking-[0.1em] ${user.is_active ? 'text-[#b8f43d]' : 'text-red-300'}`}>{user.is_active ? 'Active' : 'Suspended'} · {user.portal_last_active_at ? `seen ${formatPortalDateTime(user.portal_last_active_at)}` : 'no activity recorded'}</p></div></div><select aria-label={`Role for ${user.full_name}`} value={user.platform_role || 'administrator'} disabled={user.platform_role === 'owner'} onChange={(event) => void updatePortalUser(user, { platform_role: event.target.value })} className="h-10 rounded-xl border border-white/10 bg-[#1a2621] px-3 text-xs font-black capitalize outline-none disabled:opacity-60"><option value="owner">Owner</option><option value="administrator">Administrator</option><option value="support_agent">Support agent</option><option value="billing_agent">Billing agent</option><option value="auditor">Auditor</option></select><select aria-label={`Access scope for ${user.full_name}`} value={user.platform_access_scope || 'all_organizations'} onChange={(event) => void updatePortalUser(user, { platform_access_scope: event.target.value })} className="h-10 rounded-xl border border-white/10 bg-[#1a2621] px-3 text-xs font-black outline-none"><option value="all_organizations">All organizations</option><option value="assigned_organizations">Assigned only</option><option value="read_only">Read only</option></select><button type="button" onClick={() => void updatePortalUser(user, { is_active: !user.is_active })} className={`rounded-xl px-3 py-2.5 text-xs font-black ${user.is_active ? 'border border-red-400/20 bg-red-500/10 text-red-200' : 'bg-[#b8f43d] text-[#10150f]'}`}>{user.is_active ? 'Suspend' : 'Reactivate'}</button></article>)}</div>
             </div>
 
             <section className="rounded-[26px] bg-[#b8f43d] p-5 text-[#10150f] sm:p-6">
-              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#10150f] text-[#b8f43d]"><Plus className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-60">Access control</p><h2 className="text-lg font-black">Create portal administrator</h2></div></div>
-              <form onSubmit={createPortalUser} className="mt-5 grid gap-3"><input value={userForm.full_name} onChange={(event) => setUserForm((current) => ({ ...current, full_name: event.target.value }))} placeholder="Full name" className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-bold outline-none focus:bg-white" required /><input value={userForm.email} onChange={(event) => setUserForm((current) => ({ ...current, email: event.target.value }))} placeholder="Email address" type="email" className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-bold outline-none focus:bg-white" required /><input value={userForm.password} onChange={(event) => setUserForm((current) => ({ ...current, password: event.target.value }))} placeholder="Temporary password · 8+ characters" type="password" minLength={8} className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-bold outline-none focus:bg-white" required /><button disabled={creatingUser} className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#10150f] px-4 text-sm font-black text-white disabled:opacity-60">{creatingUser ? 'Creating administrator…' : 'Create administrator'}<ChevronRight className="h-4 w-4" /></button></form>
-              <p className="mt-4 flex items-start gap-2 text-xs font-semibold leading-5 opacity-65"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />This grants cross-tenant platform control. Create accounts only for trusted operators.</p>
+              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#10150f] text-[#b8f43d]"><Plus className="h-5 w-5" /></span><div><p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-60">Access control</p><h2 className="text-lg font-black">Create portal user</h2></div></div>
+              <form onSubmit={createPortalUser} className="mt-5 grid gap-3"><input value={userForm.full_name} onChange={(event) => setUserForm((current) => ({ ...current, full_name: event.target.value }))} placeholder="Full name" className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-bold outline-none focus:bg-white" required /><input value={userForm.email} onChange={(event) => setUserForm((current) => ({ ...current, email: event.target.value }))} placeholder="Email address" type="email" className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-bold outline-none focus:bg-white" required /><input value={userForm.password} onChange={(event) => setUserForm((current) => ({ ...current, password: event.target.value }))} placeholder="Temporary password · 8+ characters" type="password" minLength={8} className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-bold outline-none focus:bg-white" required /><select value={userForm.platform_role} onChange={(event) => setUserForm((current) => ({ ...current, platform_role: event.target.value }))} className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-black outline-none"><option value="administrator">Administrator</option><option value="support_agent">Support agent</option><option value="billing_agent">Billing agent</option><option value="auditor">Auditor</option></select><select value={userForm.platform_access_scope} onChange={(event) => setUserForm((current) => ({ ...current, platform_access_scope: event.target.value }))} className="h-11 rounded-xl border border-black/10 bg-white/75 px-3 text-sm font-black outline-none"><option value="all_organizations">All organizations</option><option value="assigned_organizations">Assigned organizations</option><option value="read_only">Read only</option></select><button disabled={creatingUser} className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#10150f] px-4 text-sm font-black text-white disabled:opacity-60">{creatingUser ? 'Creating portal user…' : 'Create portal user'}<ChevronRight className="h-4 w-4" /></button></form>
+              <p className="mt-4 flex items-start gap-2 text-xs font-semibold leading-5 opacity-65"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />Owner accounts are protected. The final active owner cannot be suspended or demoted.</p>
             </section>
+          </section>
+
+          <section className="overflow-hidden rounded-[26px] border border-white/10 bg-[#f7f8f5] text-[#152019]">
+            <div className="flex flex-col gap-4 border-b border-black/10 bg-[#dff7a8] px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#506637]">Service desk</p><h2 className="mt-1 text-2xl font-black tracking-[-0.04em]">Support inbox</h2><p className="mt-1 text-sm text-[#52605a]">Triage, assign, respond, and protect every customer SLA from one queue.</p></div><div className="flex gap-2"><span className="rounded-xl bg-[#152019] px-4 py-3 text-xs font-black text-white">{openSupportCount} open</span><span className={`rounded-xl px-4 py-3 text-xs font-black ${breachedSupportCount ? 'bg-red-600 text-white' : 'bg-white text-[#506637]'}`}>{breachedSupportCount} response SLA breached</span></div></div>
+            <div className="grid min-h-[560px] lg:grid-cols-[minmax(300px,0.7fr)_minmax(0,1.3fr)]"><div className="border-b border-black/10 lg:border-b-0 lg:border-r"><div className="border-b border-black/10 px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-[#718078]">Queue · newest activity first</div><div className="max-h-[650px] overflow-y-auto">{supportTickets.map((ticket) => <button type="button" key={ticket.id} onClick={() => setSelectedTicketId(ticket.id)} className={`w-full border-b border-black/10 p-4 text-left transition ${selectedTicket?.id === ticket.id ? 'bg-[#152019] text-white' : 'bg-white hover:bg-[#eff3eb]'}`}><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-black uppercase tracking-wider opacity-60">#{ticket.ticket_number} · {ticket.organization?.name || 'Unknown organization'}</span><span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${ticket.priority === 'urgent' ? 'bg-red-500 text-white' : ticket.priority === 'high' ? 'bg-amber-300 text-amber-950' : 'bg-[#dff7a8] text-[#35500e]'}`}>{ticket.priority}</span></div><p className="mt-2 line-clamp-2 text-sm font-black">{ticket.subject}</p><div className="mt-2 flex items-center justify-between text-[10px] font-bold opacity-60"><span>{formatRole(ticket.status)}</span><span>{formatPortalDateTime(ticket.updated_at)}</span></div></button>)}{supportTickets.length === 0 ? <div className="p-10 text-center"><MessageSquareText className="mx-auto h-6 w-6 text-[#8c9891]" /><p className="mt-3 font-black">No support cases yet</p><p className="mt-1 text-sm text-[#718078]">Customer tickets will appear here automatically.</p></div> : null}</div></div>
+              <div className="bg-[#eef1eb] p-4 sm:p-6">{selectedTicket ? <div className="space-y-4"><div className="rounded-[22px] bg-white p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#718078]">Case #{selectedTicket.ticket_number} · {selectedTicket.category}</p><h3 className="mt-1 text-xl font-black">{selectedTicket.subject}</h3><p className="mt-2 text-sm font-semibold text-[#657269]">{selectedTicket.organization?.name} · opened by {selectedTicket.creator?.full_name || 'Customer'} on {formatPortalDateTime(selectedTicket.created_at)}</p></div><span className="rounded-full bg-[#152019] px-3 py-2 text-[10px] font-black uppercase text-white">{formatRole(selectedTicket.status)}</span></div><p className="mt-4 rounded-xl bg-[#f5f7f2] p-4 text-sm leading-6 text-[#46534c]">{selectedTicket.message}</p><div className="mt-4 grid gap-3 sm:grid-cols-3"><label className="text-[10px] font-black uppercase tracking-wide text-[#718078]">Status<select disabled={!supportCanManage || supportSaving} value={selectedTicket.status} onChange={(event) => void updateSupportTicket(selectedTicket, { status: event.target.value })} className="mt-1 h-10 w-full rounded-xl border border-black/10 bg-white px-3 text-xs font-black capitalize"><option value="open">Open</option><option value="triaged">Triaged</option><option value="in_progress">In progress</option><option value="waiting_on_customer">Waiting on customer</option><option value="escalated">Escalated</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></label><label className="text-[10px] font-black uppercase tracking-wide text-[#718078]">Priority<select disabled={!supportCanManage || supportSaving} value={selectedTicket.priority} onChange={(event) => void updateSupportTicket(selectedTicket, { priority: event.target.value })} className="mt-1 h-10 w-full rounded-xl border border-black/10 bg-white px-3 text-xs font-black capitalize"><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label><label className="text-[10px] font-black uppercase tracking-wide text-[#718078]">Assigned agent<select disabled={!supportCanManage || supportSaving} value={selectedTicket.assigned_to_profile_id || ''} onChange={(event) => void updateSupportTicket(selectedTicket, { assigned_to_profile_id: event.target.value || null })} className="mt-1 h-10 w-full rounded-xl border border-black/10 bg-white px-3 text-xs font-black"><option value="">Unassigned</option>{supportAgents.filter((agent) => ['owner', 'administrator', 'support_agent'].includes(agent.platform_role || 'administrator')).map((agent) => <option key={agent.id} value={agent.id}>{agent.full_name}</option>)}</select></label></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><SlaBadge label="First response" due={selectedTicket.first_response_due_at} completed={selectedTicket.first_response_at} /><SlaBadge label="Resolution" due={selectedTicket.resolution_due_at} completed={['resolved', 'closed'].includes(selectedTicket.status) ? selectedTicket.updated_at : null} /></div></div><div className="rounded-[22px] bg-white p-5"><h4 className="font-black">Case conversation</h4><div className="mt-4 max-h-72 space-y-3 overflow-y-auto">{selectedTicket.messages.map((entry) => <div key={entry.id} className={`rounded-2xl p-3 ${entry.visibility === 'internal' ? 'border border-amber-200 bg-amber-50' : entry.author_type === 'portal_agent' ? 'ml-5 bg-[#e6f5c6]' : 'mr-5 bg-[#f1f3ef]'}`}><div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-wide text-[#718078]"><span>{entry.author?.full_name || formatRole(entry.author_type)} · {entry.visibility === 'internal' ? 'Private note' : 'Customer visible'}</span><span>{formatPortalDateTime(entry.created_at)}</span></div><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{entry.message}</p></div>)}{selectedTicket.messages.length === 0 ? <p className="rounded-xl bg-[#f5f7f2] p-4 text-sm text-[#718078]">No replies or private notes yet.</p> : null}</div>{supportCanManage ? <div className="mt-4 border-t border-black/10 pt-4"><div className="flex gap-2"><button type="button" onClick={() => setSupportVisibility('customer')} className={`rounded-lg px-3 py-2 text-xs font-black ${supportVisibility === 'customer' ? 'bg-[#152019] text-white' : 'bg-[#eef1eb]'}`}>Reply to customer</button><button type="button" onClick={() => setSupportVisibility('internal')} className={`rounded-lg px-3 py-2 text-xs font-black ${supportVisibility === 'internal' ? 'bg-amber-500 text-white' : 'bg-[#eef1eb]'}`}>Private note</button></div><textarea value={supportReply} onChange={(event) => setSupportReply(event.target.value)} rows={4} placeholder={supportVisibility === 'internal' ? 'Internal context, escalation details, or handover note…' : 'Write a clear customer response…'} className="mt-3 w-full resize-none rounded-xl border border-black/10 bg-[#f5f7f2] p-3 text-sm outline-none focus:border-[#7ca52b]" /><button type="button" disabled={supportSaving || supportReply.trim().length < 2} onClick={() => void sendSupportMessage(selectedTicket)} className="mt-2 rounded-xl bg-[#152019] px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">{supportSaving ? 'Saving…' : supportVisibility === 'internal' ? 'Add private note' : 'Send response'}</button></div> : <p className="mt-4 rounded-xl bg-slate-100 p-3 text-xs font-bold text-slate-600">Your portal role has read-only support access.</p>}</div></div> : <div className="flex h-full items-center justify-center text-center"><div><LifeBuoy className="mx-auto h-8 w-8 text-[#7f8d85]" /><p className="mt-3 font-black">Select a support case</p><p className="mt-1 text-sm text-[#718078]">Assignment, SLA, and conversation details appear here.</p></div></div>}</div></div>
           </section>
         </>}
       </div>
@@ -509,6 +567,11 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose, onR
 
 function DetailStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return <article className="rounded-[20px] border border-black/10 bg-white p-4"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf2e8] text-[#597338] [&>svg]:h-4 [&>svg]:w-4">{icon}</span><p className="mt-4 text-[9px] font-black uppercase tracking-[0.14em] text-[#718078]">{label}</p><p className="mt-1 text-sm font-black capitalize">{value}</p></article>
+}
+
+function SlaBadge({ label, due, completed }: { label: string; due: string | null; completed: string | null }) {
+  const breached = Boolean(due && !completed && new Date(due).getTime() < Date.now())
+  return <div className={`rounded-xl border p-3 ${completed ? 'border-emerald-200 bg-emerald-50' : breached ? 'border-red-200 bg-red-50' : 'border-black/10 bg-[#f5f7f2]'}`}><p className="text-[9px] font-black uppercase tracking-wide text-[#718078]">{label} SLA</p><p className={`mt-1 text-xs font-black ${breached ? 'text-red-700' : completed ? 'text-emerald-700' : ''}`}>{completed ? `Completed ${formatPortalDateTime(completed)}` : due ? `${breached ? 'Breached' : 'Due'} ${formatPortalDateTime(due)}` : 'Not calculated'}</p></div>
 }
 
 function SectionHeading({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {

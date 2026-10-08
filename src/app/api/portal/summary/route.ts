@@ -41,7 +41,7 @@ export async function GET() {
         .order('created_at', { ascending: false }),
       adminSupabase
         .from('profiles')
-        .select('id, full_name, email, role, is_active, created_at')
+        .select('id, full_name, email, role, is_active, platform_role, platform_access_scope, platform_permissions, portal_last_active_at, created_at')
         .is('organization_id', null)
         .eq('role', 'super_admin')
         .order('created_at', { ascending: false }),
