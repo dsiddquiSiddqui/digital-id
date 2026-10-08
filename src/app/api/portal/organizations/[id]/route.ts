@@ -53,7 +53,7 @@ export async function GET(
         .order('created_at', { ascending: false }),
       adminSupabase
         .from('organization_subscriptions')
-        .select('id, provider, provider_customer_id, provider_subscription_id, status, plan, current_period_end, cancel_at_period_end, created_at')
+        .select('id, provider, provider_customer_id, provider_subscription_id, status, plan, current_period_end, created_at')
         .eq('organization_id', id)
         .order('created_at', { ascending: false })
         .limit(1)
