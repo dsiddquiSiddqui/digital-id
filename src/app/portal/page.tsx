@@ -123,6 +123,8 @@ type OrganizationDetail = {
   activity: Array<{ id: string; action_type: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown>; created_at: string }>
   securityEvents: Array<{ id: string; event_type: string; severity: string; reviewed_at: string | null; created_at: string }>
   supportTickets: Array<{ id: string; ticket_number: string; subject: string; category: string; priority: string; status: string; response_summary: string | null; created_at: string; updated_at: string }>
+  billingEvents: Array<{ id: string; event_type: string; status: string; provider_event_id: string | null; created_at: string }>
+  portalNotes: Array<{ id: string; action_type: string; metadata: Record<string, unknown>; created_at: string }>
 }
 
 const STATUS_OPTIONS = ['active', 'trialing', 'paused', 'suspended', 'archived']
@@ -331,7 +333,7 @@ export default function PortalPage() {
           </section>
         </>}
       </div>
-      {selectedOrganization ? <OrganizationDrawer organization={selectedOrganization} detail={organizationDetail} loading={detailLoading} error={detailError} onClose={() => setSelectedOrganization(null)} /> : null}
+      {selectedOrganization ? <OrganizationDrawer organization={selectedOrganization} detail={organizationDetail} loading={detailLoading} error={detailError} onClose={() => setSelectedOrganization(null)} onRefresh={() => void openOrganization(selectedOrganization)} /> : null}
     </main>
   )
 }
@@ -343,11 +345,14 @@ function OrganizationRowView({ organization, saving, onUpdate, onOpen }: { organ
   return <tr className={`border-b border-black/10 bg-white transition hover:bg-[#fafbf8] last:border-0 ${isCancelledSubscription(organization.subscription_status) ? 'bg-red-50/40' : ''}`}><td className="px-5 py-4"><button type="button" onClick={() => onOpen(organization)} className="group flex items-center gap-3 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322] transition group-hover:bg-[#b8f43d]">{organization.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="max-w-52 truncate text-sm font-black group-hover:underline">{organization.name}</p><p className="mt-1 max-w-52 truncate font-mono text-[10px] font-bold text-[#7a877f]">/{organization.slug}</p></div></button></td><td className="px-5 py-4"><select value={organization.status} disabled={saving} onChange={(event) => void onUpdate(organization, { status: event.target.value })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black capitalize outline-none disabled:opacity-50">{STATUS_OPTIONS.map((status) => <option key={status}>{status}</option>)}</select></td><td className="px-5 py-4"><select value={organization.plan} disabled={saving} onChange={(event) => void onUpdate(organization, { plan: event.target.value as BillingPlanKey })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black outline-none disabled:opacity-50">{BILLING_PLANS.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select></td><td className="px-5 py-4"><p className="text-sm font-black">{plan.monthlyPrice === null ? 'Custom' : `£${plan.monthlyPrice}`}</p><p className={`mt-1 text-[9px] font-black uppercase tracking-wide ${isCancelledSubscription(organization.subscription_status) ? 'text-red-700' : 'text-[#718078]'}`}>{organization.subscription_status ? formatRole(organization.subscription_status) : organization.plan === 'free' ? 'Free plan' : 'No billing record'}</p></td><td className="px-5 py-4"><Capacity value={organization.user_count} limit={plan.userLimit} percent={userPercent} label="users" /></td><td className="px-5 py-4"><Capacity value={organization.staff_count} limit={plan.staffLimit} percent={staffPercent} label="staff" /></td><td className="px-5 py-4"><div className="flex items-center justify-end gap-2"><button type="button" onClick={() => onOpen(organization)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#152019] px-3 py-2 text-xs font-black text-white">Details<ChevronRight className="h-3.5 w-3.5" /></button>{organization.status === 'suspended' ? <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'active' })} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" />Reactivate</button> : <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'suspended' })} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"><PauseCircle className="h-3.5 w-3.5" />Suspend</button>}</div></td></tr>
 }
 
-function OrganizationDrawer({ organization, detail, loading, error, onClose }: { organization: OrganizationRow; detail: OrganizationDetail | null; loading: boolean; error: string; onClose: () => void }) {
+function OrganizationDrawer({ organization, detail, loading, error, onClose, onRefresh }: { organization: OrganizationRow; detail: OrganizationDetail | null; loading: boolean; error: string; onClose: () => void; onRefresh: () => void }) {
   const [activeSection, setActiveSection] = useState<'overview' | 'billing' | 'users' | 'staff' | 'security' | 'activity' | 'support'>('overview')
   const [enterReason, setEnterReason] = useState('')
   const [entering, setEntering] = useState(false)
   const [enterError, setEnterError] = useState('')
+  const [supportNote, setSupportNote] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
   const data = detail?.organization || organization
   const subscription = detail?.subscription
   const health = detail ? organizationHealth(detail) : { score: 0, label: 'Loading', tone: 'text-white/50' }
@@ -369,6 +374,38 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose }: {
       setEnterError('Unable to enter organization right now.')
     } finally {
       setEntering(false)
+    }
+  }
+
+  const saveSupportNote = async () => {
+    setNoteSaving(true)
+    setActionMessage('')
+    try {
+      const response = await fetch(`/api/portal/organizations/${organization.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: supportNote }) })
+      const result = await response.json()
+      if (!response.ok) { setActionMessage(result.error || 'Unable to save note.'); return }
+      setSupportNote('')
+      setActionMessage('Private note saved.')
+      onRefresh()
+    } catch {
+      setActionMessage('Unable to save note.')
+    } finally {
+      setNoteSaving(false)
+    }
+  }
+
+  const updateUser = async (person: OrganizationUser, changes: { is_active?: boolean; role?: string }) => {
+    const description = changes.role ? `change ${person.full_name}'s role to ${formatRole(changes.role)}` : `${changes.is_active ? 'activate' : 'deactivate'} ${person.full_name}`
+    if (!window.confirm(`Confirm that you want to ${description}. This action will be audited.`)) return
+    setActionMessage('')
+    try {
+      const response = await fetch(`/api/portal/organizations/${organization.id}/users`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: person.id, confirmation: 'CONFIRM', ...changes }) })
+      const result = await response.json()
+      if (!response.ok) { setActionMessage(result.error || 'Unable to update user.'); return }
+      setActionMessage(`${person.full_name} updated.`)
+      onRefresh()
+    } catch {
+      setActionMessage('Unable to update user.')
     }
   }
 
@@ -403,9 +440,9 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose }: {
             <section className="rounded-[22px] border border-black/10 bg-white p-5"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#152019] text-[#b8f43d]"><DoorOpen className="h-5 w-5" /></span><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#718078]">Audited support access</p><h3 className="text-lg font-black">Enter this organization</h3></div></div><p className="mt-3 text-sm leading-6 text-[#657269]">Open the customer dashboard for troubleshooting. Access expires after 30 minutes and the reason is written to the audit log.</p><div className="mt-4 flex flex-col gap-2 sm:flex-row"><input value={enterReason} onChange={(event) => setEnterReason(event.target.value)} placeholder="Reason for support access" className="h-11 min-w-0 flex-1 rounded-xl border border-black/10 bg-[#f5f7f2] px-3 text-sm font-semibold outline-none focus:border-[#7ca52b]" /><button type="button" onClick={() => void enterOrganization()} disabled={entering} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#152019] px-4 text-sm font-black text-white disabled:opacity-60"><DoorOpen className="h-4 w-4" />{entering ? 'Entering…' : 'Enter workspace'}</button></div>{enterError ? <p className="mt-2 text-xs font-bold text-red-700">{enterError}</p> : null}</section>
           </div> : null}
 
-          {activeSection === 'billing' ? <div className="space-y-5"><SectionHeading icon={<ReceiptText />} title="Billing and subscription" subtitle="Commercial status, renewal timing, and provider references." /><div className="grid gap-3 sm:grid-cols-2"><DetailStat icon={<CreditCard />} label="Plan" value={getBillingPlan(detail.organization.plan).name} /><DetailStat icon={<ReceiptText />} label="Subscription status" value={subscription?.status || 'No subscription'} /><DetailStat icon={<CalendarDays />} label="Subscribed on" value={subscription ? formatPortalDate(subscription.created_at) : 'Not subscribed'} /><DetailStat icon={<CalendarDays />} label="Current period ends" value={subscription?.current_period_end ? formatPortalDate(subscription.current_period_end) : 'No renewal date'} /></div><ReferenceCard label="Stripe customer" value={subscription?.provider_customer_id} /><ReferenceCard label="Stripe subscription" value={subscription?.provider_subscription_id} /><p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-900">Payment failures and invoices remain authoritative in Stripe. Subscription lifecycle changes are synchronized through webhooks.</p></div> : null}
+          {activeSection === 'billing' ? <div className="space-y-5"><SectionHeading icon={<ReceiptText />} title="Billing and subscription" subtitle="Commercial status, renewal timing, and provider references." /><div className="grid gap-3 sm:grid-cols-2"><DetailStat icon={<CreditCard />} label="Plan" value={getBillingPlan(detail.organization.plan).name} /><DetailStat icon={<ReceiptText />} label="Subscription status" value={subscription?.status || 'No subscription'} /><DetailStat icon={<CalendarDays />} label="Subscribed on" value={subscription ? formatPortalDate(subscription.created_at) : 'Not subscribed'} /><DetailStat icon={<CalendarDays />} label="Current period ends" value={subscription?.current_period_end ? formatPortalDate(subscription.current_period_end) : 'No renewal date'} /></div><ReferenceCard label="Stripe customer" value={subscription?.provider_customer_id} /><ReferenceCard label="Stripe subscription" value={subscription?.provider_subscription_id} /><Directory title="Billing event history" subtitle="Webhook-confirmed subscription and payment lifecycle events." empty="No billing events recorded.">{detail.billingEvents.map((event) => <EventCard key={event.id} title={formatRole(event.event_type)} meta={`${event.provider_event_id || 'Internal event'} · ${formatPortalDateTime(event.created_at)}`} status={event.status} />)}</Directory><p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-900">Invoices and disputes remain authoritative in Stripe. This timeline shows the webhook events successfully recorded by the platform.</p></div> : null}
 
-          {activeSection === 'users' ? <Directory title="Account users" subtitle="People with access to the administration system." empty="No account users found.">{detail.users.map((user) => <PersonCard key={user.id} person={user} owner={user.id === detail.accountOwner?.id} />)}</Directory> : null}
+          {activeSection === 'users' ? <div className="space-y-3">{actionMessage ? <p className="rounded-xl bg-[#edf2e8] px-4 py-3 text-sm font-bold text-[#506637]">{actionMessage}</p> : null}<Directory title="Account users" subtitle="Change roles or suspend system access. Every action requires confirmation and is audited." empty="No account users found.">{detail.users.map((user) => <PersonCard key={user.id} person={user} owner={user.id === detail.accountOwner?.id} onToggle={() => void updateUser(user, { is_active: !user.is_active })} onRoleChange={(role) => void updateUser(user, { role })} />)}</Directory></div> : null}
 
           {activeSection === 'staff' ? <Directory title="Staff accounts" subtitle="Every staff record in this organization, including login status." empty="No staff records found.">{detail.staff.map((person) => <StaffCard key={person.id} person={person} />)}</Directory> : null}
 
@@ -413,7 +450,7 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose }: {
 
           {activeSection === 'activity' ? <div className="space-y-5"><SectionHeading icon={<History />} title="Activity timeline" subtitle="The latest audited changes across this organization." /><Directory title="Recent activity" subtitle={`${detail.activity.length} latest recorded actions.`} empty="No activity recorded.">{detail.activity.map((event) => <EventCard key={event.id} title={formatRole(event.action_type)} meta={`${formatRole(event.entity_type)} · ${formatPortalDateTime(event.created_at)}`} status={actorName(event.metadata)} />)}</Directory></div> : null}
 
-          {activeSection === 'support' ? <div className="space-y-5"><SectionHeading icon={<LifeBuoy />} title="Support history" subtitle="Customer-raised requests and their current progress." /><Directory title="Support tickets" subtitle={`${detail.supportTickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length} currently open.`} empty="No support tickets found.">{detail.supportTickets.map((ticket) => <EventCard key={ticket.id} title={`${ticket.ticket_number} · ${ticket.subject}`} meta={`${ticket.priority} priority · opened ${formatPortalDateTime(ticket.created_at)}`} status={formatRole(ticket.status)} />)}</Directory></div> : null}
+          {activeSection === 'support' ? <div className="space-y-5"><SectionHeading icon={<LifeBuoy />} title="Support history" subtitle="Customer requests plus private notes visible only to platform operators." /><section className="rounded-[22px] border border-black/10 bg-white p-5"><h4 className="font-black">Add private platform note</h4><textarea value={supportNote} onChange={(event) => setSupportNote(event.target.value)} placeholder="Record a call, problem, decision, or follow-up…" rows={4} className="mt-3 w-full resize-none rounded-xl border border-black/10 bg-[#f5f7f2] p-3 text-sm font-semibold outline-none focus:border-[#7ca52b]" /><div className="mt-3 flex items-center justify-between gap-3">{actionMessage ? <p className="text-xs font-bold text-[#506637]">{actionMessage}</p> : <span />}<button type="button" onClick={() => void saveSupportNote()} disabled={noteSaving || supportNote.trim().length < 3} className="rounded-xl bg-[#152019] px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">{noteSaving ? 'Saving…' : 'Save private note'}</button></div></section><Directory title="Private notes" subtitle="Internal operational context, stored in the immutable audit trail." empty="No private platform notes yet.">{detail.portalNotes.map((note) => <EventCard key={note.id} title={noteText(note.metadata)} meta={formatPortalDateTime(note.created_at)} status={actorName(note.metadata)} />)}</Directory><Directory title="Support tickets" subtitle={`${detail.supportTickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length} currently open.`} empty="No support tickets found.">{detail.supportTickets.map((ticket) => <EventCard key={ticket.id} title={`${ticket.ticket_number} · ${ticket.subject}`} meta={`${ticket.priority} priority · opened ${formatPortalDateTime(ticket.created_at)}`} status={formatRole(ticket.status)} />)}</Directory></div> : null}
         </> : null}
       </div>
     </aside>
@@ -450,8 +487,8 @@ function Directory({ title, subtitle, empty, children }: { title: string; subtit
   return <section><div className="mb-4"><h3 className="text-xl font-black tracking-[-0.03em]">{title}</h3><p className="mt-1 text-sm text-[#718078]">{subtitle}</p></div><div className="space-y-3">{entries.length > 0 ? children : <p className="rounded-2xl border border-dashed border-black/15 bg-white p-8 text-center text-sm font-bold text-[#718078]">{empty}</p>}</div></section>
 }
 
-function PersonCard({ person, owner = false }: { person: OrganizationUser; owner?: boolean }) {
-  return <article className="mt-3 flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322]">{person.full_name.charAt(0).toUpperCase()}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-black">{person.full_name}</p>{owner ? <span className="rounded-full bg-[#b8f43d] px-2 py-1 text-[8px] font-black uppercase tracking-wide">Owner</span> : null}<span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide ${person.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{person.is_active ? 'Active' : 'Inactive'}</span></div><p className="mt-1 text-[10px] font-black uppercase tracking-wide text-[#718078]">{formatRole(person.role)} · created {formatPortalDate(person.created_at)}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-[#657269]">{person.email ? <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{person.email}</span> : null}{person.phone ? <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{person.phone}</span> : null}</div></div></article>
+function PersonCard({ person, owner = false, onToggle, onRoleChange }: { person: OrganizationUser; owner?: boolean; onToggle?: () => void; onRoleChange?: (role: string) => void }) {
+  return <article className="mt-3 flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322]">{person.full_name.charAt(0).toUpperCase()}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-black">{person.full_name}</p>{owner ? <span className="rounded-full bg-[#b8f43d] px-2 py-1 text-[8px] font-black uppercase tracking-wide">Owner</span> : null}<span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide ${person.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{person.is_active ? 'Active' : 'Inactive'}</span></div><p className="mt-1 text-[10px] font-black uppercase tracking-wide text-[#718078]">{formatRole(person.role)} · created {formatPortalDate(person.created_at)}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-[#657269]">{person.email ? <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{person.email}</span> : null}{person.phone ? <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{person.phone}</span> : null}</div>{onToggle && onRoleChange ? <div className="mt-4 flex flex-wrap items-center gap-2"><select value={person.role} onChange={(event) => onRoleChange(event.target.value)} className="h-9 rounded-xl border border-black/10 bg-[#f5f7f2] px-2 text-xs font-black capitalize outline-none">{['admin', 'manager', 'hr_manager', 'hr', 'operation_manager', 'operation_team', 'guard'].map((role) => <option key={role} value={role}>{formatRole(role)}</option>)}</select><button type="button" onClick={onToggle} className={`h-9 rounded-xl px-3 text-xs font-black ${person.is_active ? 'border border-red-200 bg-red-50 text-red-700' : 'bg-emerald-600 text-white'}`}>{person.is_active ? 'Deactivate access' : 'Reactivate access'}</button></div> : null}</div></article>
 }
 
 function StaffCard({ person }: { person: StaffAccount }) {
@@ -500,6 +537,11 @@ function formatRole(value: string) {
 function actorName(metadata: Record<string, unknown>) {
   const value = metadata.actor_name
   return typeof value === 'string' && value ? value : 'System'
+}
+
+function noteText(metadata: Record<string, unknown>) {
+  const value = metadata.note
+  return typeof value === 'string' && value ? value : 'Private support note'
 }
 
 function organizationHealth(detail: OrganizationDetail) {

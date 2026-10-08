@@ -35,7 +35,7 @@ export async function GET(
     const { id } = await context.params
     const adminSupabase = createAdminClient()
 
-    const [organization, users, staff, subscription, usage, activity, securityEvents, supportTickets] = await Promise.all([
+    const [organization, users, staff, subscription, usage, activity, securityEvents, supportTickets, billingEvents] = await Promise.all([
       adminSupabase
         .from('organizations')
         .select('id, name, slug, status, plan, created_at, updated_at')
@@ -77,6 +77,12 @@ export async function GET(
         .eq('organization_id', id)
         .order('created_at', { ascending: false })
         .limit(25),
+      adminSupabase
+        .from('billing_events')
+        .select('id, event_type, status, provider_event_id, created_at')
+        .eq('organization_id', id)
+        .order('created_at', { ascending: false })
+        .limit(25),
     ])
 
     if (organization.error || !organization.data) {
@@ -91,6 +97,7 @@ export async function GET(
     if (activity.error) return NextResponse.json({ error: activity.error.message }, { status: 400 })
     if (securityEvents.error) return NextResponse.json({ error: securityEvents.error.message }, { status: 400 })
     if (supportTickets.error) return NextResponse.json({ error: supportTickets.error.message }, { status: 400 })
+    if (billingEvents.error) return NextResponse.json({ error: billingEvents.error.message }, { status: 400 })
 
     const accountUsers = (users.data || []).filter((user) => user.role !== 'staff')
     const accountOwner =
@@ -110,9 +117,45 @@ export async function GET(
       activity: activity.data || [],
       securityEvents: securityEvents.data || [],
       supportTickets: supportTickets.data || [],
+      billingEvents: billingEvents.data || [],
+      portalNotes: (activity.data || []).filter((event) => event.action_type === 'portal_support_note'),
     })
   } catch (error) {
     console.error('Portal organization detail error:', error)
+    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 })
+  }
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const access = await requirePortalAccess()
+    if (!access) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+
+    const { id } = await context.params
+    const body = await request.json()
+    const note = typeof body.note === 'string' ? body.note.trim().slice(0, 2000) : ''
+    if (note.length < 3) return NextResponse.json({ error: 'Enter a note of at least 3 characters.' }, { status: 400 })
+
+    const adminSupabase = createAdminClient()
+    const { data: organization } = await adminSupabase.from('organizations').select('id, name').eq('id', id).maybeSingle()
+    if (!organization) return NextResponse.json({ error: 'Organization not found.' }, { status: 404 })
+
+    const { data, error } = await adminSupabase.from('audit_logs').insert({
+      organization_id: id,
+      actor_profile_id: access.id,
+      action_type: 'portal_support_note',
+      entity_type: 'organization',
+      entity_id: id,
+      metadata: { note, actor_role: access.role, module: 'Platform Portal', page: '/portal' },
+    }).select('id, action_type, metadata, created_at').single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ note: data })
+  } catch (error) {
+    console.error('Portal support note error:', error)
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 })
   }
 }
