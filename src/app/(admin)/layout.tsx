@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -63,6 +64,22 @@ const ALLOWED_LAYOUT_ROLES = [
   'operation_manager',
   'operation_team',
 ]
+
+function readableTextColor(color: string | null | undefined) {
+  const hex = color?.trim().replace('#', '')
+  if (!hex || !/^[\da-f]{3}([\da-f]{3})?$/i.test(hex)) return '#ffffff'
+
+  const normalized = hex.length === 3
+    ? hex.split('').map((character) => character + character).join('')
+    : hex
+  const red = Number.parseInt(normalized.slice(0, 2), 16)
+  const green = Number.parseInt(normalized.slice(2, 4), 16)
+  const blue = Number.parseInt(normalized.slice(4, 6), 16)
+
+  return (red * 299 + green * 587 + blue * 114) / 1000 >= 150
+    ? '#171915'
+    : '#ffffff'
+}
 
 export default function AdminLayout({
   children,
@@ -184,6 +201,23 @@ export default function AdminLayout({
 
   const role = profile?.role ?? ''
   const organization = profile?.organizations ?? null
+  const tenantStyle = organization
+    ? {
+        '--tenant-primary': organization.primary_color || '#17834b',
+        '--tenant-accent': organization.accent_color || '#171915',
+        '--tenant-surface': organization.surface_color || '#f7f8fa',
+        '--tenant-on-primary': readableTextColor(organization.primary_color),
+        '--brand': organization.primary_color || '#17834b',
+        '--brand-hover': `color-mix(in srgb, ${organization.primary_color || '#17834b'} 84%, black)`,
+        '--dx-canvas': organization.surface_color || '#f7f8fa',
+        '--dx-signal': organization.primary_color || '#17834b',
+        '--dx-signal-soft': `color-mix(in srgb, ${organization.primary_color || '#17834b'} 12%, white)`,
+        '--dx-on-signal': readableTextColor(organization.primary_color),
+        '--dx-nav': organization.accent_color || '#171915',
+        '--dx-line': `color-mix(in srgb, ${organization.accent_color || '#171915'} 13%, transparent)`,
+        '--dx-line-strong': `color-mix(in srgb, ${organization.accent_color || '#171915'} 24%, transparent)`,
+      } as CSSProperties
+    : undefined
   const permissions = useMemo(() => {
     const isSuperAdmin = role === 'super_admin'
     const isAdmin = role === 'admin'
@@ -418,7 +452,7 @@ export default function AdminLayout({
 
   return (
     <ToastProvider>
-    <main className="min-h-screen bg-[var(--dx-canvas)] text-[var(--dx-ink)]">
+    <main className="tenant-theme min-h-screen bg-[var(--dx-canvas)] text-[var(--dx-ink)]" style={tenantStyle}>
       <div className="flex min-h-screen overflow-x-hidden">
         {mobileSidebarOpen ? (
           <div
@@ -428,7 +462,7 @@ export default function AdminLayout({
         ) : null}
 
         <aside
-          className={`fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-white/10 bg-[#111612] text-white shadow-[8px_0_30px_rgba(16,24,20,0.08)] transition-[width,transform] duration-300 lg:translate-x-0 ${
+          className={`fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-white/10 bg-[var(--dx-nav)] text-white shadow-[8px_0_30px_rgba(16,24,20,0.08)] transition-[width,transform] duration-300 lg:translate-x-0 ${
             sidebarCollapsed ? 'lg:w-[76px]' : 'lg:w-[260px]'
           } ${
             mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -618,13 +652,13 @@ function SidebarLink({
       aria-current={active ? 'page' : undefined}
       className={`group relative flex min-h-10 items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-semibold transition ${collapsed ? 'lg:justify-center lg:gap-0 lg:px-2' : ''} ${
         active
-          ? 'bg-white/[0.09] text-white ring-1 ring-inset ring-white/10 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-r-full before:bg-[#38b66a]'
+          ? 'bg-white/[0.09] text-white ring-1 ring-inset ring-white/10 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-r-full before:bg-[var(--dx-signal)]'
           : 'text-white/62 hover:bg-white/[0.055] hover:text-white'
       }`}
     >
       <span
         className={`transition ${
-          active ? 'text-[#38b66a]' : 'text-white/38 group-hover:text-white/75'
+          active ? 'text-[var(--dx-signal)]' : 'text-white/38 group-hover:text-white/75'
         }`}
       >
         {icon}

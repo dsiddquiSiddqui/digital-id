@@ -7,6 +7,7 @@
   --tenant-primary: #0094e0;
   --tenant-accent: #081a33;
   --tenant-surface: #f8fafc;
+  --tenant-on-primary: #ffffff;
   --dx-canvas: #f7f8fa;
   --dx-surface: #ffffff;
   --dx-surface-muted: #f3f5f7;
@@ -54,7 +55,7 @@ textarea:focus-visible {
 
 ::selection {
   background: var(--dx-signal);
-  color: white;
+  color: var(--dx-on-signal);
 }
 
 @layer components {
@@ -124,11 +125,11 @@ textarea:focus-visible {
 
   .dx-button-primary {
     background: var(--dx-signal);
-    color: white;
+    color: var(--dx-on-signal);
   }
 
   .dx-button-primary:hover {
-    background: #116b3c;
+    background: color-mix(in srgb, var(--dx-signal) 84%, black);
   }
 
   .dx-button-secondary {
@@ -212,6 +213,12 @@ textarea:focus-visible {
 
 .tenant-theme {
   background-color: var(--tenant-surface);
+}
+
+.tenant-theme .text-white:is(.bg-\[\#0094e0\], .bg-\[var\(--dx-signal\)\]),
+.tenant-theme .bg-\[\#0094e0\].text-white,
+.tenant-theme .bg-\[var\(--dx-signal\)\].text-white {
+  color: var(--tenant-on-primary) !important;
 }
 
 .tenant-theme .bg-\[\#0094e0\],
