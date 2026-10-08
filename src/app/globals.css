@@ -271,3 +271,34 @@ textarea:focus-visible {
 .tenant-theme .bg-\[\#f8fafcdb\] {
   background-color: var(--tenant-surface) !important;
 }
+
+/* Legacy page accents inside the authenticated shell inherit the organization palette. */
+.tenant-theme .bg-slate-950,
+.tenant-theme .bg-\[\#111612\],
+.tenant-theme .bg-\[\#12251f\],
+.tenant-theme .bg-\[\#102a24\]\/90 {
+  background-color: var(--tenant-accent) !important;
+}
+
+.tenant-theme .border-slate-950,
+.tenant-theme .border-emerald-700,
+.tenant-theme .hover\:border-emerald-300:hover {
+  border-color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .bg-emerald-400,
+.tenant-theme .bg-emerald-600,
+.tenant-theme .hover\:bg-emerald-300:hover {
+  background-color: var(--tenant-primary) !important;
+  color: var(--tenant-on-primary) !important;
+}
+
+.tenant-theme .text-emerald-300,
+.tenant-theme .text-emerald-200\/70 {
+  color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .ring-emerald-100,
+.tenant-theme .focus-visible\:ring-emerald-500\/15:focus-visible {
+  --tw-ring-color: color-mix(in srgb, var(--tenant-primary) 28%, transparent) !important;
+}
