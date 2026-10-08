@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getOrganizationPlanUsage } from '@/lib/plan-usage'
 
 async function requirePortalAccess() {
   const supabase = await createClient()
@@ -34,7 +35,7 @@ export async function GET(
     const { id } = await context.params
     const adminSupabase = createAdminClient()
 
-    const [organization, users, staff, subscription] = await Promise.all([
+    const [organization, users, staff, subscription, usage, activity, securityEvents, supportTickets] = await Promise.all([
       adminSupabase
         .from('organizations')
         .select('id, name, slug, status, plan, created_at, updated_at')
@@ -52,11 +53,30 @@ export async function GET(
         .order('created_at', { ascending: false }),
       adminSupabase
         .from('organization_subscriptions')
-        .select('id, provider, status, plan, current_period_end, created_at')
+        .select('id, provider, provider_customer_id, provider_subscription_id, status, plan, current_period_end, cancel_at_period_end, created_at')
         .eq('organization_id', id)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      getOrganizationPlanUsage(adminSupabase, id),
+      adminSupabase
+        .from('audit_logs')
+        .select('id, action_type, entity_type, entity_id, metadata, created_at')
+        .eq('organization_id', id)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      adminSupabase
+        .from('security_events')
+        .select('id, event_type, severity, event_payload, reviewed_at, created_at')
+        .eq('organization_id', id)
+        .order('created_at', { ascending: false })
+        .limit(25),
+      adminSupabase
+        .from('support_tickets')
+        .select('id, ticket_number, subject, category, priority, status, response_summary, created_at, updated_at')
+        .eq('organization_id', id)
+        .order('created_at', { ascending: false })
+        .limit(25),
     ])
 
     if (organization.error || !organization.data) {
@@ -68,6 +88,9 @@ export async function GET(
     if (users.error) return NextResponse.json({ error: users.error.message }, { status: 400 })
     if (staff.error) return NextResponse.json({ error: staff.error.message }, { status: 400 })
     if (subscription.error) return NextResponse.json({ error: subscription.error.message }, { status: 400 })
+    if (activity.error) return NextResponse.json({ error: activity.error.message }, { status: 400 })
+    if (securityEvents.error) return NextResponse.json({ error: securityEvents.error.message }, { status: 400 })
+    if (supportTickets.error) return NextResponse.json({ error: supportTickets.error.message }, { status: 400 })
 
     const accountUsers = (users.data || []).filter((user) => user.role !== 'staff')
     const accountOwner =
@@ -83,6 +106,10 @@ export async function GET(
       users: accountUsers,
       staff: staff.data || [],
       subscription: subscription.data || null,
+      usage,
+      activity: activity.data || [],
+      securityEvents: securityEvents.data || [],
+      supportTickets: supportTickets.data || [],
     })
   } catch (error) {
     console.error('Portal organization detail error:', error)

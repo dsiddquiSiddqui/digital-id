@@ -12,12 +12,19 @@ import {
   CircleDollarSign,
   Copy,
   CreditCard,
+  DoorOpen,
+  FileText,
+  HardDrive,
+  History,
+  LifeBuoy,
+  LockKeyhole,
   LogOut,
   Mail,
   PauseCircle,
   Phone,
   Plus,
   RefreshCw,
+  ReceiptText,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -97,11 +104,23 @@ type OrganizationDetail = {
   subscription: {
     id: string
     provider: string
+    provider_customer_id: string | null
+    provider_subscription_id: string | null
     status: string
     plan: string
     current_period_end: string | null
+    cancel_at_period_end: boolean
     created_at: string
   } | null
+  usage: {
+    usage: { users: number; staff: number; ids: number; activeIds: number; documents: number; devices: number; securityAlerts: number; storageMb: number }
+    limits: { users: number | null; staff: number | null; storageMb: number }
+    percentages: { users: number; staff: number; storage: number }
+    isOverLimit: { users: boolean; staff: boolean }
+  }
+  activity: Array<{ id: string; action_type: string; entity_type: string; entity_id: string | null; metadata: Record<string, unknown>; created_at: string }>
+  securityEvents: Array<{ id: string; event_type: string; severity: string; reviewed_at: string | null; created_at: string }>
+  supportTickets: Array<{ id: string; ticket_number: string; subject: string; category: string; priority: string; status: string; response_summary: string | null; created_at: string; updated_at: string }>
 }
 
 const STATUS_OPTIONS = ['active', 'trialing', 'paused', 'suspended', 'archived']
@@ -323,12 +342,32 @@ function OrganizationRowView({ organization, saving, onUpdate, onOpen }: { organ
 }
 
 function OrganizationDrawer({ organization, detail, loading, error, onClose }: { organization: OrganizationRow; detail: OrganizationDetail | null; loading: boolean; error: string; onClose: () => void }) {
-  const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'staff'>('overview')
+  const [activeSection, setActiveSection] = useState<'overview' | 'billing' | 'users' | 'staff' | 'security' | 'activity' | 'support'>('overview')
+  const [enterReason, setEnterReason] = useState('')
+  const [entering, setEntering] = useState(false)
+  const [enterError, setEnterError] = useState('')
   const data = detail?.organization || organization
   const subscription = detail?.subscription
+  const health = detail ? organizationHealth(detail) : { score: 0, label: 'Loading', tone: 'text-white/50' }
 
   const copyOrganizationId = async () => {
     await navigator.clipboard.writeText(organization.id)
+  }
+
+  const enterOrganization = async () => {
+    if (enterReason.trim().length < 8) { setEnterError('Enter a support reason of at least 8 characters.'); return }
+    setEntering(true)
+    setEnterError('')
+    try {
+      const response = await fetch('/api/platform/organizations/enter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ organization_id: organization.id, reason: enterReason }) })
+      const result = await response.json()
+      if (!response.ok) { setEnterError(result.error || 'Unable to enter organization.'); return }
+      window.location.assign(result.redirect_to || '/dashboard')
+    } catch {
+      setEnterError('Unable to enter organization right now.')
+    } finally {
+      setEntering(false)
+    }
   }
 
   return <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`${organization.name} details`}>
@@ -340,11 +379,11 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose }: {
           <div className="flex min-w-0 items-center gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#b8f43d] text-lg font-black text-[#10150f]">{organization.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#b8f43d]">Organization intelligence</p><h2 className="mt-1 truncate text-2xl font-black tracking-[-0.04em]">{organization.name}</h2><p className="mt-1 font-mono text-xs text-white/45">/{organization.slug}</p></div></div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 transition hover:bg-white/10" aria-label="Close drawer"><X className="h-5 w-5" /></button>
         </div>
-        <div className="relative mt-5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#b8f43d] px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-[#10150f]">{data.plan_name || getBillingPlan(data.plan).name}</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white/70">{data.status}</span><span className="text-xs font-semibold text-white/45">{organization.user_count} users · {organization.staff_count} staff</span></div>
+        <div className="relative mt-5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#b8f43d] px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-[#10150f]">{data.plan_name || getBillingPlan(data.plan).name}</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white/70">{data.status}</span><span className={`rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide ${health.tone}`}>{health.score} · {health.label}</span><span className="text-xs font-semibold text-white/45">{organization.user_count} users · {organization.staff_count} staff</span></div>
       </header>
 
-      <nav className="flex gap-1 border-b border-black/10 bg-white px-5 py-3 sm:px-7" aria-label="Organization detail sections">
-        {(['overview', 'users', 'staff'] as const).map((section) => <button key={section} type="button" onClick={() => setActiveSection(section)} className={`rounded-xl px-4 py-2 text-xs font-black capitalize transition ${activeSection === section ? 'bg-[#152019] text-white' : 'text-[#657269] hover:bg-[#eef1eb]'}`}>{section}{section === 'users' && detail ? ` (${detail.users.length})` : ''}{section === 'staff' && detail ? ` (${detail.staff.length})` : ''}</button>)}
+      <nav className="flex gap-1 overflow-x-auto border-b border-black/10 bg-white px-5 py-3 sm:px-7" aria-label="Organization detail sections">
+        {(['overview', 'billing', 'users', 'staff', 'security', 'activity', 'support'] as const).map((section) => <button key={section} type="button" onClick={() => setActiveSection(section)} className={`shrink-0 rounded-xl px-3 py-2 text-xs font-black capitalize transition ${activeSection === section ? 'bg-[#152019] text-white' : 'text-[#657269] hover:bg-[#eef1eb]'}`}>{section}{section === 'users' && detail ? ` (${detail.users.length})` : ''}{section === 'staff' && detail ? ` (${detail.staff.length})` : ''}</button>)}
       </nav>
 
       <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
@@ -357,11 +396,21 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose }: {
             <section className="rounded-[22px] border border-black/10 bg-white p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#718078]">Account ownership</p><h3 className="mt-1 text-lg font-black">Account owner</h3></div><UserRoundCog className="h-5 w-5 text-[#79905f]" /></div>{detail.accountOwner ? <PersonCard person={detail.accountOwner} owner /> : <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">No organization administrator was found.</p>}<p className="mt-3 text-[11px] font-semibold leading-5 text-[#718078]">Owner is identified as the earliest active administrator because the current data model does not store a separate owner role.</p></section>
 
             <section className="grid gap-3 sm:grid-cols-3"><CountCard value={detail.users.length} label="Account users" /><CountCard value={detail.staff.length} label="Staff records" /><CountCard value={detail.staff.filter((person) => person.profile_id).length} label="Staff logins" /></section>
+
+            <section className="rounded-[22px] border border-black/10 bg-white p-5"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#152019] text-[#b8f43d]"><DoorOpen className="h-5 w-5" /></span><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#718078]">Audited support access</p><h3 className="text-lg font-black">Enter this organization</h3></div></div><p className="mt-3 text-sm leading-6 text-[#657269]">Open the customer dashboard for troubleshooting. Access expires after 30 minutes and the reason is written to the audit log.</p><div className="mt-4 flex flex-col gap-2 sm:flex-row"><input value={enterReason} onChange={(event) => setEnterReason(event.target.value)} placeholder="Reason for support access" className="h-11 min-w-0 flex-1 rounded-xl border border-black/10 bg-[#f5f7f2] px-3 text-sm font-semibold outline-none focus:border-[#7ca52b]" /><button type="button" onClick={() => void enterOrganization()} disabled={entering} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#152019] px-4 text-sm font-black text-white disabled:opacity-60"><DoorOpen className="h-4 w-4" />{entering ? 'Entering…' : 'Enter workspace'}</button></div>{enterError ? <p className="mt-2 text-xs font-bold text-red-700">{enterError}</p> : null}</section>
           </div> : null}
+
+          {activeSection === 'billing' ? <div className="space-y-5"><SectionHeading icon={<ReceiptText />} title="Billing and subscription" subtitle="Commercial status, renewal timing, and provider references." /><div className="grid gap-3 sm:grid-cols-2"><DetailStat icon={<CreditCard />} label="Plan" value={getBillingPlan(detail.organization.plan).name} /><DetailStat icon={<ReceiptText />} label="Subscription status" value={subscription?.status || 'No subscription'} /><DetailStat icon={<CalendarDays />} label="Subscribed on" value={subscription ? formatPortalDate(subscription.created_at) : 'Not subscribed'} /><DetailStat icon={<CalendarDays />} label={subscription?.cancel_at_period_end ? 'Cancels on' : 'Renews on'} value={subscription?.current_period_end ? formatPortalDate(subscription.current_period_end) : 'No renewal date'} /></div><ReferenceCard label="Stripe customer" value={subscription?.provider_customer_id} /><ReferenceCard label="Stripe subscription" value={subscription?.provider_subscription_id} /><p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-900">Payment failures and invoices remain authoritative in Stripe. Subscription lifecycle changes are synchronized through webhooks.</p></div> : null}
 
           {activeSection === 'users' ? <Directory title="Account users" subtitle="People with access to the administration system." empty="No account users found.">{detail.users.map((user) => <PersonCard key={user.id} person={user} owner={user.id === detail.accountOwner?.id} />)}</Directory> : null}
 
           {activeSection === 'staff' ? <Directory title="Staff accounts" subtitle="Every staff record in this organization, including login status." empty="No staff records found.">{detail.staff.map((person) => <StaffCard key={person.id} person={person} />)}</Directory> : null}
+
+          {activeSection === 'security' ? <div className="space-y-5"><SectionHeading icon={<LockKeyhole />} title="Security and usage" subtitle="Capacity, storage, devices, and recent security signals." /><div className="grid gap-3 sm:grid-cols-2"><UsageCard icon={<Users />} label="System users" value={detail.usage.usage.users} limit={detail.usage.limits.users} percent={detail.usage.percentages.users} /><UsageCard icon={<Users />} label="Staff records" value={detail.usage.usage.staff} limit={detail.usage.limits.staff} percent={detail.usage.percentages.staff} /><UsageCard icon={<HardDrive />} label="Storage" value={detail.usage.usage.storageMb} limit={detail.usage.limits.storageMb} percent={detail.usage.percentages.storage} suffix=" MB" /><UsageCard icon={<FileText />} label="Documents" value={detail.usage.usage.documents} limit={null} percent={0} /></div><div className="grid gap-3 sm:grid-cols-3"><CountCard value={detail.usage.usage.devices} label="Known devices" /><CountCard value={detail.usage.usage.activeIds} label="Active IDs" /><CountCard value={detail.usage.usage.securityAlerts} label="Security events" /></div><Directory title="Recent security events" subtitle="Latest signals requiring platform awareness." empty="No security events recorded.">{detail.securityEvents.map((event) => <EventCard key={event.id} title={formatRole(event.event_type)} meta={`${event.severity} · ${formatPortalDateTime(event.created_at)}`} status={event.reviewed_at ? 'Reviewed' : 'Open'} />)}</Directory></div> : null}
+
+          {activeSection === 'activity' ? <div className="space-y-5"><SectionHeading icon={<History />} title="Activity timeline" subtitle="The latest audited changes across this organization." /><Directory title="Recent activity" subtitle={`${detail.activity.length} latest recorded actions.`} empty="No activity recorded.">{detail.activity.map((event) => <EventCard key={event.id} title={formatRole(event.action_type)} meta={`${formatRole(event.entity_type)} · ${formatPortalDateTime(event.created_at)}`} status={actorName(event.metadata)} />)}</Directory></div> : null}
+
+          {activeSection === 'support' ? <div className="space-y-5"><SectionHeading icon={<LifeBuoy />} title="Support history" subtitle="Customer-raised requests and their current progress." /><Directory title="Support tickets" subtitle={`${detail.supportTickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length} currently open.`} empty="No support tickets found.">{detail.supportTickets.map((ticket) => <EventCard key={ticket.id} title={`${ticket.ticket_number} · ${ticket.subject}`} meta={`${ticket.priority} priority · opened ${formatPortalDateTime(ticket.created_at)}`} status={formatRole(ticket.status)} />)}</Directory></div> : null}
         </> : null}
       </div>
     </aside>
@@ -370,6 +419,23 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose }: {
 
 function DetailStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return <article className="rounded-[20px] border border-black/10 bg-white p-4"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf2e8] text-[#597338] [&>svg]:h-4 [&>svg]:w-4">{icon}</span><p className="mt-4 text-[9px] font-black uppercase tracking-[0.14em] text-[#718078]">{label}</p><p className="mt-1 text-sm font-black capitalize">{value}</p></article>
+}
+
+function SectionHeading({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
+  return <div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#152019] text-[#b8f43d] [&>svg]:h-5 [&>svg]:w-5">{icon}</span><div><h3 className="text-xl font-black tracking-[-0.03em]">{title}</h3><p className="mt-1 text-sm text-[#718078]">{subtitle}</p></div></div>
+}
+
+function ReferenceCard({ label, value }: { label: string; value?: string | null }) {
+  return <div className="rounded-2xl border border-black/10 bg-white p-4"><p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#718078]">{label}</p><p className="mt-2 break-all font-mono text-xs font-bold">{value || 'Not connected'}</p></div>
+}
+
+function UsageCard({ icon, label, value, limit, percent, suffix = '' }: { icon: React.ReactNode; label: string; value: number; limit: number | null; percent: number; suffix?: string }) {
+  const warning = limit !== null && percent >= 80
+  return <article className="rounded-[20px] border border-black/10 bg-white p-4"><div className="flex items-center justify-between"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf2e8] text-[#597338] [&>svg]:h-4 [&>svg]:w-4">{icon}</span><span className={`text-[10px] font-black ${warning ? 'text-amber-700' : 'text-[#718078]'}`}>{limit === null ? 'UNLIMITED' : `${percent}%`}</span></div><p className="mt-4 text-[9px] font-black uppercase tracking-[0.14em] text-[#718078]">{label}</p><p className="mt-1 text-lg font-black">{value.toLocaleString()}{suffix} <span className="text-xs text-[#8a958e]">/ {limit === null ? '∞' : `${limit.toLocaleString()}${suffix}`}</span></p><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf0eb]"><div className={`h-full rounded-full ${warning ? 'bg-amber-500' : 'bg-[#9ed52c]'}`} style={{ width: `${limit === null ? Math.min(20 + value, 100) : percent}%` }} /></div></article>
+}
+
+function EventCard({ title, meta, status }: { title: string; meta: string; status: string }) {
+  return <article className="flex items-start justify-between gap-4 rounded-2xl border border-black/10 bg-white p-4"><div className="min-w-0"><p className="truncate text-sm font-black capitalize">{title}</p><p className="mt-1 text-[11px] font-semibold capitalize text-[#718078]">{meta}</p></div><span className="shrink-0 rounded-full bg-[#edf2e8] px-2.5 py-1 text-[8px] font-black uppercase tracking-wide text-[#506637]">{status}</span></article>
 }
 
 function CountCard({ value, label }: { value: number; label: string }) {
@@ -420,6 +486,30 @@ function formatPortalDate(value: string) {
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
 }
 
+function formatPortalDateTime(value: string) {
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
 function formatRole(value: string) {
   return value.replaceAll('_', ' ')
+}
+
+function actorName(metadata: Record<string, unknown>) {
+  const value = metadata.actor_name
+  return typeof value === 'string' && value ? value : 'System'
+}
+
+function organizationHealth(detail: OrganizationDetail) {
+  let score = 100
+  if (!['active', 'trialing'].includes(detail.organization.status)) score -= 35
+  if (detail.subscription && !['active', 'trialing'].includes(detail.subscription.status)) score -= 20
+  if (detail.usage.percentages.users >= 90 || detail.usage.percentages.staff >= 90) score -= 15
+  if (detail.usage.percentages.storage >= 90) score -= 10
+  const openCritical = detail.securityEvents.filter((event) => !event.reviewed_at && ['high', 'critical'].includes(event.severity)).length
+  score -= Math.min(25, openCritical * 5)
+  score = Math.max(0, score)
+  if (score >= 85) return { score, label: 'Healthy', tone: 'text-[#b8f43d]' }
+  if (score >= 65) return { score, label: 'Needs attention', tone: 'text-amber-300' }
+  if (score >= 40) return { score, label: 'At risk', tone: 'text-orange-300' }
+  return { score, label: 'Critical', tone: 'text-red-300' }
 }
