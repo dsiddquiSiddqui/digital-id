@@ -6,11 +6,16 @@ import {
   Activity,
   BadgeDollarSign,
   Building2,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
+  Copy,
+  CreditCard,
   LogOut,
+  Mail,
   PauseCircle,
+  Phone,
   Plus,
   RefreshCw,
   Search,
@@ -19,6 +24,7 @@ import {
   TrendingUp,
   UserRoundCog,
   Users,
+  X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -61,6 +67,43 @@ type Metrics = {
   staff: number
 }
 
+type OrganizationUser = {
+  id: string
+  full_name: string
+  email: string | null
+  phone: string | null
+  role: string
+  is_active: boolean
+  created_at: string
+}
+
+type StaffAccount = {
+  id: string
+  full_name: string
+  employee_code: string
+  email: string | null
+  phone: string | null
+  staff_type: string | null
+  status: string
+  profile_id: string | null
+  created_at: string
+}
+
+type OrganizationDetail = {
+  organization: OrganizationRow & { updated_at: string }
+  accountOwner: OrganizationUser | null
+  users: OrganizationUser[]
+  staff: StaffAccount[]
+  subscription: {
+    id: string
+    provider: string
+    status: string
+    plan: string
+    current_period_end: string | null
+    created_at: string
+  } | null
+}
+
 const STATUS_OPTIONS = ['active', 'trialing', 'paused', 'suspended', 'archived']
 
 export default function PortalPage() {
@@ -78,6 +121,10 @@ export default function PortalPage() {
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [userForm, setUserForm] = useState({ full_name: '', email: '', password: '' })
+  const [selectedOrganization, setSelectedOrganization] = useState<OrganizationRow | null>(null)
+  const [organizationDetail, setOrganizationDetail] = useState<OrganizationDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
 
   const loadPortal = useCallback(async () => {
     setLoading(true)
@@ -102,6 +149,17 @@ export default function PortalPage() {
   }, [router])
 
   useEffect(() => { void Promise.resolve().then(loadPortal) }, [loadPortal])
+
+  useEffect(() => {
+    if (!selectedOrganization) return
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedOrganization(null) }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [selectedOrganization])
 
   const filteredOrganizations = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -131,6 +189,27 @@ export default function PortalPage() {
       setError('Something went wrong while updating organization.')
     } finally {
       setSavingId('')
+    }
+  }
+
+  const openOrganization = async (organization: OrganizationRow) => {
+    setSelectedOrganization(organization)
+    setOrganizationDetail(null)
+    setDetailError('')
+    setDetailLoading(true)
+    try {
+      const response = await fetch(`/api/portal/organizations/${organization.id}`, { cache: 'no-store' })
+      const result = await response.json()
+      if (!response.ok) {
+        if (response.status === 403) router.replace('/portal/login')
+        setDetailError(result.error || 'Unable to load organization details.')
+        return
+      }
+      setOrganizationDetail(result)
+    } catch {
+      setDetailError('Something went wrong while loading organization details.')
+    } finally {
+      setDetailLoading(false)
     }
   }
 
@@ -199,7 +278,7 @@ export default function PortalPage() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px]">
                   <thead className="bg-[#edf0eb]"><tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#68766e]"><th className="px-5 py-3.5">Organization</th><th className="px-5 py-3.5">Status</th><th className="px-5 py-3.5">Package</th><th className="px-5 py-3.5">Monthly</th><th className="px-5 py-3.5">Seat capacity</th><th className="px-5 py-3.5">Staff capacity</th><th className="px-5 py-3.5 text-right">Control</th></tr></thead>
-                  <tbody>{filteredOrganizations.map((organization) => <OrganizationRowView key={organization.id} organization={organization} saving={savingId === organization.id} onUpdate={updateOrganization} />)}</tbody>
+                  <tbody>{filteredOrganizations.map((organization) => <OrganizationRowView key={organization.id} organization={organization} saving={savingId === organization.id} onUpdate={updateOrganization} onOpen={openOrganization} />)}</tbody>
                 </table>
                 {filteredOrganizations.length === 0 ? <div className="px-6 py-16 text-center"><Search className="mx-auto h-6 w-6 text-[#8c9891]" /><p className="mt-3 font-black">No organizations match</p><p className="mt-1 text-sm text-[#718078]">Try a broader search or another status.</p></div> : null}
               </div>
@@ -231,15 +310,87 @@ export default function PortalPage() {
           </section>
         </>}
       </div>
+      {selectedOrganization ? <OrganizationDrawer organization={selectedOrganization} detail={organizationDetail} loading={detailLoading} error={detailError} onClose={() => setSelectedOrganization(null)} /> : null}
     </main>
   )
 }
 
-function OrganizationRowView({ organization, saving, onUpdate }: { organization: OrganizationRow; saving: boolean; onUpdate: (organization: OrganizationRow, updates: Partial<Pick<OrganizationRow, 'status' | 'plan'>>) => Promise<void> }) {
+function OrganizationRowView({ organization, saving, onUpdate, onOpen }: { organization: OrganizationRow; saving: boolean; onUpdate: (organization: OrganizationRow, updates: Partial<Pick<OrganizationRow, 'status' | 'plan'>>) => Promise<void>; onOpen: (organization: OrganizationRow) => void }) {
   const plan = getBillingPlan(organization.plan)
   const staffPercent = utilization(organization.staff_count, plan.staffLimit)
   const userPercent = utilization(organization.user_count, plan.userLimit)
-  return <tr className="border-b border-black/10 bg-white transition hover:bg-[#fafbf8] last:border-0"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322]">{organization.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="max-w-52 truncate text-sm font-black">{organization.name}</p><p className="mt-1 max-w-52 truncate font-mono text-[10px] font-bold text-[#7a877f]">/{organization.slug}</p></div></div></td><td className="px-5 py-4"><select value={organization.status} disabled={saving} onChange={(event) => void onUpdate(organization, { status: event.target.value })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black capitalize outline-none disabled:opacity-50">{STATUS_OPTIONS.map((status) => <option key={status}>{status}</option>)}</select></td><td className="px-5 py-4"><select value={organization.plan} disabled={saving} onChange={(event) => void onUpdate(organization, { plan: event.target.value as BillingPlanKey })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black outline-none disabled:opacity-50">{BILLING_PLANS.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select></td><td className="px-5 py-4 text-sm font-black">{plan.monthlyPrice === null ? 'Custom' : `£${plan.monthlyPrice}`}</td><td className="px-5 py-4"><Capacity value={organization.user_count} limit={plan.userLimit} percent={userPercent} label="users" /></td><td className="px-5 py-4"><Capacity value={organization.staff_count} limit={plan.staffLimit} percent={staffPercent} label="staff" /></td><td className="px-5 py-4 text-right">{organization.status === 'suspended' ? <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'active' })} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" />Reactivate</button> : <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'suspended' })} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"><PauseCircle className="h-3.5 w-3.5" />Suspend</button>}</td></tr>
+  return <tr className="border-b border-black/10 bg-white transition hover:bg-[#fafbf8] last:border-0"><td className="px-5 py-4"><button type="button" onClick={() => onOpen(organization)} className="group flex items-center gap-3 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322] transition group-hover:bg-[#b8f43d]">{organization.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="max-w-52 truncate text-sm font-black group-hover:underline">{organization.name}</p><p className="mt-1 max-w-52 truncate font-mono text-[10px] font-bold text-[#7a877f]">/{organization.slug}</p></div></button></td><td className="px-5 py-4"><select value={organization.status} disabled={saving} onChange={(event) => void onUpdate(organization, { status: event.target.value })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black capitalize outline-none disabled:opacity-50">{STATUS_OPTIONS.map((status) => <option key={status}>{status}</option>)}</select></td><td className="px-5 py-4"><select value={organization.plan} disabled={saving} onChange={(event) => void onUpdate(organization, { plan: event.target.value as BillingPlanKey })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black outline-none disabled:opacity-50">{BILLING_PLANS.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select></td><td className="px-5 py-4 text-sm font-black">{plan.monthlyPrice === null ? 'Custom' : `£${plan.monthlyPrice}`}</td><td className="px-5 py-4"><Capacity value={organization.user_count} limit={plan.userLimit} percent={userPercent} label="users" /></td><td className="px-5 py-4"><Capacity value={organization.staff_count} limit={plan.staffLimit} percent={staffPercent} label="staff" /></td><td className="px-5 py-4"><div className="flex items-center justify-end gap-2"><button type="button" onClick={() => onOpen(organization)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#152019] px-3 py-2 text-xs font-black text-white">Details<ChevronRight className="h-3.5 w-3.5" /></button>{organization.status === 'suspended' ? <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'active' })} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" />Reactivate</button> : <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'suspended' })} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"><PauseCircle className="h-3.5 w-3.5" />Suspend</button>}</div></td></tr>
+}
+
+function OrganizationDrawer({ organization, detail, loading, error, onClose }: { organization: OrganizationRow; detail: OrganizationDetail | null; loading: boolean; error: string; onClose: () => void }) {
+  const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'staff'>('overview')
+  const data = detail?.organization || organization
+  const subscription = detail?.subscription
+
+  const copyOrganizationId = async () => {
+    await navigator.clipboard.writeText(organization.id)
+  }
+
+  return <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`${organization.name} details`}>
+    <button type="button" aria-label="Close organization details" onClick={onClose} className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
+    <aside className="relative flex h-full w-full max-w-[760px] flex-col overflow-hidden border-l border-white/10 bg-[#f5f7f2] text-[#152019] shadow-2xl">
+      <header className="relative overflow-hidden bg-[#101a16] px-5 pb-5 pt-5 text-white sm:px-7 sm:pt-7">
+        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full border-[32px] border-[#b8f43d]/10" />
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#b8f43d] text-lg font-black text-[#10150f]">{organization.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#b8f43d]">Organization intelligence</p><h2 className="mt-1 truncate text-2xl font-black tracking-[-0.04em]">{organization.name}</h2><p className="mt-1 font-mono text-xs text-white/45">/{organization.slug}</p></div></div>
+          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 transition hover:bg-white/10" aria-label="Close drawer"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="relative mt-5 flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#b8f43d] px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-[#10150f]">{data.plan_name || getBillingPlan(data.plan).name}</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white/70">{data.status}</span><span className="text-xs font-semibold text-white/45">{organization.user_count} users · {organization.staff_count} staff</span></div>
+      </header>
+
+      <nav className="flex gap-1 border-b border-black/10 bg-white px-5 py-3 sm:px-7" aria-label="Organization detail sections">
+        {(['overview', 'users', 'staff'] as const).map((section) => <button key={section} type="button" onClick={() => setActiveSection(section)} className={`rounded-xl px-4 py-2 text-xs font-black capitalize transition ${activeSection === section ? 'bg-[#152019] text-white' : 'text-[#657269] hover:bg-[#eef1eb]'}`}>{section}{section === 'users' && detail ? ` (${detail.users.length})` : ''}{section === 'staff' && detail ? ` (${detail.staff.length})` : ''}</button>)}
+      </nav>
+
+      <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+        {loading ? <DrawerSkeleton /> : error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{error}</div> : detail ? <>
+          {activeSection === 'overview' ? <div className="space-y-5">
+            <section className="rounded-[22px] bg-[#b8f43d] p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-black uppercase tracking-[0.18em] opacity-60">Permanent organization ID</p><p className="mt-2 break-all font-mono text-sm font-black">{detail.organization.id}</p></div><button type="button" onClick={() => void copyOrganizationId()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#10150f] text-[#b8f43d]" aria-label="Copy organization ID"><Copy className="h-4 w-4" /></button></div></section>
+
+            <section className="grid gap-3 sm:grid-cols-2"><DetailStat icon={<CalendarDays />} label="Organization created" value={formatPortalDate(detail.organization.created_at)} /><DetailStat icon={<CreditCard />} label="Subscribed on" value={subscription ? formatPortalDate(subscription.created_at) : 'No subscription record'} /><DetailStat icon={<CalendarDays />} label="Current period ends" value={subscription?.current_period_end ? formatPortalDate(subscription.current_period_end) : 'No renewal date'} /><DetailStat icon={<CreditCard />} label="Billing source" value={subscription ? `${subscription.provider} · ${subscription.status}` : 'Free / not connected'} /></section>
+
+            <section className="rounded-[22px] border border-black/10 bg-white p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#718078]">Account ownership</p><h3 className="mt-1 text-lg font-black">Account owner</h3></div><UserRoundCog className="h-5 w-5 text-[#79905f]" /></div>{detail.accountOwner ? <PersonCard person={detail.accountOwner} owner /> : <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">No organization administrator was found.</p>}<p className="mt-3 text-[11px] font-semibold leading-5 text-[#718078]">Owner is identified as the earliest active administrator because the current data model does not store a separate owner role.</p></section>
+
+            <section className="grid gap-3 sm:grid-cols-3"><CountCard value={detail.users.length} label="Account users" /><CountCard value={detail.staff.length} label="Staff records" /><CountCard value={detail.staff.filter((person) => person.profile_id).length} label="Staff logins" /></section>
+          </div> : null}
+
+          {activeSection === 'users' ? <Directory title="Account users" subtitle="People with access to the administration system." empty="No account users found.">{detail.users.map((user) => <PersonCard key={user.id} person={user} owner={user.id === detail.accountOwner?.id} />)}</Directory> : null}
+
+          {activeSection === 'staff' ? <Directory title="Staff accounts" subtitle="Every staff record in this organization, including login status." empty="No staff records found.">{detail.staff.map((person) => <StaffCard key={person.id} person={person} />)}</Directory> : null}
+        </> : null}
+      </div>
+    </aside>
+  </div>
+}
+
+function DetailStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <article className="rounded-[20px] border border-black/10 bg-white p-4"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf2e8] text-[#597338] [&>svg]:h-4 [&>svg]:w-4">{icon}</span><p className="mt-4 text-[9px] font-black uppercase tracking-[0.14em] text-[#718078]">{label}</p><p className="mt-1 text-sm font-black capitalize">{value}</p></article>
+}
+
+function CountCard({ value, label }: { value: number; label: string }) {
+  return <article className="rounded-[18px] bg-[#152019] p-4 text-white"><p className="text-2xl font-black text-[#b8f43d]">{value}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/45">{label}</p></article>
+}
+
+function Directory({ title, subtitle, empty, children }: { title: string; subtitle: string; empty: string; children: React.ReactNode }) {
+  const entries = Array.isArray(children) ? children : [children]
+  return <section><div className="mb-4"><h3 className="text-xl font-black tracking-[-0.03em]">{title}</h3><p className="mt-1 text-sm text-[#718078]">{subtitle}</p></div><div className="space-y-3">{entries.length > 0 ? children : <p className="rounded-2xl border border-dashed border-black/15 bg-white p-8 text-center text-sm font-bold text-[#718078]">{empty}</p>}</div></section>
+}
+
+function PersonCard({ person, owner = false }: { person: OrganizationUser; owner?: boolean }) {
+  return <article className="mt-3 flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322]">{person.full_name.charAt(0).toUpperCase()}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-black">{person.full_name}</p>{owner ? <span className="rounded-full bg-[#b8f43d] px-2 py-1 text-[8px] font-black uppercase tracking-wide">Owner</span> : null}<span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide ${person.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{person.is_active ? 'Active' : 'Inactive'}</span></div><p className="mt-1 text-[10px] font-black uppercase tracking-wide text-[#718078]">{formatRole(person.role)} · created {formatPortalDate(person.created_at)}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-[#657269]">{person.email ? <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{person.email}</span> : null}{person.phone ? <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{person.phone}</span> : null}</div></div></article>
+}
+
+function StaffCard({ person }: { person: StaffAccount }) {
+  return <article className="flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#152019] text-sm font-black text-[#b8f43d]">{person.full_name.charAt(0).toUpperCase()}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-black">{person.full_name}</p><span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide ${person.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{person.status}</span>{person.profile_id ? <span className="rounded-full bg-blue-50 px-2 py-1 text-[8px] font-black uppercase tracking-wide text-blue-700">Login enabled</span> : null}</div><p className="mt-1 font-mono text-[10px] font-bold text-[#718078]">{person.employee_code} · {formatRole(person.staff_type || 'staff')} · added {formatPortalDate(person.created_at)}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-[#657269]">{person.email ? <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{person.email}</span> : <span>No email recorded</span>}{person.phone ? <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{person.phone}</span> : null}</div></div></article>
+}
+
+function DrawerSkeleton() {
+  return <div className="space-y-4"><div className="h-24 animate-pulse rounded-[22px] bg-black/10" /><div className="grid gap-3 sm:grid-cols-2">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-32 animate-pulse rounded-[20px] bg-black/10" />)}</div><div className="h-52 animate-pulse rounded-[22px] bg-black/10" /></div>
 }
 
 function Capacity({ value, limit, percent, label }: { value: number; limit: number | null; percent: number; label: string }) {
@@ -263,4 +414,12 @@ function PortalSkeleton() {
 function utilization(value: number, limit: number | null) {
   if (!limit) return 0
   return Math.min(100, Math.round((value / limit) * 100))
+}
+
+function formatPortalDate(value: string) {
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
+}
+
+function formatRole(value: string) {
+  return value.replaceAll('_', ' ')
 }
