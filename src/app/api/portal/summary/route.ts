@@ -49,7 +49,7 @@ export async function GET() {
 
     const organizationRows = await Promise.all(
       (organizations || []).map(async (organization) => {
-        const [users, staff] = await Promise.all([
+        const [users, staff, subscription] = await Promise.all([
           adminSupabase
             .from('profiles')
             .select('*', { count: 'exact', head: true })
@@ -59,6 +59,13 @@ export async function GET() {
             .from('staff')
             .select('*', { count: 'exact', head: true })
             .eq('organization_id', organization.id),
+          adminSupabase
+            .from('organization_subscriptions')
+            .select('status, current_period_end, created_at')
+            .eq('organization_id', organization.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ])
 
         const billingPlan = getBillingPlan(organization.plan)
@@ -71,12 +78,16 @@ export async function GET() {
           staff_limit: billingPlan.staffLimit,
           user_count: users.count || 0,
           staff_count: staff.count || 0,
+          subscription_status: subscription.data?.status || null,
+          subscription_period_end: subscription.data?.current_period_end || null,
         }
       })
     )
 
+    const cancelledStatuses = new Set(['canceled', 'cancelled', 'incomplete_expired', 'inactive'])
     const activeOrganizations = organizationRows.filter((organization) =>
-      ['active', 'trialing'].includes(organization.status)
+      ['active', 'trialing'].includes(organization.status) &&
+      !cancelledStatuses.has(organization.subscription_status || '')
     )
     const monthlyRevenue = activeOrganizations.reduce(
       (sum, organization) => sum + (organization.monthly_price || 0),
@@ -89,6 +100,9 @@ export async function GET() {
         activeOrganizations: activeOrganizations.length,
         suspendedOrganizations: organizationRows.filter(
           (organization) => organization.status === 'suspended'
+        ).length,
+        cancelledSubscriptions: organizationRows.filter((organization) =>
+          cancelledStatuses.has(organization.subscription_status || '')
         ).length,
         monthlyRevenue,
         annualRevenue: monthlyRevenue * 12,

@@ -53,6 +53,8 @@ type OrganizationRow = {
   staff_limit: number | null
   user_count: number
   staff_count: number
+  subscription_status: string | null
+  subscription_period_end: string | null
 }
 
 type PortalUser = {
@@ -68,6 +70,7 @@ type Metrics = {
   organizations: number
   activeOrganizations: number
   suspendedOrganizations: number
+  cancelledSubscriptions: number
   monthlyRevenue: number
   annualRevenue: number
   users: number
@@ -132,7 +135,7 @@ export default function PortalPage() {
   const [creatingUser, setCreatingUser] = useState(false)
   const [organizations, setOrganizations] = useState<OrganizationRow[]>([])
   const [portalUsers, setPortalUsers] = useState<PortalUser[]>([])
-  const [metrics, setMetrics] = useState<Metrics>({ organizations: 0, activeOrganizations: 0, suspendedOrganizations: 0, monthlyRevenue: 0, annualRevenue: 0, users: 0, staff: 0 })
+  const [metrics, setMetrics] = useState<Metrics>({ organizations: 0, activeOrganizations: 0, suspendedOrganizations: 0, cancelledSubscriptions: 0, monthlyRevenue: 0, annualRevenue: 0, users: 0, staff: 0 })
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [message, setMessage] = useState('')
@@ -189,7 +192,7 @@ export default function PortalPage() {
   }, [organizations, search, statusFilter])
 
   const planMix = useMemo(() => BILLING_PLANS.map((plan) => ({ ...plan, count: organizations.filter((organization) => organization.plan === plan.key).length })).filter((plan) => plan.count > 0), [organizations])
-  const attentionOrganizations = useMemo(() => organizations.filter((organization) => organization.status === 'suspended' || organization.status === 'paused' || utilization(organization.staff_count, organization.staff_limit) >= 85), [organizations])
+  const attentionOrganizations = useMemo(() => organizations.filter((organization) => isCancelledSubscription(organization.subscription_status) || organization.status === 'suspended' || organization.status === 'paused' || utilization(organization.staff_count, organization.staff_limit) >= 85), [organizations])
   const paidOrganizations = organizations.filter((organization) => !['free'].includes(organization.plan) && ['active', 'trialing'].includes(organization.status)).length
   const averageRevenue = metrics.activeOrganizations ? Math.round(metrics.monthlyRevenue / metrics.activeOrganizations) : 0
 
@@ -276,7 +279,7 @@ export default function PortalPage() {
         {loading && organizations.length === 0 ? <PortalSkeleton /> : <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric title="Monthly recurring revenue" value={`£${metrics.monthlyRevenue.toLocaleString()}`} detail={`£${metrics.annualRevenue.toLocaleString()} annual run rate`} icon={<CircleDollarSign />} tone="lime" />
-            <Metric title="Organizations" value={metrics.organizations.toLocaleString()} detail={`${metrics.activeOrganizations} active · ${metrics.suspendedOrganizations} suspended`} icon={<Building2 />} />
+            <Metric title="Organizations" value={metrics.organizations.toLocaleString()} detail={`${metrics.activeOrganizations} active · ${metrics.cancelledSubscriptions} cancelled`} icon={<Building2 />} />
             <Metric title="People managed" value={(metrics.users + metrics.staff).toLocaleString()} detail={`${metrics.users} system users · ${metrics.staff} staff`} icon={<Users />} />
             <Metric title="Revenue quality" value={`${paidOrganizations} paid`} detail={`£${averageRevenue.toLocaleString()} average per active org`} icon={<TrendingUp />} />
           </section>
@@ -295,7 +298,7 @@ export default function PortalPage() {
 
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px]">
-                  <thead className="bg-[#edf0eb]"><tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#68766e]"><th className="px-5 py-3.5">Organization</th><th className="px-5 py-3.5">Status</th><th className="px-5 py-3.5">Package</th><th className="px-5 py-3.5">Monthly</th><th className="px-5 py-3.5">Seat capacity</th><th className="px-5 py-3.5">Staff capacity</th><th className="px-5 py-3.5 text-right">Control</th></tr></thead>
+                  <thead className="bg-[#edf0eb]"><tr className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#68766e]"><th className="px-5 py-3.5">Organization</th><th className="px-5 py-3.5">Status</th><th className="px-5 py-3.5">Package</th><th className="px-5 py-3.5">Billing</th><th className="px-5 py-3.5">Seat capacity</th><th className="px-5 py-3.5">Staff capacity</th><th className="px-5 py-3.5 text-right">Control</th></tr></thead>
                   <tbody>{filteredOrganizations.map((organization) => <OrganizationRowView key={organization.id} organization={organization} saving={savingId === organization.id} onUpdate={updateOrganization} onOpen={openOrganization} />)}</tbody>
                 </table>
                 {filteredOrganizations.length === 0 ? <div className="px-6 py-16 text-center"><Search className="mx-auto h-6 w-6 text-[#8c9891]" /><p className="mt-3 font-black">No organizations match</p><p className="mt-1 text-sm text-[#718078]">Try a broader search or another status.</p></div> : null}
@@ -309,7 +312,7 @@ export default function PortalPage() {
               </Panel>
 
               <Panel eyebrow="Intervention" title="Needs attention" icon={<Activity className="h-4 w-4" />}>
-                <div className="space-y-2">{attentionOrganizations.slice(0, 5).map((organization) => <div key={organization.id} className="flex items-center justify-between gap-3 rounded-xl bg-amber-50 px-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-black">{organization.name}</p><p className="mt-0.5 text-[11px] font-semibold text-amber-800">{organization.status === 'suspended' ? 'Access suspended' : organization.status === 'paused' ? 'Workspace paused' : `${utilization(organization.staff_count, organization.staff_limit)}% staff capacity`}</p></div><ShieldAlert className="h-4 w-4 shrink-0 text-amber-700" /></div>)}{attentionOrganizations.length === 0 ? <p className="rounded-xl bg-emerald-50 px-3 py-4 text-sm font-bold text-emerald-800">No tenant intervention required.</p> : null}</div>
+                <div className="space-y-2">{attentionOrganizations.slice(0, 5).map((organization) => <button type="button" onClick={() => void openOrganization(organization)} key={organization.id} className="flex w-full items-center justify-between gap-3 rounded-xl bg-amber-50 px-3 py-3 text-left transition hover:bg-amber-100"><div className="min-w-0"><p className="truncate text-sm font-black">{organization.name}</p><p className="mt-0.5 text-[11px] font-semibold text-amber-800">{isCancelledSubscription(organization.subscription_status) ? `Subscription ${formatRole(organization.subscription_status || 'cancelled')}${organization.subscription_period_end ? ` · ended ${formatPortalDate(organization.subscription_period_end)}` : ''}` : organization.status === 'suspended' ? 'Access suspended' : organization.status === 'paused' ? 'Workspace paused' : `${utilization(organization.staff_count, organization.staff_limit)}% staff capacity`}</p></div><ShieldAlert className="h-4 w-4 shrink-0 text-amber-700" /></button>)}{attentionOrganizations.length === 0 ? <p className="rounded-xl bg-emerald-50 px-3 py-4 text-sm font-bold text-emerald-800">No tenant intervention required.</p> : null}</div>
               </Panel>
             </aside>
           </section>
@@ -337,7 +340,7 @@ function OrganizationRowView({ organization, saving, onUpdate, onOpen }: { organ
   const plan = getBillingPlan(organization.plan)
   const staffPercent = utilization(organization.staff_count, plan.staffLimit)
   const userPercent = utilization(organization.user_count, plan.userLimit)
-  return <tr className="border-b border-black/10 bg-white transition hover:bg-[#fafbf8] last:border-0"><td className="px-5 py-4"><button type="button" onClick={() => onOpen(organization)} className="group flex items-center gap-3 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322] transition group-hover:bg-[#b8f43d]">{organization.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="max-w-52 truncate text-sm font-black group-hover:underline">{organization.name}</p><p className="mt-1 max-w-52 truncate font-mono text-[10px] font-bold text-[#7a877f]">/{organization.slug}</p></div></button></td><td className="px-5 py-4"><select value={organization.status} disabled={saving} onChange={(event) => void onUpdate(organization, { status: event.target.value })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black capitalize outline-none disabled:opacity-50">{STATUS_OPTIONS.map((status) => <option key={status}>{status}</option>)}</select></td><td className="px-5 py-4"><select value={organization.plan} disabled={saving} onChange={(event) => void onUpdate(organization, { plan: event.target.value as BillingPlanKey })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black outline-none disabled:opacity-50">{BILLING_PLANS.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select></td><td className="px-5 py-4 text-sm font-black">{plan.monthlyPrice === null ? 'Custom' : `£${plan.monthlyPrice}`}</td><td className="px-5 py-4"><Capacity value={organization.user_count} limit={plan.userLimit} percent={userPercent} label="users" /></td><td className="px-5 py-4"><Capacity value={organization.staff_count} limit={plan.staffLimit} percent={staffPercent} label="staff" /></td><td className="px-5 py-4"><div className="flex items-center justify-end gap-2"><button type="button" onClick={() => onOpen(organization)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#152019] px-3 py-2 text-xs font-black text-white">Details<ChevronRight className="h-3.5 w-3.5" /></button>{organization.status === 'suspended' ? <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'active' })} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" />Reactivate</button> : <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'suspended' })} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"><PauseCircle className="h-3.5 w-3.5" />Suspend</button>}</div></td></tr>
+  return <tr className={`border-b border-black/10 bg-white transition hover:bg-[#fafbf8] last:border-0 ${isCancelledSubscription(organization.subscription_status) ? 'bg-red-50/40' : ''}`}><td className="px-5 py-4"><button type="button" onClick={() => onOpen(organization)} className="group flex items-center gap-3 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8efdf] text-sm font-black text-[#3b5322] transition group-hover:bg-[#b8f43d]">{organization.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="max-w-52 truncate text-sm font-black group-hover:underline">{organization.name}</p><p className="mt-1 max-w-52 truncate font-mono text-[10px] font-bold text-[#7a877f]">/{organization.slug}</p></div></button></td><td className="px-5 py-4"><select value={organization.status} disabled={saving} onChange={(event) => void onUpdate(organization, { status: event.target.value })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black capitalize outline-none disabled:opacity-50">{STATUS_OPTIONS.map((status) => <option key={status}>{status}</option>)}</select></td><td className="px-5 py-4"><select value={organization.plan} disabled={saving} onChange={(event) => void onUpdate(organization, { plan: event.target.value as BillingPlanKey })} className="rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-black outline-none disabled:opacity-50">{BILLING_PLANS.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select></td><td className="px-5 py-4"><p className="text-sm font-black">{plan.monthlyPrice === null ? 'Custom' : `£${plan.monthlyPrice}`}</p><p className={`mt-1 text-[9px] font-black uppercase tracking-wide ${isCancelledSubscription(organization.subscription_status) ? 'text-red-700' : 'text-[#718078]'}`}>{organization.subscription_status ? formatRole(organization.subscription_status) : organization.plan === 'free' ? 'Free plan' : 'No billing record'}</p></td><td className="px-5 py-4"><Capacity value={organization.user_count} limit={plan.userLimit} percent={userPercent} label="users" /></td><td className="px-5 py-4"><Capacity value={organization.staff_count} limit={plan.staffLimit} percent={staffPercent} label="staff" /></td><td className="px-5 py-4"><div className="flex items-center justify-end gap-2"><button type="button" onClick={() => onOpen(organization)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#152019] px-3 py-2 text-xs font-black text-white">Details<ChevronRight className="h-3.5 w-3.5" /></button>{organization.status === 'suspended' ? <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'active' })} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" />Reactivate</button> : <button disabled={saving} onClick={() => void onUpdate(organization, { status: 'suspended' })} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"><PauseCircle className="h-3.5 w-3.5" />Suspend</button>}</div></td></tr>
 }
 
 function OrganizationDrawer({ organization, detail, loading, error, onClose }: { organization: OrganizationRow; detail: OrganizationDetail | null; loading: boolean; error: string; onClose: () => void }) {
@@ -387,6 +390,7 @@ function OrganizationDrawer({ organization, detail, loading, error, onClose }: {
 
       <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
         {loading ? <DrawerSkeleton /> : error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{error}</div> : detail ? <>
+          {isCancelledSubscription(subscription?.status) ? <section className="mb-5 rounded-[20px] border border-red-200 bg-red-50 p-4 text-red-900"><div className="flex items-start gap-3"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-black">Subscription cancelled</p><p className="mt-1 text-sm font-semibold leading-5">This organization is no longer contributing to recurring revenue.{subscription?.current_period_end ? ` The recorded subscription period ended on ${formatPortalDate(subscription.current_period_end)}.` : ' No final access date is recorded.'}</p></div></div></section> : null}
           {activeSection === 'overview' ? <div className="space-y-5">
             <section className="rounded-[22px] bg-[#b8f43d] p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-black uppercase tracking-[0.18em] opacity-60">Permanent organization ID</p><p className="mt-2 break-all font-mono text-sm font-black">{detail.organization.id}</p></div><button type="button" onClick={() => void copyOrganizationId()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#10150f] text-[#b8f43d]" aria-label="Copy organization ID"><Copy className="h-4 w-4" /></button></div></section>
 
@@ -511,4 +515,8 @@ function organizationHealth(detail: OrganizationDetail) {
   if (score >= 65) return { score, label: 'Needs attention', tone: 'text-amber-300' }
   if (score >= 40) return { score, label: 'At risk', tone: 'text-orange-300' }
   return { score, label: 'Critical', tone: 'text-red-300' }
+}
+
+function isCancelledSubscription(status?: string | null) {
+  return ['canceled', 'cancelled', 'incomplete_expired', 'inactive'].includes(status || '')
 }
