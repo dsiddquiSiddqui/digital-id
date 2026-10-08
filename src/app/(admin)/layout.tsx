@@ -452,7 +452,7 @@ export default function AdminLayout({
 
   return (
     <ToastProvider>
-    <main className="tenant-theme min-h-screen bg-[var(--dx-canvas)] text-[var(--dx-ink)]" style={tenantStyle}>
+    <main className="tenant-theme min-h-screen bg-[var(--dx-canvas)] text-[var(--dx-ink)]" style={tenantStyle} data-pathname={pathname}>
       <div className="flex min-h-screen overflow-x-hidden">
         {mobileSidebarOpen ? (
           <div

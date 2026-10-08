@@ -302,3 +302,67 @@ textarea:focus-visible {
 .tenant-theme .focus-visible\:ring-emerald-500\/15:focus-visible {
   --tw-ring-color: color-mix(in srgb, var(--tenant-primary) 28%, transparent) !important;
 }
+
+/* Primary actions and selected controls use the tenant signal, while panels keep the accent. */
+.tenant-theme :is(button, a).bg-slate-950,
+.tenant-theme :is(button, a).bg-\[\#111612\],
+.tenant-theme :is(button, a).bg-\[var\(--dx-ink\)\],
+.tenant-theme :is(button, a).hover\:bg-\[\#202821\]:hover {
+  background-color: var(--tenant-primary) !important;
+  color: var(--tenant-on-primary) !important;
+}
+
+.tenant-theme :is(button, a).bg-slate-950:hover,
+.tenant-theme :is(button, a).bg-\[\#111612\]:hover,
+.tenant-theme :is(button, a).bg-\[var\(--dx-ink\)\]:hover {
+  background-color: color-mix(in srgb, var(--tenant-primary) 84%, black) !important;
+}
+
+.tenant-theme :is(button, a).border-slate-950,
+.tenant-theme :is(input, select).focus\:border-slate-950:focus {
+  border-color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .h-full.rounded-full.bg-slate-950,
+.tenant-theme .shrink-0.rounded-2xl.bg-slate-950,
+.tenant-theme .bg-\[\#38b66a\],
+.tenant-theme .bg-\[\#17834b\] {
+  background-color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .text-\[\#7ee2a8\],
+.tenant-theme .text-emerald-200\/75,
+.tenant-theme .text-emerald-100\/55 {
+  color: var(--tenant-primary) !important;
+}
+
+.tenant-theme .accent-slate-950 {
+  accent-color: var(--tenant-primary) !important;
+}
+
+.tenant-theme [role="switch"][aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--tenant-primary) 42%, transparent) !important;
+  background-color: var(--dx-signal-soft) !important;
+}
+
+.tenant-theme [role="switch"][aria-checked="true"] .bg-emerald-100 {
+  background-color: color-mix(in srgb, var(--tenant-primary) 16%, white) !important;
+  color: var(--tenant-primary) !important;
+}
+
+/* Settings uses green decoratively, so scope its legacy accents to the selected theme. */
+.tenant-theme[data-pathname="/settings"] :is(.text-emerald-700, .text-emerald-800, .text-emerald-900) {
+  color: var(--tenant-primary) !important;
+}
+
+.tenant-theme[data-pathname="/settings"] :is(.bg-emerald-50, .bg-emerald-50\/60, .hover\:bg-emerald-50:hover, .bg-\[\#f2f7f4\]) {
+  background-color: var(--dx-signal-soft) !important;
+}
+
+.tenant-theme[data-pathname="/settings"] :is(.border-emerald-100, .border-emerald-200) {
+  border-color: color-mix(in srgb, var(--tenant-primary) 34%, transparent) !important;
+}
+
+.tenant-theme[data-pathname="/settings"] .bg-emerald-400\/10 {
+  background-color: color-mix(in srgb, var(--tenant-primary) 10%, transparent) !important;
+}
