@@ -26,7 +26,7 @@ export async function GET() {
 
     const { data: organization, error } = await createAdminClient()
       .from('organizations')
-      .select('id_card_template, name, logo_url')
+      .select('id_card_template, name, logo_url, primary_color, accent_color, surface_color')
       .eq('id', profile.organization_id)
       .single()
 
@@ -39,6 +39,9 @@ export async function GET() {
       organization: {
         name: organization.name,
         logo_url: organization.logo_url,
+        primary_color: organization.primary_color,
+        accent_color: organization.accent_color,
+        surface_color: organization.surface_color,
       },
     })
   } catch {

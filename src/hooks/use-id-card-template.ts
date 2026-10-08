@@ -9,11 +9,17 @@ import {
 type OrganizationBrand = {
   name: string | null
   logo_url: string | null
+  primary_color: string | null
+  accent_color: string | null
+  surface_color: string | null
 }
 
 const EMPTY_ORGANIZATION: OrganizationBrand = {
   name: null,
   logo_url: null,
+  primary_color: null,
+  accent_color: null,
+  surface_color: null,
 }
 
 export function useIdCardTemplate() {
@@ -34,6 +40,9 @@ export function useIdCardTemplate() {
         setOrganization({
           name: result.organization?.name || null,
           logo_url: result.organization?.logo_url || null,
+          primary_color: result.organization?.primary_color || null,
+          accent_color: result.organization?.accent_color || null,
+          surface_color: result.organization?.surface_color || null,
         })
       } catch {
         // The safe default keeps the credential usable if branded settings cannot load.

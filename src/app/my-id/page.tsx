@@ -437,10 +437,10 @@ export default function MyIdPage() {
     : profile?.organizations ?? null
 
   const tenantStyle = {
-    '--tenant-primary': organization?.primary_color || '#0094e0',
-    '--tenant-accent': organization?.accent_color || '#081a33',
-    '--tenant-surface': organization?.surface_color || '#f8fafc',
-    '--brand': organization?.primary_color || '#0094e0',
+    '--tenant-primary': organization?.primary_color || cardOrganization.primary_color || '#0094e0',
+    '--tenant-accent': organization?.accent_color || cardOrganization.accent_color || '#081a33',
+    '--tenant-surface': organization?.surface_color || cardOrganization.surface_color || '#f8fafc',
+    '--brand': organization?.primary_color || cardOrganization.primary_color || '#0094e0',
   } as CSSProperties
 
   if (loading && !profile && !staff) {
