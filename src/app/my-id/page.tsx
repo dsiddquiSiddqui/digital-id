@@ -235,7 +235,7 @@ export default function MyIdPage() {
 
         if (!user) {
           if (isMounted) setAuthError('No active session found.')
-          router.replace('/staff-login')
+          router.replace('/login')
           return
         }
 
@@ -250,7 +250,7 @@ export default function MyIdPage() {
         if (profileError || !profileData) {
           if (isMounted) setAuthError('Profile not found.')
           await supabase.auth.signOut()
-          router.replace('/staff-login')
+          router.replace('/login')
           return
         }
 
@@ -263,7 +263,7 @@ export default function MyIdPage() {
         if (!profileData.is_active) {
           if (isMounted) setAuthError('Your account is inactive.')
           await supabase.auth.signOut()
-          router.replace('/staff-login')
+          router.replace('/login')
           return
         }
 
@@ -382,7 +382,7 @@ export default function MyIdPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.replace('/staff-login')
+    router.replace('/login')
   }
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -459,7 +459,7 @@ export default function MyIdPage() {
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="text-base font-semibold text-slate-800">{authError}</p>
           <button
-            onClick={() => router.replace('/staff-login')}
+            onClick={() => router.replace('/login')}
             className="mt-4 rounded-2xl bg-[#0094e0] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#007bb8]"
           >
             Go to Login

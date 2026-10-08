@@ -7,7 +7,7 @@ describe('public application routes', () => {
     ['homepage', '/', 200],
     ['login', '/login', 200],
     ['signup', '/signup', 200],
-    ['staff login', '/staff-login', 200],
+    ['staff login redirect', '/staff-login', 307],
     ['invalid verification token', '/verify/sample', 404],
   ])('returns the exact status for %s', async (_name, path, expectedStatus) => {
     const response = await fetch(new URL(path, baseUrl), { redirect: 'manual' })

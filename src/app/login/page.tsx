@@ -90,14 +90,19 @@ export default function LoginPage() {
 
     if (profileError || !profile) {
       await supabase.auth.signOut()
-      setError('Access denied. No admin profile found.')
+      setError('Access denied. No account profile was found.')
       setLoading(false)
       return
     }
 
-    if (!ALLOWED_ADMIN_SIDE_ROLES.includes(profile.role as (typeof ALLOWED_ADMIN_SIDE_ROLES)[number])) {
+    const isStaff = profile.role === 'staff'
+    const isSystemUser = ALLOWED_ADMIN_SIDE_ROLES.includes(
+      profile.role as (typeof ALLOWED_ADMIN_SIDE_ROLES)[number]
+    )
+
+    if (!isStaff && !isSystemUser) {
       await supabase.auth.signOut()
-      setError('Access denied. Staff must use the staff login page.')
+      setError('Access denied. This account does not have a supported role.')
       setLoading(false)
       return
     }
@@ -127,15 +132,14 @@ export default function LoginPage() {
     if (organization?.require_2fa) {
       const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
       if (assurance?.nextLevel === 'aal2' && assurance?.currentLevel !== 'aal2') {
-        router.push('/mfa?next=/dashboard')
+        router.replace(`/mfa?next=${isStaff ? '/my-id' : '/dashboard'}`)
         return
       }
     }
 
     await fetch('/api/session/activity', { method: 'POST' }).catch(() => null)
 
-    setLoading(false)
-    router.push('/dashboard')
+    router.replace(isStaff ? '/my-id' : '/dashboard')
     router.refresh()
   }
 
@@ -149,21 +153,21 @@ export default function LoginPage() {
                 <Image src="/digital-id-x-icon.png" alt="" width={165} height={134} priority className="h-auto w-full" />
               </div>
               <p className="mt-8 text-xs font-black uppercase tracking-[0.2em] text-white/45">
-                Workspace sign in
+                Smart workspace access
               </p>
               <h1 className="mt-4 max-w-sm text-4xl font-black leading-tight">
-                Access your Digital ID X operations dashboard.
+                One sign-in. The right workspace, automatically.
               </h1>
               <p className="mt-5 max-w-sm text-sm leading-7 text-white/65">
-                Sign in to manage staff records, digital IDs, alerts, users, and
-                audit activity for your organization.
+                Digital ID X securely recognises your account type and opens
+                either your staff ID or your organisation workspace.
               </p>
             </div>
 
             <div className="grid gap-3">
-              <MiniPill text="Organization scoped" />
-              <MiniPill text="Role protected" />
-              <MiniPill text="Audit tracked" />
+              <MiniPill text="Staff and system users" />
+              <MiniPill text="Automatic role routing" />
+              <MiniPill text="Organisation protected" />
             </div>
           </section>
 
@@ -171,12 +175,12 @@ export default function LoginPage() {
             <div className="mx-auto w-full max-w-md">
               <div className="mb-8">
                 <Image src="/digital-id-x-logo.png" alt="Digital ID X" width={800} height={134} priority className="mb-6 h-auto w-[210px]" />
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Admin workspace</p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Secure account access</p>
                 <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                  Login
+                  Welcome back
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Continue to your organization dashboard.
+                  Use your work email. We will take you to the correct workspace.
                 </p>
                 {createdWorkspace ? (
                   <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
@@ -194,7 +198,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={setEmail}
-                  placeholder="admin@company.com"
+                  placeholder="you@company.com"
                 />
 
                 <div>
@@ -235,7 +239,7 @@ export default function LoginPage() {
                   disabled={loading}
                   className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? 'Signing in...' : 'Login to dashboard'}
+                  {loading ? 'Finding your workspace…' : 'Continue securely'}
                   {!loading ? <ArrowRight className="h-4 w-4" /> : null}
                 </button>
               </form>
