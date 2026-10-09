@@ -59,9 +59,9 @@ export async function POST(request: Request) {
       )
     }
 
-    if (password.length < 8) {
+    if (password.length < 12) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters.' },
+        { error: 'Temporary password must be at least 12 characters.' },
         { status: 400 }
       )
     }
@@ -112,6 +112,7 @@ export async function POST(request: Request) {
         platform_role: platformRole,
         platform_access_scope: accessScope,
         platform_permissions: permissionsFor(platformRole),
+        force_password_change: true,
       })
       .select('id, full_name, email, role, is_active, platform_role, platform_access_scope, platform_permissions, portal_last_active_at, created_at')
       .single()

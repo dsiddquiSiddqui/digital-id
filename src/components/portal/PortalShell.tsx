@@ -4,9 +4,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Activity, Bell, Building2, CheckSquare, ChevronRight, CircleDollarSign, ClipboardList, FileBarChart, LayoutDashboard, LifeBuoy, LogOut, Menu, RefreshCw, Search, Settings, ShieldCheck, UserRoundCog, X } from 'lucide-react'
+import { Activity, Bell, Building2, CheckSquare, ChevronRight, CircleDollarSign, ClipboardList, FileBarChart, LayoutDashboard, LifeBuoy, LogOut, Menu, RefreshCw, Settings, ShieldCheck, UserRoundCog, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePortal } from './PortalProvider'
+import { PortalCommand } from './PortalCommand'
 
 const navigation = [
   { href: '/portal/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -25,7 +26,7 @@ const navigation = [
 export function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { tickets, loading, lastUpdated, refresh } = usePortal()
+  const { tickets, loading, error, lastUpdated, refresh } = usePortal()
   const [open, setOpen] = useState(false)
   const openTickets = tickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length
   const logout = async () => { await createClient().auth.signOut(); router.replace('/portal/login') }
@@ -38,8 +39,8 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       <div className="border-t border-white/10 p-3"><button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-white/55 hover:bg-white/[0.06] hover:text-white"><LogOut className="h-4 w-4" />Sign out</button></div>
     </aside>
     <div className="lg:pl-[272px]">
-      <header className="sticky top-0 z-30 border-b border-black/10 bg-[#f8faf6]/95 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"><div className="mx-auto flex max-w-[1500px] items-center gap-3"><button aria-label="Open navigation" onClick={() => setOpen(true)} className="rounded-xl border border-black/10 bg-white p-2.5 lg:hidden"><Menu className="h-5 w-5" /></button><Link href="/portal/organizations" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm text-[#718078] shadow-sm sm:max-w-lg"><Search className="h-4 w-4" /><span className="truncate">Search organizations and accounts</span><kbd className="ml-auto hidden rounded border border-black/10 bg-[#f2f4ef] px-1.5 py-0.5 text-[10px] font-black sm:inline">⌘ K</kbd></Link><span className="hidden text-xs font-bold text-[#718078] xl:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Connecting…'}</span><button aria-label="Refresh portal data" onClick={() => void refresh()} disabled={loading} className="rounded-xl border border-black/10 bg-white p-2.5 text-[#627068] hover:bg-[#f1f4ed] disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><button aria-label="Notifications" className="relative rounded-xl border border-black/10 bg-white p-2.5 text-[#627068]"><Bell className="h-4 w-4" />{openTickets ? <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" /> : null}</button></div></header>
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+      <header className="sticky top-0 z-30 border-b border-black/10 bg-[#f8faf6]/95 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8"><div className="mx-auto flex max-w-[1500px] items-center gap-3"><button aria-label="Open navigation" onClick={() => setOpen(true)} className="rounded-xl border border-black/10 bg-white p-2.5 lg:hidden"><Menu className="h-5 w-5" /></button><PortalCommand /><span className="hidden text-xs font-bold text-[#718078] xl:inline">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Connecting…'}</span><button aria-label="Refresh portal data" onClick={() => void refresh()} disabled={loading} className="rounded-xl border border-black/10 bg-white p-2.5 text-[#627068] hover:bg-[#f1f4ed] disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button><Link href="/portal/notifications" aria-label={`${openTickets} open support cases. Open notifications`} className="relative rounded-xl border border-black/10 bg-white p-2.5 text-[#627068]"><Bell className="h-4 w-4" />{openTickets ? <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" /> : null}</Link></div></header>
+      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{error ? <div role="alert" className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 sm:flex-row sm:items-center"><span className="flex-1">Some portal data could not be refreshed. {error}</span><button type="button" onClick={() => void refresh()} className="rounded-lg bg-amber-900 px-3 py-2 text-xs font-black text-white">Retry</button></div> : null}{children}</div>
     </div>
   </main>
 }
