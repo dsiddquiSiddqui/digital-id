@@ -43,7 +43,7 @@ export async function GET(
         .single(),
       adminSupabase
         .from('profiles')
-        .select('id, full_name, email, phone, role, is_active, created_at')
+        .select('id, full_name, email, phone, role, is_active, force_password_change, locked_at, lock_reason, created_at')
         .eq('organization_id', id)
         .order('created_at', { ascending: true }),
       adminSupabase

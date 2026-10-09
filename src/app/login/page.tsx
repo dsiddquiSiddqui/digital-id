@@ -17,6 +17,7 @@ type Profile = {
   auth_user_id: string
   role: string
   is_active?: boolean
+  force_password_change?: boolean
   organization_id?: string | null
   organizations?: {
     status: string
@@ -84,7 +85,7 @@ export default function LoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, auth_user_id, role, is_active, organization_id, organizations:organizations(status, require_2fa)')
+      .select('id, auth_user_id, role, is_active, force_password_change, organization_id, organizations:organizations(status, require_2fa)')
       .eq('auth_user_id', user.id)
       .single<Profile>()
 
@@ -126,6 +127,11 @@ export default function LoginPage() {
       await supabase.auth.signOut()
       setError('This organization is not active. Please contact platform support.')
       setLoading(false)
+      return
+    }
+
+    if (profile.force_password_change) {
+      router.replace('/change-password')
       return
     }
 

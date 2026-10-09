@@ -64,7 +64,7 @@ export async function POST(
     const supabase = createAdminClient()
     const { data: invitation } = await supabase
       .from('user_invitations')
-      .select('id, organization_id, email, full_name, role, status, expires_at')
+      .select('id, organization_id, staff_id, email, full_name, role, status, expires_at')
       .eq('token', token)
       .maybeSingle()
 
@@ -121,6 +121,10 @@ export async function POST(
     if (profileError || !profile) {
       await supabase.auth.admin.deleteUser(authResult.user.id)
       return NextResponse.json({ error: profileError?.message || 'Unable to create profile.' }, { status: 400 })
+    }
+
+    if (invitation.staff_id) {
+      await supabase.from('staff').update({ profile_id: profile.id, status: 'active' }).eq('id', invitation.staff_id).eq('organization_id', invitation.organization_id)
     }
 
     await supabase
