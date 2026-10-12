@@ -24,6 +24,7 @@ const navItems = [
   { label: 'Teams', href: '#teams' },
   { label: 'Packages', href: '#packages' },
   { label: 'Security', href: '#security' },
+  { label: 'Insights', href: '/blog' },
 ]
 
 const workspaceTabs = [

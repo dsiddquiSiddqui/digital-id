@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -127,6 +128,8 @@ export default function PortalLoginPage() {
                     </button>
                   </span>
                 </label>
+
+                <div className="text-right"><Link href="/portal/forgot-password" className="text-sm font-black text-slate-600 hover:text-slate-950">Forgot password?</Link></div>
 
                 {error ? (
                   <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">

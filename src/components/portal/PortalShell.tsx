@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Activity, Bell, Building2, CheckSquare, ChevronDown, ChevronRight, CircleDollarSign, ClipboardList, FileBarChart, LayoutDashboard, LifeBuoy, LogOut, Menu, RefreshCw, Settings, ShieldCheck, UserRoundCog, X } from 'lucide-react'
+import { Activity, Bell, Building2, CheckSquare, ChevronDown, ChevronRight, CircleDollarSign, ClipboardList, FileBarChart, LayoutDashboard, LifeBuoy, LogOut, Menu, Newspaper, RefreshCw, Settings, ShieldCheck, UserRoundCog, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePortal } from './PortalProvider'
 import { PortalCommand } from './PortalCommand'
@@ -14,6 +14,7 @@ const navigation = [
   { href: '/portal/organizations', label: 'Organizations', icon: Building2, roles: [] },
   { href: '/portal/support', label: 'Support desk', icon: LifeBuoy, roles: ['owner', 'administrator', 'support_agent'] },
   { href: '/portal/users', label: 'Portal users', icon: UserRoundCog, roles: ['owner', 'administrator'] },
+  { href: '/portal/posts', label: 'Posts', icon: Newspaper, roles: ['owner', 'administrator'] },
   { href: '/portal/billing', label: 'Billing', icon: CircleDollarSign, roles: ['owner', 'administrator', 'billing_agent'] },
   { href: '/portal/security', label: 'Security', icon: ShieldCheck, roles: ['owner', 'administrator', 'auditor'] },
   { href: '/portal/tasks', label: 'Tasks & approvals', icon: CheckSquare, roles: ['owner', 'administrator', 'support_agent'] },
