@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { usePortal } from '@/components/portal/PortalProvider'
+import { usePortalFeedback } from '@/components/portal/PortalFeedback'
 import { EmptyState, PageHeader, Panel, StatusPill, formatDateTime } from '@/components/portal/PortalUi'
 
 export default function SupportPage() {
+  const { notify } = usePortalFeedback()
   const { tickets, agents, canManageSupport, supportMacros, governanceSettings, refresh } = usePortal()
   const searchParams = useSearchParams()
   const [selectedId, setSelectedId] = useState(() => searchParams.get('ticket') || '')
@@ -17,8 +19,9 @@ export default function SupportPage() {
   const [macroTitle, setMacroTitle] = useState('')
   const filtered = tickets.filter((ticket) => !query || [ticket.subject, ticket.organization?.name, String(ticket.ticket_number)].some((value) => value?.toLowerCase().includes(query.toLowerCase())))
   const selected = tickets.find((ticket) => ticket.id === selectedId) || filtered[0]
-  const update = async (changes: Record<string, string | null>) => { if (!selected) return; setSaving(true); await fetch('/api/portal/support', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selected.id, confirmation: 'CONFIRM', ...changes }) }); await refresh(); setSaving(false) }
-  const send = async () => { if (!selected || reply.trim().length < 2) return; setSaving(true); await fetch('/api/portal/support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: selected.id, message: reply, visibility }) }); setReply(''); await refresh(); setSaving(false) }
+  const run = async (request: Promise<Response>, success: string) => { try { const response = await request; const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to update the support case.'); notify({ tone: 'success', title: success }); await refresh(); return true } catch (caught) { notify({ tone: 'error', title: 'Support action failed', description: caught instanceof Error ? caught.message : 'Please try again.' }); return false } }
+  const update = async (changes: Record<string, string | null>) => { if (!selected) return; setSaving(true); await run(fetch('/api/portal/support', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selected.id, confirmation: 'CONFIRM', ...changes }) }), 'Support case updated'); setSaving(false) }
+  const send = async () => { if (!selected || reply.trim().length < 2) return; setSaving(true); if (await run(fetch('/api/portal/support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket_id: selected.id, message: reply, visibility }) }), visibility === 'internal' ? 'Private note added' : 'Customer response sent')) setReply(''); setSaving(false) }
   const saveMacro = async () => { if (!macroTitle.trim() || reply.trim().length < 2) return; setSaving(true); const response = await fetch('/api/portal/maturity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'support_macro', title: macroTitle, body: reply, visibility }) }); if (response.ok) { setMacroTitle(''); await refresh() }; setSaving(false) }
   return <div className="space-y-6"><PageHeader eyebrow="Customer operations" title="Support desk" description={`Triage, assign, respond, and protect customer SLAs. First-response target: ${governanceSettings?.support_first_response_minutes || 240} minutes.`} />
     {canManageSupport ? <Panel title="Response templates" description="Approved templates keep communication consistent and remain editable before sending."><div className="flex flex-wrap gap-2">{supportMacros.map((macro) => <button key={macro.id} type="button" onClick={() => { setReply(macro.body); setVisibility(macro.visibility === 'internal' ? 'internal' : 'customer') }} className="rounded-xl bg-[#eef1eb] px-3 py-2 text-xs font-black">{macro.title}</button>)}{!supportMacros.length ? <span className="text-xs font-bold text-[#718078]">No templates yet.</span> : null}</div><div className="mt-4 flex flex-col gap-2 sm:flex-row"><input value={macroTitle} onChange={(event) => setMacroTitle(event.target.value)} placeholder="Template name" className="h-10 flex-1 rounded-xl border border-black/10 bg-[#f7f8f5] px-3 text-sm" /><button type="button" disabled={saving || !macroTitle.trim() || reply.trim().length < 2} onClick={() => void saveMacro()} className="rounded-xl bg-[#152019] px-4 py-2 text-xs font-black text-white disabled:opacity-40">Save current reply as template</button></div></Panel> : null}

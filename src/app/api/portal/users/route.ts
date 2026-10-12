@@ -88,9 +88,8 @@ export async function POST(request: Request) {
         email_confirm: true,
         user_metadata: {
           full_name: fullName,
-          role: 'super_admin',
-          portal_access: true,
         },
+        app_metadata: { role: 'super_admin', portal_access: true },
       })
 
     if (authError || !authData.user) {
@@ -165,6 +164,7 @@ export async function PATCH(request: Request) {
     if (!target) return NextResponse.json({ error: 'Portal user not found.' }, { status: 404 })
 
     const update: Record<string, unknown> = {}
+    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) : ''
     if (typeof body.is_active === 'boolean') update.is_active = body.is_active
     if (typeof body.platform_role === 'string' && PLATFORM_ROLES.includes(body.platform_role)) {
       update.platform_role = body.platform_role
@@ -182,7 +182,7 @@ export async function PATCH(request: Request) {
 
     const { data: profile, error } = await adminSupabase.from('profiles').update(update).eq('id', target.id).select('id, full_name, email, role, is_active, platform_role, platform_access_scope, platform_permissions, portal_last_active_at, created_at').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    await adminSupabase.from('audit_logs').insert({ actor_profile_id: access.profile.id, action_type: 'portal_user_access_updated', entity_type: 'profile', entity_id: target.id, metadata: { previous: target, changes: update, actor_name: access.profile.full_name, module: 'Portal Users', page: '/portal' } })
+    await adminSupabase.from('audit_logs').insert({ actor_profile_id: access.profile.id, action_type: 'portal_user_access_updated', entity_type: 'profile', entity_id: target.id, metadata: { previous: target, changes: update, reason: reason || null, actor_name: access.profile.full_name, module: 'Portal Users', page: '/portal/users' } })
     return NextResponse.json({ profile })
   } catch (error) {
     console.error('Portal user update error:', error)

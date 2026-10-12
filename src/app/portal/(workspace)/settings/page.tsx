@@ -3,17 +3,19 @@
 import { Bell, Check, KeyRound, LockKeyhole, Save, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { usePortal } from '@/components/portal/PortalProvider'
+import { usePortalFeedback } from '@/components/portal/PortalFeedback'
 import { PageHeader, Panel, StatusPill } from '@/components/portal/PortalUi'
 
 const approvalOptions = ['owner_change', 'admin_role_change', 'bulk_disable', 'mfa_reset', 'billing_refund', 'tenant_suspension']
 
 export default function SettingsPage() {
+  const { notify } = usePortalFeedback()
   const { access, governanceSettings, refresh } = usePortal()
   const [form, setForm] = useState({ approval_required_for: [] as string[], audit_retention_days: 2555, support_first_response_minutes: 240, support_resolution_minutes: 1440, notification_policy: { sla_breach: true, billing_risk: true, security_event: true, daily_digest: false } as Record<string, boolean> })
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState('')
   useEffect(() => { if (governanceSettings) setForm({ approval_required_for: governanceSettings.approval_required_for || [], audit_retention_days: governanceSettings.audit_retention_days, support_first_response_minutes: governanceSettings.support_first_response_minutes, support_resolution_minutes: governanceSettings.support_resolution_minutes, notification_policy: governanceSettings.notification_policy || {} }) }, [governanceSettings])
-  const save = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setFeedback(''); try { const response = await fetch('/api/portal/maturity', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, confirmation: 'CONFIRM' }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to save governance settings.'); setFeedback('Governance policy saved and audited.'); await refresh() } catch (caught) { setFeedback(caught instanceof Error ? caught.message : 'Unable to save governance settings.') } finally { setSaving(false) } }
+  const save = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setFeedback(''); try { const response = await fetch('/api/portal/maturity', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, confirmation: 'CONFIRM' }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to save governance settings.'); setFeedback('Governance policy saved and audited.'); notify({ tone: 'success', title: 'Governance policy saved', description: 'The updated controls are active across platform operations.' }); await refresh() } catch (caught) { const message = caught instanceof Error ? caught.message : 'Unable to save governance settings.'; setFeedback(message); notify({ tone: 'error', title: 'Settings were not saved', description: message }) } finally { setSaving(false) } }
   const toggleApproval = (value: string) => setForm((current) => ({ ...current, approval_required_for: current.approval_required_for.includes(value) ? current.approval_required_for.filter((item) => item !== value) : [...current.approval_required_for, value] }))
 
   return <div className="space-y-6"><PageHeader eyebrow="Platform governance" title="Portal settings" description="Configure approval thresholds, retention, service targets, and the notification policy enforced across platform operations." />
