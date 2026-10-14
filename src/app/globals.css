@@ -366,3 +366,9 @@ textarea:focus-visible {
 .tenant-theme[data-pathname="/settings"] .bg-emerald-400\/10 {
   background-color: color-mix(in srgb, var(--tenant-primary) 10%, transparent) !important;
 }
+
+.input {
+  height: 2.75rem; width: 100%; border-radius: 0.75rem; border: 1px solid rgb(0 0 0 / 10%);
+  background: #f7f8f5; padding-inline: 0.75rem; font-size: 0.875rem; outline: none;
+}
+.input:focus { border-color: #78924e; }

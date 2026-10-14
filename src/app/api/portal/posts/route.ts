@@ -16,7 +16,7 @@ async function requireEditor() {
 export async function GET() {
   const access = await requireEditor(); if (!access) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
   const admin = createAdminClient()
-  const [{ data, error }, { data: revisions }] = await Promise.all([admin.from('platform_posts').select('*').order('updated_at', { ascending: false }), admin.from('platform_post_revisions').select('id, post_id, revision_number, created_at').order('created_at', { ascending: false }).limit(250)])
+  const [{ data, error }, { data: revisions }] = await Promise.all([admin.from('platform_posts').select('*').order('updated_at', { ascending: false }), admin.from('platform_post_revisions').select('id, post_id, revision_number, created_at, snapshot').order('created_at', { ascending: false }).limit(250)])
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ posts: data || [], revisions: revisions || [] })
 }
