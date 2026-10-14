@@ -1,31 +1,60 @@
 'use client'
 
 import Link from 'next/link'
-import { AlertTriangle, BellRing, Check, CheckCircle2, CircleDollarSign, Clock3, ShieldAlert, UserCheck } from 'lucide-react'
+import { AlertTriangle, BellRing, Check, CheckCheck, CircleDollarSign, Clock3, Search, ShieldAlert, UserCheck } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { usePortal } from '@/components/portal/PortalProvider'
-import { EmptyState, PageHeader, StatusPill, formatDateTime } from '@/components/portal/PortalUi'
+import { EmptyState, PageHeader } from '@/components/portal/PortalUi'
+import { buildPortalNotifications, type PortalNotificationItem } from '@/lib/portal-notifications'
+
+const iconByCategory = { task: Clock3, approval: ShieldAlert, support: AlertTriangle, billing: CircleDollarSign }
+type View = 'all' | 'unread' | 'mine' | 'acknowledged'
 
 export default function NotificationsPage() {
-  const { tasks, approvals, tickets, organizations, notificationStates, refresh } = usePortal()
+  const { tasks, approvals, tickets, organizations, notificationStates, access, refresh } = usePortal()
   const [now] = useState(() => Date.now())
-  const [filter, setFilter] = useState<'all' | 'unread' | 'owned'>('all')
-  const [saving, setSaving] = useState('')
+  const [view, setView] = useState<View>('all')
+  const [category, setCategory] = useState('all')
+  const [query, setQuery] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const states = useMemo(() => new Map(notificationStates.map((item) => [item.item_key, item])), [notificationStates])
-  const items = [
-    ...tasks.filter((task) => !['completed', 'cancelled'].includes(task.status) && task.due_at && new Date(task.due_at).getTime() < now).map((task) => ({ id: `task-${task.id}`, icon: Clock3, title: `Overdue: ${task.title}`, detail: `${task.organization?.name} · due ${formatDateTime(task.due_at)}`, tone: 'urgent', href: '/portal/tasks' })),
-    ...approvals.filter((approval) => approval.status === 'pending').map((approval) => ({ id: `approval-${approval.id}`, icon: ShieldAlert, title: `Approval required: ${approval.action_type.replaceAll('_', ' ')}`, detail: `${approval.organization?.name || 'Platform-wide'} · requested ${formatDateTime(approval.created_at)}`, tone: 'high', href: '/portal/tasks' })),
-    ...tickets.filter((ticket) => !ticket.first_response_at && ticket.first_response_due_at && new Date(ticket.first_response_due_at).getTime() < now).map((ticket) => ({ id: `ticket-${ticket.id}`, icon: AlertTriangle, title: `Support SLA breached: ${ticket.subject}`, detail: `${ticket.organization?.name} · case #${ticket.ticket_number}`, tone: 'urgent', href: `/portal/support?ticket=${ticket.id}` })),
-    ...organizations.filter((organization) => ['cancelled', 'past_due', 'unpaid'].includes(organization.subscription_status || '')).map((organization) => ({ id: `billing-${organization.id}`, icon: CircleDollarSign, title: `Billing intervention: ${organization.name}`, detail: `${organization.plan_name} · ${organization.subscription_status}`, tone: 'high', href: `/portal/organizations/${organization.id}` })),
-  ]
-  const visible = items.filter((item) => filter === 'all' || (filter === 'unread' ? !states.get(item.id)?.read_at : Boolean(states.get(item.id)?.owner_profile_id)))
+  const items = useMemo(() => buildPortalNotifications({ tasks, approvals, tickets, organizations, now }), [approvals, organizations, tasks, tickets, now])
+  const visible = useMemo(() => items.filter((item) => {
+    const state = states.get(item.id)
+    const matchesView = view === 'all' || (view === 'unread' && !state?.read_at) || (view === 'mine' && state?.owner_profile_id === access?.id) || (view === 'acknowledged' && Boolean(state?.acknowledged_at))
+    const matchesCategory = category === 'all' || item.category === category
+    const term = query.trim().toLowerCase()
+    return matchesView && matchesCategory && (!term || [item.title, item.detail, item.organizationName].some((value) => value.toLowerCase().includes(term)))
+  }), [access?.id, category, items, query, states, view])
   const unread = items.filter((item) => !states.get(item.id)?.read_at).length
-  const update = async (itemKey: string, changes: { read?: boolean; acknowledged?: boolean; assign_to_me?: boolean }) => { setSaving(itemKey); try { const response = await fetch('/api/portal/maturity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'notification_state', item_key: itemKey, ...changes }) }); if (!response.ok) throw new Error('Unable to update notification.'); await refresh() } finally { setSaving('') } }
-  return <div className="space-y-6"><PageHeader eyebrow="Action centre" title="Notifications" description="A persistent, owned work inbox generated from overdue work, SLA breaches, approvals, and commercial risk." />
-    <section className="grid gap-3 sm:grid-cols-4"><Summary icon={<BellRing />} label="Requires action" value={items.length} /><Summary icon={<AlertTriangle />} label="Urgent" value={items.filter((item) => item.tone === 'urgent').length} /><Summary icon={<BellRing />} label="Unread" value={unread} /><Summary icon={<CheckCircle2 />} label="Acknowledged" value={notificationStates.filter((item) => item.acknowledged_at).length} /></section>
-    <div className="flex flex-wrap gap-2">{(['all', 'unread', 'owned'] as const).map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={`rounded-xl px-4 py-2 text-xs font-black capitalize ${filter === item ? 'bg-[#152019] text-white' : 'bg-white ring-1 ring-black/10'}`}>{item}</button>)}</div>
-    <section className="rounded-[24px] border border-black/10 bg-white p-5 shadow-[0_18px_55px_rgba(20,31,24,0.06)] sm:p-6">{visible.length ? <div className="divide-y divide-black/5">{visible.map((item) => { const Icon = item.icon; const state = states.get(item.id); return <article key={item.id} className={`flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center ${state?.read_at ? 'opacity-65' : ''}`}><Link href={item.href} onClick={() => void update(item.id, { read: true })} className="flex min-w-0 flex-1 items-center gap-4"><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${item.tone === 'urgent' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}><Icon className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{item.title}</p><p className="mt-1 truncate text-xs text-[#718078]">{item.detail}</p></div><StatusPill value={item.tone} /></Link><div className="flex justify-end gap-2"><button disabled={saving === item.id} onClick={() => void update(item.id, { read: true, assign_to_me: true })} className="inline-flex items-center gap-1 rounded-lg bg-[#eef1eb] px-3 py-2 text-xs font-black"><UserCheck className="h-3.5 w-3.5" />Own</button><button disabled={saving === item.id} onClick={() => void update(item.id, { read: true, acknowledged: true, assign_to_me: Boolean(state?.owner_profile_id) })} className="inline-flex items-center gap-1 rounded-lg bg-[#152019] px-3 py-2 text-xs font-black text-white"><Check className="h-3.5 w-3.5" />Acknowledge</button></div></article> })}</div> : <EmptyState title="Nothing in this view" description="There are no matching operational notifications." />}</section>
+  const urgent = items.filter((item) => item.priority === 'urgent').length
+  const owned = items.filter((item) => states.get(item.id)?.owner_profile_id === access?.id).length
+
+  const update = async (itemKeys: string[], changes: { read?: boolean; acknowledged?: boolean; assign_to_me?: boolean }, success: string) => {
+    if (!itemKeys.length) return
+    setSaving(true); setFeedback(null)
+    try {
+      const response = await fetch('/api/portal/maturity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'notification_state', item_keys: itemKeys, ...changes }), keepalive: true })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Unable to update notifications.')
+      setFeedback({ tone: 'success', message: success }); await refresh()
+    } catch (error) { setFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to update notifications.' }) } finally { setSaving(false) }
+  }
+
+  return <div className="space-y-6"><PageHeader eyebrow="Action centre" title="Notifications" description="A focused work inbox for overdue tasks, approvals, breached support SLAs, and account risk." action={unread ? <button type="button" disabled={saving} onClick={() => void update(items.filter((item) => !states.get(item.id)?.read_at).map((item) => item.id), { read: true }, 'All notifications marked as read.')} className="inline-flex items-center gap-2 rounded-xl bg-[#152019] px-4 py-3 text-sm font-black text-white disabled:opacity-50"><CheckCheck className="h-4 w-4" />Mark all read</button> : undefined} />
+    {feedback ? <p role="status" className={`rounded-xl border px-4 py-3 text-sm font-bold ${feedback.tone === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-[#a9cf5b] bg-[#e9f6cc] text-[#496126]'}`}>{feedback.message}</p> : null}
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Summary label="Requires action" value={items.length} accent="dark" /><Summary label="Urgent" value={urgent} accent="red" /><Summary label="Unread" value={unread} accent="lime" /><Summary label="Owned by me" value={owned} accent="amber" /></section>
+    <section className="overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-[0_18px_55px_rgba(20,31,24,.06)]"><div className="grid gap-3 border-b border-black/10 bg-[#fbfcfa] p-4 lg:grid-cols-[1fr_auto_auto]"><label className="flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3 focus-within:border-[#78924e]"><Search className="h-4 w-4 text-[#718078]" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search notification or organization" className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none" /></label><div className="flex gap-2 overflow-x-auto">{(['all', 'unread', 'mine', 'acknowledged'] as const).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-black capitalize ${view === item ? 'bg-[#152019] text-white' : 'bg-[#eef1eb] text-[#59655e]'}`}>{item}</button>)}</div><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Filter notification category" className="h-11 rounded-xl border border-black/10 bg-white px-3 text-xs font-black"><option value="all">All categories</option><option value="task">Tasks</option><option value="approval">Approvals</option><option value="support">Support</option><option value="billing">Billing</option></select></div>
+      {visible.length ? <div className="divide-y divide-black/5">{visible.map((item) => <NotificationRow key={item.id} item={item} state={states.get(item.id)} saving={saving} mine={states.get(item.id)?.owner_profile_id === access?.id} onUpdate={(changes, message) => update([item.id], changes, message)} />)}</div> : <div className="p-5"><EmptyState title="Nothing in this view" description="No notifications match the selected view, category, and search." /></div>}
+      {items.length ? <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-black/10 bg-[#fbfcfa] px-4 py-3 text-xs font-bold text-[#718078]"><span>Showing {visible.length} of {items.length} active notifications</span><span>Resolved source records disappear automatically</span></footer> : null}
+    </section>
   </div>
 }
 
-function Summary({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) { return <article className="rounded-[22px] border border-black/10 bg-white p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[.14em] text-[#718078]">{label}</p><span className="[&>svg]:h-4 [&>svg]:w-4 text-[#78924e]">{icon}</span></div><p className="mt-4 text-3xl font-black">{value}</p></article> }
+function NotificationRow({ item, state, saving, mine, onUpdate }: { item: PortalNotificationItem; state?: { read_at: string | null; acknowledged_at: string | null; owner_profile_id: string | null }; saving: boolean; mine: boolean; onUpdate: (changes: { read?: boolean; acknowledged?: boolean; assign_to_me?: boolean }, message: string) => Promise<void> }) {
+  const Icon = iconByCategory[item.category]
+  return <article className={`grid gap-4 p-4 transition sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center ${state?.read_at ? 'bg-white' : 'bg-[#fbfff3]'}`}><div className="flex min-w-0 gap-4"><span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${item.priority === 'urgent' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}><Icon className="h-5 w-5" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Link href={item.href} onClick={() => void onUpdate({ read: true }, 'Notification marked as read.')} className="text-sm font-black hover:underline">{item.title}</Link>{!state?.read_at ? <span className="h-2 w-2 rounded-full bg-[#78a12d]" aria-label="Unread" /> : null}<span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${item.priority === 'urgent' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{item.priority}</span>{state?.acknowledged_at ? <span className="rounded-full bg-[#e9f6cc] px-2 py-1 text-[9px] font-black uppercase text-[#496126]">Acknowledged</span> : null}</div><p className="mt-1 text-xs leading-5 text-[#718078]">{item.organizationName} · {item.detail}</p><p className="mt-2 text-[10px] font-black uppercase tracking-wide text-[#9aa39d]">{item.category}</p></div></div><div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={saving} onClick={() => void onUpdate({ read: !state?.read_at }, state?.read_at ? 'Notification marked unread.' : 'Notification marked read.')} className="rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-black">{state?.read_at ? 'Mark unread' : 'Mark read'}</button><button type="button" disabled={saving} onClick={() => void onUpdate({ assign_to_me: !mine, read: true }, mine ? 'Notification released.' : 'Notification assigned to you.')} className="inline-flex items-center gap-1 rounded-lg bg-[#eef1eb] px-3 py-2 text-xs font-black"><UserCheck className="h-3.5 w-3.5" />{mine ? 'Release' : 'Own'}</button><button type="button" disabled={saving || Boolean(state?.acknowledged_at)} onClick={() => void onUpdate({ read: true, acknowledged: true }, 'Notification acknowledged.')} className="inline-flex items-center gap-1 rounded-lg bg-[#152019] px-3 py-2 text-xs font-black text-white disabled:opacity-40"><Check className="h-3.5 w-3.5" />Acknowledge</button></div></article>
+}
+
+function Summary({ label, value, accent }: { label: string; value: number; accent: 'dark' | 'red' | 'lime' | 'amber' }) { const colors = { dark: 'bg-[#152019] text-white', red: 'bg-red-50 text-red-700', lime: 'bg-[#e9f6cc] text-[#496126]', amber: 'bg-amber-50 text-amber-700' }; return <article className={`rounded-[22px] border border-black/10 p-5 ${colors[accent]}`}><div className="flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[.14em] opacity-70">{label}</p><BellRing className="h-4 w-4 opacity-70" /></div><p className="mt-4 text-3xl font-black">{value}</p></article> }

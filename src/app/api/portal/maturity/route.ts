@@ -42,12 +42,16 @@ export async function POST(request: Request) {
     const body = await request.json()
     const admin = createAdminClient()
     if (body.kind === 'notification_state') {
-      const itemKey = typeof body.item_key === 'string' ? body.item_key.slice(0, 300) : ''
-      if (!itemKey) return NextResponse.json({ error: 'Notification key is required.' }, { status: 400 })
-      const update = { profile_id: access.id, item_key: itemKey, read_at: body.read ? new Date().toISOString() : null, acknowledged_at: body.acknowledged ? new Date().toISOString() : null, owner_profile_id: body.assign_to_me ? access.id : null, updated_at: new Date().toISOString() }
-      const { data, error } = await admin.from('platform_notification_states').upsert(update).select('*').single()
+      const keys = (Array.isArray(body.item_keys) ? body.item_keys : [body.item_key]).filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0).map((item: string) => item.slice(0, 300)).slice(0, 200)
+      if (!keys.length) return NextResponse.json({ error: 'At least one notification key is required.' }, { status: 400 })
+      const { data: existing, error: lookupError } = await admin.from('platform_notification_states').select('item_key, read_at, acknowledged_at, owner_profile_id').eq('profile_id', access.id).in('item_key', keys)
+      if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 400 })
+      const previous = new Map((existing || []).map((item) => [item.item_key, item]))
+      const now = new Date().toISOString()
+      const updates = keys.map((itemKey: string) => { const state = previous.get(itemKey); return { profile_id: access.id, item_key: itemKey, read_at: typeof body.read === 'boolean' ? (body.read ? now : null) : state?.read_at || null, acknowledged_at: typeof body.acknowledged === 'boolean' ? (body.acknowledged ? now : null) : state?.acknowledged_at || null, owner_profile_id: typeof body.assign_to_me === 'boolean' ? (body.assign_to_me ? access.id : null) : state?.owner_profile_id || null, updated_at: now } })
+      const { data, error } = await admin.from('platform_notification_states').upsert(updates, { onConflict: 'profile_id,item_key' }).select('*')
       if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-      return NextResponse.json({ notificationState: data })
+      return NextResponse.json({ notificationStates: data || [] })
     }
     if (!access.canManage) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     if (body.kind === 'task_comment') {

@@ -8,6 +8,7 @@ import { Activity, Bell, Building2, CheckSquare, ChevronDown, ChevronRight, Circ
 import { createClient } from '@/lib/supabase/client'
 import { usePortal } from './PortalProvider'
 import { PortalCommand } from './PortalCommand'
+import { buildPortalNotifications } from '@/lib/portal-notifications'
 
 const navigation = [
   { href: '/portal/dashboard', label: 'Overview', icon: LayoutDashboard, roles: [] },
@@ -27,13 +28,15 @@ const navigation = [
 export function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { tickets, notificationStates, access, loading, error, lastUpdated, refresh } = usePortal()
+  const { tickets, tasks, approvals, organizations, notificationStates, access, loading, error, lastUpdated, refresh } = usePortal()
   const [open, setOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const openTickets = tickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length
   const role = access?.platform_role || 'administrator'
   const visibleNavigation = navigation.filter((item) => item.roles.length === 0 || item.roles.includes(role))
-  const unreadCount = Math.max(0, openTickets - notificationStates.filter((state) => state.read_at).length)
+  const notificationItems = buildPortalNotifications({ tasks, approvals, tickets, organizations })
+  const stateMap = new Map(notificationStates.map((state) => [state.item_key, state]))
+  const unreadCount = notificationItems.filter((item) => !stateMap.get(item.id)?.read_at).length
   const currentLabel = navigation.find((item) => pathname === item.href || (item.href !== '/portal/dashboard' && pathname.startsWith(`${item.href}/`)))?.label || 'Platform portal'
   const logout = async () => { await createClient().auth.signOut(); router.replace('/portal/login') }
 
@@ -42,7 +45,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
     {open ? <button aria-label="Close navigation overlay" className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} /> : null}
     <aside className={`fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col bg-[#101713] text-white shadow-2xl transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="border-b border-white/10 p-5"><div className="flex items-center justify-between"><Link href="/portal/dashboard" className="rounded-xl bg-white px-3 py-2"><Image src="/digital-id-x-logo.png" alt="Digital ID X" width={800} height={134} className="h-auto w-40" priority /></Link><button aria-label="Close navigation" className="p-2 text-white/60 lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button></div><div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#b8f43d]"><Activity className="h-3.5 w-3.5" />Platform operations</div></div>
-      <nav className="flex-1 overflow-y-auto p-3" aria-label="Portal navigation"><p className="px-3 pb-2 pt-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/35">Control plane</p><div className="space-y-1">{visibleNavigation.map((item) => { const active = pathname === item.href || (item.href !== '/portal/dashboard' && pathname.startsWith(`${item.href}/`)); const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={() => setOpen(false)} aria-current={active ? 'page' : undefined} className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold transition ${active ? 'bg-white/10 text-white ring-1 ring-inset ring-white/10' : 'text-white/55 hover:bg-white/[0.06] hover:text-white'}`}><Icon className={`h-4 w-4 ${active ? 'text-[#b8f43d]' : 'text-white/35'}`} /><span className="flex-1">{item.label}</span>{item.href === '/portal/support' && openTickets ? <span className="rounded-full bg-[#b8f43d] px-2 py-0.5 text-[10px] font-black text-[#101713]">{openTickets}</span> : null}{active ? <ChevronRight className="h-3.5 w-3.5 text-white/35" /> : null}</Link>})}</div></nav>
+      <nav className="flex-1 overflow-y-auto p-3" aria-label="Portal navigation"><p className="px-3 pb-2 pt-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/35">Control plane</p><div className="space-y-1">{visibleNavigation.map((item) => { const active = pathname === item.href || (item.href !== '/portal/dashboard' && pathname.startsWith(`${item.href}/`)); const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={() => setOpen(false)} aria-current={active ? 'page' : undefined} className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold transition ${active ? 'bg-white/10 text-white ring-1 ring-inset ring-white/10' : 'text-white/55 hover:bg-white/[0.06] hover:text-white'}`}><Icon className={`h-4 w-4 ${active ? 'text-[#b8f43d]' : 'text-white/35'}`} /><span className="flex-1">{item.label}</span>{item.href === '/portal/support' && openTickets ? <span className="rounded-full bg-[#b8f43d] px-2 py-0.5 text-[10px] font-black text-[#101713]">{openTickets}</span> : null}{item.href === '/portal/notifications' && unreadCount ? <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">{Math.min(99, unreadCount)}</span> : null}{active ? <ChevronRight className="h-3.5 w-3.5 text-white/35" /> : null}</Link>})}</div></nav>
       <div className="border-t border-white/10 p-3"><div className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#b8f43d] text-xs font-black text-[#152019]">{access?.full_name?.[0] || 'P'}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{access?.full_name || 'Portal operator'}</p><p className="truncate text-[10px] font-bold capitalize text-white/40">{role.replaceAll('_', ' ')}</p></div></div><button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-white/55 hover:bg-white/[0.06] hover:text-white"><LogOut className="h-4 w-4" />Sign out</button></div>
     </aside>
     <div className="lg:pl-[272px]">
