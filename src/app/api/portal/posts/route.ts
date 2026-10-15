@@ -8,7 +8,7 @@ const slugify = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]
 
 async function requireEditor() {
   const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('id, role, platform_role, is_active, full_name, email, organization_id').eq('auth_user_id', user.id).is('organization_id', null).single()
+  const { data: profile } = await supabase.from('profiles').select('id, role, platform_role, is_active, full_name, email, organization_id').eq('auth_user_id', user.id).single()
   if (!profile || profile.role !== 'super_admin' || profile.is_active === false || !['owner', 'administrator'].includes(profile.platform_role || 'administrator')) return null
   return { profile }
 }

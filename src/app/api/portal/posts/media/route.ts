@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
-  const { data: profile } = await supabase.from('profiles').select('id, role, platform_role, is_active, organization_id').eq('auth_user_id', user.id).is('organization_id', null).single()
+  const { data: profile } = await supabase.from('profiles').select('id, role, platform_role, is_active, organization_id').eq('auth_user_id', user.id).single()
   if (!profile || profile.role !== 'super_admin' || profile.is_active === false || !['owner', 'administrator'].includes(profile.platform_role || 'administrator')) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
   const form = await request.formData()
   const file = form.get('file')
