@@ -7,11 +7,23 @@ describe('public application routes', () => {
     ['homepage', '/', 200],
     ['login', '/login', 200],
     ['signup', '/signup', 200],
+    ['insights', '/blog', 200],
+    ['robots', '/robots.txt', 200],
+    ['sitemap', '/sitemap.xml', 200],
     ['staff login redirect', '/staff-login', 307],
     ['invalid verification token', '/verify/sample', 404],
   ])('returns the exact status for %s', async (_name, path, expectedStatus) => {
     const response = await fetch(new URL(path, baseUrl), { redirect: 'manual' })
     expect(response.status).toBe(expectedStatus)
+  })
+
+  it.each([
+    ['/staff', '/v2/staff'],
+    ['/staff/example', '/v2/staff/example'],
+  ])('permanently redirects %s to the canonical staff route', async (path, destination) => {
+    const response = await fetch(new URL(path, baseUrl), { redirect: 'manual' })
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toContain(destination)
   })
 
   it('server-renders explicit login label associations', async () => {

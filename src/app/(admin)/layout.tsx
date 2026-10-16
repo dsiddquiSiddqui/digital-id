@@ -128,12 +128,17 @@ export default function AdminLayout({
           return
         }
 
+        if (profileData.role === 'super_admin' && !profileData.organization_id) {
+          router.replace('/portal/dashboard')
+          return
+        }
+
         if (profileData.role === 'super_admin' && profileData.organization_id) {
           const sessionResponse = await fetch('/api/platform/organizations/session')
           const sessionResult = await sessionResponse.json().catch(() => null)
 
           if (sessionResult?.expired || sessionResult?.redirect_to) {
-            router.push(sessionResult.redirect_to || '/platform/organizations')
+            router.push('/portal/organizations')
             return
           }
         }
@@ -196,7 +201,7 @@ export default function AdminLayout({
     await fetch('/api/platform/organizations/leave', {
       method: 'POST',
     })
-    router.push('/platform/organizations')
+    router.push('/portal/organizations')
   }
 
   const role = profile?.role ?? ''
@@ -276,7 +281,7 @@ export default function AdminLayout({
     pathname.startsWith('/staff-ids/')
   const sidebarSections = [
     {
-      title: 'Workspace',
+      title: 'Overview & people',
       items: [
         {
           href: '/dashboard',
@@ -303,7 +308,7 @@ export default function AdminLayout({
         permissions.canViewStaff
           ? {
               href: '/notifications',
-              label: 'Notifications',
+              label: 'Inbox',
               icon: <Bell className="h-4 w-4" />,
               active: pathname === '/notifications',
             }
@@ -311,12 +316,12 @@ export default function AdminLayout({
       ],
     },
     {
-      title: 'Operations',
+      title: 'Compliance',
       items: [
         permissions.canViewAlerts
           ? {
               href: '/alerts',
-              label: 'Alerts',
+              label: 'Security events',
               icon: <Bell className="h-4 w-4" />,
               active: pathname === '/alerts',
             }
@@ -324,7 +329,7 @@ export default function AdminLayout({
         permissions.canViewStaff
           ? {
               href: '/expiry-alerts',
-              label: 'Expiry alerts',
+              label: 'Document expiry',
               icon: <FileText className="h-4 w-4" />,
               active: pathname === '/expiry-alerts',
             }
@@ -349,7 +354,7 @@ export default function AdminLayout({
     },
     permissions.canManageSettings
       ? {
-          title: 'Build',
+          title: 'Workspace setup',
           items: [
             {
               href: '/setup-wizard',

@@ -17,6 +17,7 @@ type Profile = {
   id: string
   auth_user_id: string
   role: string
+  platform_role?: string | null
   is_active?: boolean
   force_password_change?: boolean
   organization_id?: string | null
@@ -86,7 +87,7 @@ export default function LoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, auth_user_id, role, is_active, force_password_change, organization_id, organizations:organizations!profiles_organization_id_fkey(status, require_2fa)')
+      .select('id, auth_user_id, role, platform_role, is_active, force_password_change, organization_id, organizations:organizations!profiles_organization_id_fkey(status, require_2fa)')
       .eq('auth_user_id', user.id)
       .single<Profile>()
 
@@ -140,17 +141,23 @@ export default function LoginPage() {
       return
     }
 
+    const destination = isStaff
+      ? '/my-id'
+      : profile.role === 'super_admin' && !profile.organization_id
+        ? '/portal/dashboard'
+        : '/dashboard'
+
     if (organization?.require_2fa) {
       const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
       if (assurance?.nextLevel === 'aal2' && assurance?.currentLevel !== 'aal2') {
-        router.replace(`/mfa?next=${isStaff ? '/my-id' : '/dashboard'}`)
+        router.replace(`/mfa?next=${encodeURIComponent(destination)}`)
         return
       }
     }
 
     await fetch('/api/session/activity', { method: 'POST' }).catch(() => null)
 
-    router.replace(isStaff ? '/my-id' : '/dashboard')
+    router.replace(destination)
     router.refresh()
   }
 

@@ -951,7 +951,7 @@ export default function OrganizationDetailPage() {
                 className="rounded-2xl border border-black/8 bg-[#f8faf6] p-4"
               >
                 <div className="flex items-start gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] font-black text-[#b8f43d]">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] font-black text-[#dcebc9]">
                     {staff.full_name[0]}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -1040,7 +1040,7 @@ export default function OrganizationDetailPage() {
             }}
             className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-2xl"
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] text-[#b8f43d]">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] text-[#dcebc9]">
               <KeyRound className="h-5 w-5" />
             </span>
             <h2 className="mt-5 text-xl font-black">

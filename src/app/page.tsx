@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import NextImage from 'next/image'
 import {
   ArrowRight,
   BadgeCheck,
@@ -18,14 +17,8 @@ import {
   Users,
 } from 'lucide-react'
 import { BILLING_PLANS, formatPlanLimit } from '@/lib/billing-plans'
-
-const navItems = [
-  { label: 'Product', href: '#product' },
-  { label: 'Teams', href: '#teams' },
-  { label: 'Packages', href: '#packages' },
-  { label: 'Security', href: '#security' },
-  { label: 'Insights', href: '/blog' },
-]
+import { PublicHeader } from '@/components/public/PublicHeader'
+import { PublicFooter } from '@/components/public/PublicFooter'
 
 const workspaceTabs = [
   { label: 'Staff records', active: true },
@@ -77,46 +70,13 @@ const securityItems = [
   'Brand uploads for logo, favicon, and background',
 ]
 
-const logos = ['NORTHGATE', 'CITADEL', 'VAULT', 'SENTRY', 'SHIFTBASE', 'AURORA']
+const sectors = ['Security', 'Facilities', 'Events', 'Warehousing', 'Contractors', 'Field teams']
 
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#fbfaf8] text-[#191919]">
-      <header className="sticky top-0 z-30 border-b border-[#e8e2da] bg-[#fbfaf8]/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-3 sm:px-7">
-          <Link href="/" aria-label="Digital ID X home" className="flex items-center">
-            <NextImage src="/digital-id-x-logo.png" alt="Digital ID X" width={800} height={134} priority className="h-auto w-[164px] sm:w-[184px]" />
-          </Link>
-
-          <nav className="hidden items-center gap-1 md:flex">
-            {navItems.map((item) => (
-              <a
-                key={item.label}
-                href={item.href}
-                className="rounded-md px-3 py-2 text-[15px] font-semibold text-[#4d4a45] transition hover:bg-[#f1eee9] hover:text-[#191919]"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href="/login"
-              className="hidden rounded-md px-3 py-2 text-[15px] font-bold text-[#4d4a45] transition hover:bg-[#f1eee9] sm:inline-flex"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="inline-flex items-center gap-2 rounded-md bg-[#191919] px-4 py-2 text-[15px] font-black text-white transition hover:bg-black"
-            >
-              Get started
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'Digital ID X', applicationCategory: 'BusinessApplication', operatingSystem: 'Web', description: 'A secure workspace for staff identity cards, workforce documents and expiry tracking.', offers: { '@type': 'AggregateOffer', lowPrice: '0', highPrice: '399', priceCurrency: 'GBP' } }).replace(/</g, '\\u003c') }} />
 
       <section className="mx-auto w-full max-w-7xl px-5 pb-10 pt-14 text-center sm:px-7 lg:pb-12 lg:pt-18">
         <div className="mx-auto flex max-w-max items-center gap-2 rounded-full border border-[#e2dbd2] bg-white px-3 py-1.5 text-sm font-bold text-[#5f5a52] shadow-[0_1px_0_rgba(25,25,25,0.05)]">
@@ -289,12 +249,12 @@ export default function HomePage() {
       <section className="border-y border-[#e8e2da] bg-white">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 py-7 text-center sm:px-7">
           <p className="text-sm font-black text-[#6b645b]">
-            Built for teams that need clean records and fast checks
+            Purpose-built for teams that need clean records and fast checks
           </p>
           <div className="grid grid-cols-2 gap-3 text-xs font-black tracking-[0.16em] text-[#9b9388] sm:grid-cols-3 lg:grid-cols-6">
-            {logos.map((logo) => (
-              <span key={logo} className="rounded-md border border-[#eee8df] py-3">
-                {logo}
+            {sectors.map((sector) => (
+              <span key={sector} className="rounded-md border border-[#eee8df] py-3">
+                {sector}
               </span>
             ))}
           </div>
@@ -397,8 +357,9 @@ export default function HomePage() {
                   </p>
                   <h3 className="mt-3 text-2xl font-black">{plan.name}</h3>
                   <p className="mt-3 text-3xl font-black tracking-[-0.03em]">
-                    {plan.monthlyPrice === null ? 'Custom' : `GBP ${plan.monthlyPrice}`}
+                    {plan.monthlyPrice === null ? 'Custom' : `£${plan.monthlyPrice}`}
                   </p>
+                  {plan.monthlyPrice !== null ? <p className={`mt-1 text-xs font-bold ${active ? 'text-white/55' : 'text-[#8a8379]'}`}>per month · excluding VAT</p> : null}
                   <div
                     className={`mt-5 space-y-2 text-sm font-bold ${
                       active ? 'text-white/75' : 'text-[#615a52]'
@@ -408,14 +369,14 @@ export default function HomePage() {
                     <p>{formatPlanLimit(plan.staffLimit, 'staff records')}</p>
                   </div>
                   <Link
-                    href="/signup"
+                    href={plan.key === 'enterprise' ? 'mailto:sales@digitalidx.com?subject=Enterprise%20plan' : '/signup'}
                     className={`mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-md text-sm font-black ${
                       active
                         ? 'bg-white text-[#191919] hover:bg-[#f7f4ef]'
                         : 'bg-[#191919] text-white hover:bg-black'
                     }`}
                   >
-                    Start free
+                    {plan.key === 'enterprise' ? 'Contact sales' : 'Start free'}
                   </Link>
                 </article>
               )
@@ -453,6 +414,23 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="border-y border-[#e8e2da] bg-white">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-7 lg:grid-cols-[.8fr_1.2fr]">
+          <div><p className="text-sm font-black uppercase tracking-[.16em] text-[#8a8379]">How it works</p><h2 className="mt-3 text-4xl font-black tracking-[-.04em] sm:text-5xl">From staff record to trusted verification.</h2><p className="mt-5 text-base font-semibold leading-7 text-[#615a52]">Digital ID X supports your internal identity process. Official licence and right-to-work checks still take place through the appropriate authorities.</p></div>
+          <ol className="grid gap-3">{[['01', 'Add the person', 'Create a controlled staff record with the information your team actually needs.'], ['02', 'Verify and monitor', 'Record supporting documents, expiry dates and follow-up actions.'], ['03', 'Issue and manage', 'Create a branded digital ID with a live QR verification status.']].map(([number, title, text]) => <li key={number} className="grid grid-cols-[44px_1fr] gap-4 rounded-lg border border-[#e5ded5] bg-[#fbfaf8] p-5"><span className="font-black text-[#697f44]">{number}</span><div><h3 className="font-black">{title}</h3><p className="mt-1 text-sm font-semibold leading-6 text-[#615a52]">{text}</p></div></li>)}</ol>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-7">
+        <p className="text-sm font-black uppercase tracking-[.16em] text-[#8a8379]">Common questions</p>
+        <div className="mt-6 grid gap-3 md:grid-cols-2">{[
+          ['Does Digital ID X replace an SIA licence?', 'No. It helps an organisation manage and present its own workforce identity record. Official checks must still use the relevant authority.'],
+          ['Can we control who sees staff data?', 'Yes. Workspace roles and permissions separate administrative responsibilities, while public verification should expose only approved summary details.'],
+          ['Can we track document expiry dates?', 'Yes. Teams can record expiry dates and manage alerts and renewal workflows before documents become overdue.'],
+          ['Can the workspace use our branding?', 'Yes. Organisation administrators can configure brand assets and workspace colours, subject to their package and permissions.'],
+        ].map(([question, answer]) => <details key={question} className="group rounded-lg border border-[#e5ded5] bg-white p-5"><summary className="cursor-pointer list-none font-black">{question}<span className="float-right text-[#697f44] group-open:rotate-45">+</span></summary><p className="mt-3 text-sm font-semibold leading-6 text-[#615a52]">{answer}</p></details>)}</div>
+      </section>
+
       <section className="mx-auto w-full max-w-7xl px-5 pb-16 sm:px-7">
         <div className="rounded-xl border border-[#191919] bg-[#191919] px-6 py-10 text-center text-white sm:px-10">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md bg-white text-[#191919]">
@@ -483,6 +461,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      <PublicFooter />
     </main>
   )
 }
