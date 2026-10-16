@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getBillingPlan, isBillingPlanKey } from '@/lib/billing-plans'
+import { getEffectiveOrganizationLimits } from '@/lib/organization-limits'
 
 const PLATFORM_ROLES = ['super_admin']
 const ORGANIZATION_STATUSES = ['active', 'trialing', 'paused', 'suspended', 'archived']
@@ -38,7 +39,7 @@ export async function GET() {
 
     const { data: organizations, error } = await adminSupabase
       .from('organizations')
-      .select('id, name, slug, status, plan, logo_url, favicon_url, background_image_url, theme_key, primary_color, accent_color, surface_color, created_at, updated_at')
+      .select('id, name, slug, status, plan, custom_user_limit, custom_staff_limit, logo_url, favicon_url, background_image_url, theme_key, primary_color, accent_color, surface_color, created_at, updated_at')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -67,10 +68,13 @@ export async function GET() {
         ])
 
         const plan = getBillingPlan(organization.plan)
+        const effectiveLimits = getEffectiveOrganizationLimits(organization, plan)
 
         return {
           ...organization,
           billing_plan: plan,
+          user_limit: effectiveLimits.users,
+          staff_limit: effectiveLimits.staff,
           user_count: users.count || 0,
           staff_count: staff.count || 0,
           subscription: subscription.data || null,
@@ -101,6 +105,8 @@ export async function PATCH(request: Request) {
       typeof body.organization_id === 'string' ? body.organization_id : ''
     const status = typeof body.status === 'string' ? body.status : ''
     const plan = typeof body.plan === 'string' ? body.plan : ''
+    const customUserLimit = parseCustomLimit(body.custom_user_limit)
+    const customStaffLimit = parseCustomLimit(body.custom_staff_limit)
 
     if (!organizationId) {
       return NextResponse.json(
@@ -123,13 +129,25 @@ export async function PATCH(request: Request) {
       )
     }
 
+    if (customUserLimit === undefined || customStaffLimit === undefined) {
+      return NextResponse.json(
+        { error: 'Custom limits must be positive whole numbers or blank.' },
+        { status: 400 }
+      )
+    }
+
     const adminSupabase = createAdminClient()
 
     const { data: organization, error: updateError } = await adminSupabase
       .from('organizations')
-      .update({ status, plan })
+      .update({
+        status,
+        plan,
+        custom_user_limit: customUserLimit,
+        custom_staff_limit: customStaffLimit,
+      })
       .eq('id', organizationId)
-      .select('id, name, slug, status, plan')
+      .select('id, name, slug, status, plan, custom_user_limit, custom_staff_limit')
       .single()
 
     if (updateError || !organization) {
@@ -175,7 +193,12 @@ export async function PATCH(request: Request) {
         actor_role: access.profile.role,
         module: 'Platform Organizations',
         page: '/platform/organizations',
-        changes: { status, plan },
+        changes: {
+          status,
+          plan,
+          custom_user_limit: customUserLimit,
+          custom_staff_limit: customStaffLimit,
+        },
       },
     })
 
@@ -190,4 +213,12 @@ export async function PATCH(request: Request) {
       { status: 500 }
     )
   }
+}
+
+function parseCustomLimit(value: unknown): number | null | undefined {
+  if (value === null || value === '') return null
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    return undefined
+  }
+  return value
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getBillingPlan } from '@/lib/billing-plans'
+import { getEffectiveOrganizationLimits } from '@/lib/organization-limits'
 
 async function requirePortalAccess() {
   const supabase = await createClient()
@@ -37,7 +38,7 @@ export async function GET() {
     const [{ data: organizations }, { data: portalUsers }] = await Promise.all([
       adminSupabase
         .from('organizations')
-        .select('id, name, slug, status, plan, created_at')
+        .select('id, name, slug, status, plan, custom_user_limit, custom_staff_limit, created_at')
         .order('created_at', { ascending: false }),
       adminSupabase
         .from('profiles')
@@ -69,13 +70,14 @@ export async function GET() {
         ])
 
         const billingPlan = getBillingPlan(organization.plan)
+        const effectiveLimits = getEffectiveOrganizationLimits(organization, billingPlan)
 
         return {
           ...organization,
           plan_name: billingPlan.name,
           monthly_price: billingPlan.monthlyPrice,
-          user_limit: billingPlan.userLimit,
-          staff_limit: billingPlan.staffLimit,
+          user_limit: effectiveLimits.users,
+          staff_limit: effectiveLimits.staff,
           user_count: users.count || 0,
           staff_count: staff.count || 0,
           subscription_status: subscription.data?.status || null,

@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { getBillingPlan } from '@/lib/billing-plans'
+import { getEffectiveOrganizationLimits } from '@/lib/organization-limits'
 
 export const runtime = 'nodejs'
 
@@ -355,7 +356,7 @@ export async function POST(request: Request) {
 
     const { data: organization } = await supabase
       .from('organizations')
-      .select('id, plan')
+      .select('id, plan, custom_user_limit, custom_staff_limit')
       .eq('id', currentProfile.organization_id)
       .single()
 
@@ -365,15 +366,16 @@ export async function POST(request: Request) {
       .eq('organization_id', currentProfile.organization_id)
 
     const plan = getBillingPlan(organization?.plan)
+    const limits = getEffectiveOrganizationLimits(organization, plan)
     const incomingCreateRows = staffRows.length
 
     if (
-      plan.staffLimit !== null &&
-      (existingStaffCount || 0) + incomingCreateRows > plan.staffLimit
+      limits.staff !== null &&
+      (existingStaffCount || 0) + incomingCreateRows > limits.staff
     ) {
       return NextResponse.json(
         {
-          error: `This package allows ${plan.staffLimit} staff records. Reduce the import or upgrade the package.`,
+          error: `This organization allows ${limits.staff} staff records. Reduce the import or increase its staff limit.`,
         },
         { status: 400 }
       )

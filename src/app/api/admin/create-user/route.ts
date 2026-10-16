@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getBillingPlan } from '@/lib/billing-plans'
+import { getEffectiveOrganizationLimits } from '@/lib/organization-limits'
 import { isSystemUserRole } from '@/lib/user-roles'
 
 export async function POST(req: Request) {
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
 
     const { data: organization } = await adminSupabase
       .from('organizations')
-      .select('id, status, plan')
+      .select('id, status, plan, custom_user_limit, custom_staff_limit')
       .eq('id', currentProfile.organization_id)
       .single()
 
@@ -106,18 +107,19 @@ export async function POST(req: Request) {
     }
 
     const billingPlan = getBillingPlan(organization.plan)
+    const limits = getEffectiveOrganizationLimits(organization, billingPlan)
 
-    if (billingPlan.userLimit !== null) {
+    if (limits.users !== null) {
       const { count: currentUserCount } = await adminSupabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', currentProfile.organization_id)
         .neq('role', 'staff')
 
-      if ((currentUserCount || 0) >= billingPlan.userLimit) {
+      if ((currentUserCount || 0) >= limits.users) {
         return NextResponse.json(
           {
-            error: `${billingPlan.name} plan allows ${billingPlan.userLimit} users. Upgrade the organization plan to add more users.`,
+            error: `This organization allows ${limits.users} users. Increase its user limit to add more users.`,
           },
           { status: 403 }
         )

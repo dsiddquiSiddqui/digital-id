@@ -7,9 +7,11 @@ import {
   CheckCircle2,
   LogIn,
   PauseCircle,
+  PencilLine,
   Search,
   ShieldAlert,
   Users,
+  X,
 } from 'lucide-react'
 import {
   BILLING_PLANS,
@@ -26,7 +28,16 @@ type OrganizationRow = {
   plan: BillingPlanKey
   user_count: number
   staff_count: number
+  custom_user_limit: number | null
+  custom_staff_limit: number | null
+  user_limit: number | null
+  staff_limit: number | null
   created_at: string
+}
+
+type LimitDraft = {
+  users: string
+  staff: string
 }
 
 const STATUS_OPTIONS = ['active', 'trialing', 'paused', 'suspended', 'archived']
@@ -36,6 +47,8 @@ export default function PlatformOrganizationsPage() {
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState('')
   const [enteringId, setEnteringId] = useState('')
+  const [editingLimitsId, setEditingLimitsId] = useState('')
+  const [limitDraft, setLimitDraft] = useState<LimitDraft>({ users: '', staff: '' })
   const [search, setSearch] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -91,14 +104,24 @@ export default function PlatformOrganizationsPage() {
 
   const updateOrganization = async (
     organization: OrganizationRow,
-    updates: Partial<Pick<OrganizationRow, 'status' | 'plan'>>
-  ) => {
+    updates: Partial<
+      Pick<OrganizationRow, 'status' | 'plan' | 'custom_user_limit' | 'custom_staff_limit'>
+    >
+  ): Promise<boolean> => {
     setSavingId(organization.id)
     setMessage('')
     setError('')
 
     const nextStatus = updates.status || organization.status
     const nextPlan = updates.plan || organization.plan
+    const nextCustomUserLimit =
+      updates.custom_user_limit === undefined
+        ? organization.custom_user_limit
+        : updates.custom_user_limit
+    const nextCustomStaffLimit =
+      updates.custom_staff_limit === undefined
+        ? organization.custom_staff_limit
+        : updates.custom_staff_limit
 
     try {
       const response = await fetch('/api/platform/organizations', {
@@ -108,6 +131,8 @@ export default function PlatformOrganizationsPage() {
           organization_id: organization.id,
           status: nextStatus,
           plan: nextPlan,
+          custom_user_limit: nextCustomUserLimit,
+          custom_staff_limit: nextCustomStaffLimit,
         }),
       })
 
@@ -115,22 +140,61 @@ export default function PlatformOrganizationsPage() {
 
       if (!response.ok) {
         setError(result.error || 'Unable to update organization.')
-        return
+        return false
       }
 
       setOrganizations((prev) =>
         prev.map((org) =>
           org.id === organization.id
-            ? { ...org, status: nextStatus, plan: nextPlan }
+            ? {
+                ...org,
+                status: nextStatus,
+                plan: nextPlan,
+                custom_user_limit: nextCustomUserLimit,
+                custom_staff_limit: nextCustomStaffLimit,
+                user_limit: nextCustomUserLimit ?? getBillingPlan(nextPlan).userLimit,
+                staff_limit: nextCustomStaffLimit ?? getBillingPlan(nextPlan).staffLimit,
+              }
             : org
         )
       )
       setMessage(`${organization.name} updated.`)
+      return true
     } catch {
       setError('Something went wrong while updating organization.')
+      return false
     } finally {
       setSavingId('')
     }
+  }
+
+  const editLimits = (organization: OrganizationRow) => {
+    setEditingLimitsId(organization.id)
+    setLimitDraft({
+      users: organization.custom_user_limit?.toString() || '',
+      staff: organization.custom_staff_limit?.toString() || '',
+    })
+    setMessage('')
+    setError('')
+  }
+
+  const saveLimits = async (organization: OrganizationRow) => {
+    const customUserLimit = limitDraft.users === '' ? null : Number(limitDraft.users)
+    const customStaffLimit = limitDraft.staff === '' ? null : Number(limitDraft.staff)
+
+    if (
+      (customUserLimit !== null && (!Number.isInteger(customUserLimit) || customUserLimit <= 0)) ||
+      (customStaffLimit !== null && (!Number.isInteger(customStaffLimit) || customStaffLimit <= 0))
+    ) {
+      setError('Limits must be positive whole numbers, or blank to use the plan default.')
+      return
+    }
+
+    const saved = await updateOrganization(organization, {
+      custom_user_limit: customUserLimit,
+      custom_staff_limit: customStaffLimit,
+    })
+    if (saved) setEditingLimitsId('')
   }
 
   const enterOrganization = async (organization: OrganizationRow) => {
@@ -181,7 +245,7 @@ export default function PlatformOrganizationsPage() {
               </h1>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
                 Manage every tenant, deactivate organizations, and assign billing
-                packages from one platform console.
+                packages and custom user or staff capacity from one platform console.
               </p>
             </div>
           </div>
@@ -271,9 +335,12 @@ export default function PlatformOrganizationsPage() {
                 filteredOrganizations.map((organization) => {
                   const plan = getBillingPlan(organization.plan)
                   const overUserLimit =
-                    plan.userLimit !== null && organization.user_count > plan.userLimit
+                    organization.user_limit !== null &&
+                    organization.user_count > organization.user_limit
                   const overStaffLimit =
-                    plan.staffLimit !== null && organization.staff_count > plan.staffLimit
+                    organization.staff_limit !== null &&
+                    organization.staff_count > organization.staff_limit
+                  const editingLimits = editingLimitsId === organization.id
 
                   return (
                     <tr key={organization.id} className="border-b border-slate-200 last:border-b-0">
@@ -330,11 +397,80 @@ export default function PlatformOrganizationsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-500">
-                        <p>{formatPlanLimit(plan.userLimit, 'users')}</p>
-                        <p className="mt-1">{formatPlanLimit(plan.staffLimit, 'staff')}</p>
+                        {editingLimits ? (
+                          <div className="grid min-w-[250px] grid-cols-2 gap-2">
+                            <LimitInput
+                              label="Users"
+                              value={limitDraft.users}
+                              placeholder={plan.userLimit?.toString() || 'Unlimited'}
+                              onChange={(value) =>
+                                setLimitDraft((draft) => ({ ...draft, users: value }))
+                              }
+                            />
+                            <LimitInput
+                              label="Staff"
+                              value={limitDraft.staff}
+                              placeholder={plan.staffLimit?.toString() || 'Unlimited'}
+                              onChange={(value) =>
+                                setLimitDraft((draft) => ({ ...draft, staff: value }))
+                              }
+                            />
+                            <p className="col-span-2 text-[11px] font-semibold text-slate-400">
+                              Leave blank to inherit the {plan.name} plan.
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            <p>
+                              {formatPlanLimit(organization.user_limit, 'users')}
+                              {organization.custom_user_limit !== null ? (
+                                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700">
+                                  Custom
+                                </span>
+                              ) : null}
+                            </p>
+                            <p className="mt-1">
+                              {formatPlanLimit(organization.staff_limit, 'staff')}
+                              {organization.custom_staff_limit !== null ? (
+                                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700">
+                                  Custom
+                                </span>
+                              ) : null}
+                            </p>
+                          </>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
+                          {editingLimits ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={savingId === organization.id}
+                                onClick={() => saveLimits(organization)}
+                                className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-amber-400 disabled:opacity-60"
+                              >
+                                {savingId === organization.id ? 'Saving...' : 'Save limits'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingLimitsId('')}
+                                aria-label="Cancel limit editing"
+                                className="rounded-2xl border border-slate-200 p-2.5 text-slate-500 transition hover:bg-slate-50"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => editLimits(organization)}
+                              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                            >
+                              <PencilLine className="h-4 w-4" />
+                              Edit limits
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={enteringId === organization.id}
@@ -380,6 +516,36 @@ export default function PlatformOrganizationsPage() {
         </div>
       </section>
     </div>
+  )
+}
+
+function LimitInput({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string
+  value: string
+  placeholder: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="space-y-1">
+      <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
+        {label}
+      </span>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        inputMode="numeric"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-950 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+      />
+    </label>
   )
 }
 

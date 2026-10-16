@@ -1,4 +1,5 @@
 import { getBillingPlan } from '@/lib/billing-plans'
+import { getEffectiveOrganizationLimits } from '@/lib/organization-limits'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type SupabaseLike = Pick<SupabaseClient, 'from'>
@@ -16,7 +17,7 @@ export async function getOrganizationPlanUsage(
   const { data: organization } = await supabase
     .from('organizations')
     .select(
-      'id, name, slug, status, plan, storage_quota_mb, require_2fa, device_tracking_enabled, rate_limit_enabled, session_history_enabled, session_timeout_minutes, ip_allowlist, backup_policy, compliance_policy'
+      'id, name, slug, status, plan, custom_user_limit, custom_staff_limit, storage_quota_mb, require_2fa, device_tracking_enabled, rate_limit_enabled, session_history_enabled, session_timeout_minutes, ip_allowlist, backup_policy, compliance_policy'
     )
     .eq('id', organizationId)
     .single()
@@ -69,6 +70,7 @@ export async function getOrganizationPlanUsage(
   ])
 
   const plan = getBillingPlan(organization?.plan)
+  const effectiveLimits = getEffectiveOrganizationLimits(organization, plan)
   const users = usersResult.count || 0
   const staff = staffResult.count || 0
   const storageBytes = (storageResult.data || []).reduce(
@@ -93,18 +95,18 @@ export async function getOrganizationPlanUsage(
       storageBytes,
     },
     limits: {
-      users: plan.userLimit,
-      staff: plan.staffLimit,
+      users: effectiveLimits.users,
+      staff: effectiveLimits.staff,
       storageMb: organization?.storage_quota_mb ?? 1024,
     },
     percentages: {
-      users: percent(users, plan.userLimit),
-      staff: percent(staff, plan.staffLimit),
+      users: percent(users, effectiveLimits.users),
+      staff: percent(staff, effectiveLimits.staff),
       storage: percent(storageMb, organization?.storage_quota_mb ?? 1024),
     },
     isOverLimit: {
-      users: plan.userLimit !== null && users > plan.userLimit,
-      staff: plan.staffLimit !== null && staff > plan.staffLimit,
+      users: effectiveLimits.users !== null && users > effectiveLimits.users,
+      staff: effectiveLimits.staff !== null && staff > effectiveLimits.staff,
     },
   }
 }
