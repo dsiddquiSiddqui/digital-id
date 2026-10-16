@@ -1,56 +1,1189 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Building2, CreditCard, Download, DoorOpen, FileText, HardDrive, KeyRound, Plus, Search, ShieldCheck, ShieldOff, UserCog, Users } from 'lucide-react'
-import { EmptyState, LoadingState, PageHeader, Panel, StatusPill, formatDate, formatDateTime } from '@/components/portal/PortalUi'
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Building2,
+  CreditCard,
+  Download,
+  DoorOpen,
+  FileText,
+  HardDrive,
+  KeyRound,
+  Plus,
+  Search,
+  ShieldCheck,
+  ShieldOff,
+  UserCog,
+  Users,
+} from "lucide-react";
+import {
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  Panel,
+  StatusPill,
+  formatDate,
+  formatDateTime,
+} from "@/components/portal/PortalUi";
 
-type OrganizationUser = { id: string; full_name: string; email: string | null; phone: string | null; role: string; is_active: boolean; force_password_change?: boolean; locked_at?: string | null; created_at: string }
-type StaffMember = { id: string; full_name: string; employee_code: string; email: string | null; phone: string | null; staff_type: string | null; status: string; profile_id: string | null; created_at: string }
-type Detail = { organization: { id: string; name: string; slug: string; status: string; plan: string; lifecycle_stage: string; trial_ends_at: string | null; billing_contact_email: string | null }; accountOwner: { full_name: string; email: string | null } | null; users: OrganizationUser[]; staff: StaffMember[]; subscription: { status: string; current_period_end: string | null; provider_customer_id: string | null } | null; usage: { usage: { users: number; staff: number; documents: number; devices: number; storageMb: number; activeIds: number; securityAlerts: number }; limits: { users: number | null; staff: number | null; storageMb: number } }; activity: Array<{ id: string; action_type: string; entity_type: string; created_at: string }>; securityEvents: Array<{ id: string; event_type: string; severity: string; reviewed_at: string | null; created_at: string }>; supportTickets: Array<{ id: string; ticket_number: string; subject: string; priority: string; status: string; created_at: string }> }
-type PasswordTarget = { type: 'user' | 'staff'; id: string; name: string } | null
+type OrganizationUser = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  role: string;
+  is_active: boolean;
+  force_password_change?: boolean;
+  locked_at?: string | null;
+  created_at: string;
+};
+type StaffMember = {
+  id: string;
+  full_name: string;
+  employee_code: string;
+  email: string | null;
+  phone: string | null;
+  staff_type: string | null;
+  status: string;
+  profile_id: string | null;
+  created_at: string;
+};
+type Detail = {
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    plan: string;
+    custom_user_limit: number | null;
+    custom_staff_limit: number | null;
+    lifecycle_stage: string;
+    trial_ends_at: string | null;
+    billing_contact_email: string | null;
+  };
+  accountOwner: { full_name: string; email: string | null } | null;
+  users: OrganizationUser[];
+  staff: StaffMember[];
+  subscription: {
+    status: string;
+    current_period_end: string | null;
+    provider_customer_id: string | null;
+  } | null;
+  usage: {
+    usage: {
+      users: number;
+      staff: number;
+      documents: number;
+      devices: number;
+      storageMb: number;
+      activeIds: number;
+      securityAlerts: number;
+    };
+    limits: { users: number | null; staff: number | null; storageMb: number };
+  };
+  activity: Array<{
+    id: string;
+    action_type: string;
+    entity_type: string;
+    created_at: string;
+  }>;
+  securityEvents: Array<{
+    id: string;
+    event_type: string;
+    severity: string;
+    reviewed_at: string | null;
+    created_at: string;
+  }>;
+  supportTickets: Array<{
+    id: string;
+    ticket_number: string;
+    subject: string;
+    priority: string;
+    status: string;
+    created_at: string;
+  }>;
+};
+type PasswordTarget = {
+  type: "user" | "staff";
+  id: string;
+  name: string;
+} | null;
 
 export default function OrganizationDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const router = useRouter()
-  const [detail, setDetail] = useState<Detail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'staff'>('overview')
-  const [query, setQuery] = useState('')
-  const [saving, setSaving] = useState('')
-  const [message, setMessage] = useState('')
-  const [passwordTarget, setPasswordTarget] = useState<PasswordTarget>(null)
-  const [password, setPassword] = useState('')
-  const [entering, setEntering] = useState(false)
-  const [showInvite, setShowInvite] = useState(false)
-  const [invite, setInvite] = useState({ full_name: '', email: '', role: 'manager' })
-  const load = useCallback(async () => { setError(''); try { const response = await fetch(`/api/portal/organizations/${encodeURIComponent(id)}`, { cache: 'no-store' }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to load organization.'); setDetail(result) } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to load organization.') } finally { setLoading(false) } }, [id])
-  useEffect(() => { void load() }, [load])
-  const mutateAccess = async (payload: Record<string, unknown>, success: string) => { setSaving(String(payload.target_id || 'action')); setError(''); setMessage(''); try { const response = await fetch(`/api/portal/organizations/${encodeURIComponent(id)}/access`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, confirmation: 'CONFIRM' }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to update access.'); setMessage(success); await load() } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to update access.') } finally { setSaving('') } }
-  const enterWorkspace = async () => { const reason = window.prompt(`Reason for entering ${detail?.organization.name || 'this organization'}?`); if (!reason || reason.trim().length < 8) { setError('Enter a reason of at least 8 characters.'); return }; setEntering(true); setError(''); try { const response = await fetch('/api/platform/organizations/enter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ organization_id: id, reason }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to enter workspace.'); router.push(result.redirect_to || '/dashboard') } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to enter workspace.') } finally { setEntering(false) } }
-  const sendInvite = async (payload: Record<string, unknown>, success: string) => { setSaving('invite'); setError(''); setMessage(''); try { const response = await fetch(`/api/portal/organizations/${encodeURIComponent(id)}/access`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Unable to create invitation.'); setMessage(result.email_status === 'sent' ? success : `${success} Email delivery is ${result.email_status}; the invitation is still available.`); setShowInvite(false); setInvite({ full_name: '', email: '', role: 'manager' }); await load() } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to create invitation.') } finally { setSaving('') } }
-  const exportCsv = (kind: 'users' | 'staff') => { const rows = kind === 'users' ? [['Name', 'Email', 'Phone', 'Role', 'Status', 'Created'], ...filteredUsers.map((user) => [user.full_name, user.email || '', user.phone || '', user.role, user.is_active ? 'active' : 'inactive', user.created_at])] : [['Name', 'Employee ID', 'Email', 'Phone', 'Type', 'Status', 'Login linked', 'Created'], ...filteredStaff.map((staff) => [staff.full_name, staff.employee_code, staff.email || '', staff.phone || '', staff.staff_type || '', staff.status, staff.profile_id ? 'yes' : 'no', staff.created_at])]; const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n'); const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${organization.slug}-${kind}.csv`; anchor.click(); URL.revokeObjectURL(url) }
-  const filteredUsers = useMemo(() => (detail?.users || []).filter((user) => !query || [user.full_name, user.email, user.role].some((value) => value?.toLowerCase().includes(query.toLowerCase()))), [detail?.users, query])
-  const filteredStaff = useMemo(() => (detail?.staff || []).filter((staff) => !query || [staff.full_name, staff.email, staff.employee_code, staff.status].some((value) => value?.toLowerCase().includes(query.toLowerCase()))), [detail?.staff, query])
-  if (loading) return <LoadingState />
-  if (!detail) return <EmptyState title="Organization unavailable" description={error || 'This organization could not be found.'} />
-  const { organization, usage } = detail
-  return <div className="space-y-6"><Link href="/portal/organizations" className="inline-flex items-center gap-2 text-xs font-black text-[#60704e]"><ArrowLeft className="h-4 w-4" />All organizations</Link><PageHeader eyebrow="Organization intelligence" title={organization.name} description={`/${organization.slug} · Complete operational record`} action={<div className="flex items-center gap-2"><StatusPill value={organization.status} /><button type="button" disabled={entering} onClick={() => void enterWorkspace()} className="inline-flex items-center gap-2 rounded-xl bg-[#152019] px-4 py-3 text-xs font-black text-white disabled:opacity-50"><DoorOpen className="h-4 w-4" />{entering ? 'Opening…' : 'Enter workspace'}</button></div>} />
-    {error ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</p> : null}{message ? <p className="rounded-xl border border-[#a9cf5b] bg-[#e9f6cc] px-4 py-3 text-sm font-bold text-[#496126]">{message}</p> : null}
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Stat icon={<Building2 />} label="Lifecycle" value={organization.lifecycle_stage || organization.status} /><Stat icon={<CreditCard />} label="Subscription" value={detail.subscription?.status || 'No subscription'} /><Stat icon={<Users />} label="People" value={`${usage.usage.users + usage.usage.staff}`} /><Stat icon={<HardDrive />} label="Storage" value={`${usage.usage.storageMb} MB`} /></section>
-    <nav className="flex gap-2 overflow-x-auto rounded-2xl border border-black/10 bg-white p-2" aria-label="Organization sections">{(['overview', 'users', 'staff'] as const).map((tab) => <button key={tab} onClick={() => { setActiveTab(tab); setQuery('') }} className={`min-w-28 rounded-xl px-4 py-2.5 text-xs font-black capitalize ${activeTab === tab ? 'bg-[#152019] text-white' : 'text-[#657269] hover:bg-[#f2f4ef]'}`}>{tab}{tab === 'users' ? ` (${detail.users.length})` : tab === 'staff' ? ` (${detail.staff.length})` : ''}</button>)}</nav>
-    {activeTab !== 'overview' ? <Panel title="Directory actions" description="Invite accounts, export records, and perform identity recovery from one place."><div className="flex flex-wrap gap-2">{activeTab === 'users' ? <button type="button" onClick={() => setShowInvite((value) => !value)} className="inline-flex items-center gap-2 rounded-xl bg-[#152019] px-4 py-2.5 text-xs font-black text-white"><Plus className="h-4 w-4" />Invite organization user</button> : null}<button type="button" onClick={() => exportCsv(activeTab)} className="inline-flex items-center gap-2 rounded-xl bg-[#eef1eb] px-4 py-2.5 text-xs font-black"><Download className="h-4 w-4" />Export {activeTab} CSV</button></div>{activeTab === 'users' && showInvite ? <form onSubmit={(event) => { event.preventDefault(); void sendInvite(invite, `Invitation sent to ${invite.email}.`) }} className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_180px_auto]"><input required value={invite.full_name} onChange={(event) => setInvite((value) => ({ ...value, full_name: event.target.value }))} placeholder="Full name" aria-label="Invitee full name" className="h-10 rounded-xl border border-black/10 bg-[#f7f8f5] px-3 text-sm" /><input required type="email" value={invite.email} onChange={(event) => setInvite((value) => ({ ...value, email: event.target.value }))} placeholder="Email address" aria-label="Invitee email" className="h-10 rounded-xl border border-black/10 bg-[#f7f8f5] px-3 text-sm" /><select value={invite.role} onChange={(event) => setInvite((value) => ({ ...value, role: event.target.value }))} aria-label="Invitee role" className="h-10 rounded-xl border border-black/10 bg-white px-3 text-xs font-black">{['admin', 'manager', 'hr_manager', 'hr', 'operation_manager', 'operation_team', 'guard'].map((role) => <option key={role} value={role}>{role.replaceAll('_', ' ')}</option>)}</select><button disabled={saving === 'invite'} className="rounded-xl bg-[#8aae3d] px-4 text-xs font-black text-[#152019] disabled:opacity-40">Send invitation</button></form> : null}{activeTab === 'users' ? <div className="mt-4 flex flex-wrap gap-2">{filteredUsers.map((user) => <button key={user.id} type="button" disabled={saving === user.id} onClick={() => void mutateAccess({ target_type: 'user', target_id: user.id, action: 'mfa_reset' }, `MFA was reset for ${user.full_name}.`)} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800"><ShieldOff className="h-4 w-4" />Reset {user.full_name}&apos;s MFA</button>)}</div> : <div className="mt-4 grid gap-2 sm:grid-cols-2">{filteredStaff.filter((staff) => !staff.profile_id).map((staff) => <div key={staff.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f8f5] p-3"><div className="min-w-0"><p className="truncate text-sm font-black">{staff.full_name}</p><p className="truncate text-xs text-[#718078]">{staff.email || 'Email required before login creation'}</p></div>{staff.email ? <button type="button" disabled={saving === 'invite'} onClick={() => void sendInvite({ kind: 'staff_login', staff_id: staff.id, email: staff.email, full_name: staff.full_name }, `Login invitation sent to ${staff.email}.`)} className="shrink-0 rounded-lg bg-[#152019] px-3 py-2 text-xs font-black text-white">Create login</button> : null}</div>)}</div>}</Panel> : null}
-    {activeTab === 'overview' ? <section className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]"><div className="space-y-5"><Panel title="Account and capacity" description="Commercial ownership and current product utilization."><div className="grid gap-3 sm:grid-cols-2"><Info label="Account owner" value={detail.accountOwner?.full_name || 'Not assigned'} /><Info label="Owner email" value={detail.accountOwner?.email || 'Not recorded'} /><Info label="Billing contact" value={organization.billing_contact_email || 'Not recorded'} /><Info label="Renewal date" value={formatDate(detail.subscription?.current_period_end || null)} /></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><Capacity label="Users" value={usage.usage.users} limit={usage.limits.users} /><Capacity label="Staff" value={usage.usage.staff} limit={usage.limits.staff} /><Capacity label="Storage MB" value={usage.usage.storageMb} limit={usage.limits.storageMb} /></div></Panel><Panel title="Recent activity" description="Latest audited changes for this organization.">{detail.activity.length ? <div className="divide-y divide-black/5">{detail.activity.slice(0, 8).map((event) => <div key={event.id} className="flex items-center gap-3 py-3"><FileText className="h-4 w-4 text-[#78924e]" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{event.action_type.replaceAll('_', ' ')}</p><p className="text-xs text-[#718078]">{event.entity_type.replaceAll('_', ' ')}</p></div><span className="text-xs font-bold text-[#718078]">{formatDateTime(event.created_at)}</span></div>)}</div> : <EmptyState title="No activity recorded" description="Audited activity will appear here." />}</Panel></div><div className="space-y-5"><Panel title="Security posture" description={`${usage.usage.securityAlerts} recorded signals · ${usage.usage.devices} devices`}><div className="space-y-3">{detail.securityEvents.slice(0, 5).map((event) => <div key={event.id} className="rounded-xl bg-[#f7f8f5] p-3"><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#66814a]" /><p className="flex-1 text-sm font-black">{event.event_type.replaceAll('_', ' ')}</p><StatusPill value={event.reviewed_at ? 'completed' : event.severity} /></div><p className="mt-2 text-xs text-[#718078]">{formatDateTime(event.created_at)}</p></div>)}</div></Panel><Panel title="Open support cases" description="Customer requests attached to this account.">{detail.supportTickets.length ? <div className="space-y-3">{detail.supportTickets.slice(0, 6).map((ticket) => <Link key={ticket.id} href={`/portal/support?ticket=${ticket.id}`} className="block rounded-xl border border-black/8 p-3"><div className="flex items-center gap-2"><p className="min-w-0 flex-1 truncate text-sm font-black">{ticket.subject}</p><StatusPill value={ticket.status} /></div><p className="mt-1 text-xs text-[#718078]">#{ticket.ticket_number} · {ticket.priority} priority</p></Link>)}</div> : <EmptyState title="No support cases" description="This account has no recorded tickets." />}</Panel></div></section> : null}
-    {activeTab === 'users' ? <DirectoryToolbar query={query} onQuery={setQuery} placeholder="Search users by name, email, or role"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead><tr className="border-b border-black/8 text-[10px] font-black uppercase tracking-[.12em] text-[#718078]"><th className="px-5 py-3">User</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Created</th><th className="px-5 py-3 text-right">Access controls</th></tr></thead><tbody>{filteredUsers.map((user) => <tr key={user.id} className="border-b border-black/5 last:border-0"><td className="px-5 py-4"><p className="text-sm font-black">{user.full_name}</p><p className="mt-1 text-xs text-[#718078]">{user.email || 'No email'}{user.phone ? ` · ${user.phone}` : ''}</p></td><td className="px-4 py-4"><select value={user.role} disabled={saving === user.id} onChange={(event) => void mutateAccess({ target_type: 'user', target_id: user.id, action: 'role', role: event.target.value }, `${user.full_name}'s role was updated.`)} className="h-9 rounded-lg border border-black/10 bg-white px-2 text-xs font-black capitalize">{['admin', 'manager', 'hr_manager', 'hr', 'operation_manager', 'operation_team', 'guard'].map((role) => <option key={role} value={role}>{role.replaceAll('_', ' ')}</option>)}</select></td><td className="px-4 py-4"><StatusPill value={user.is_active ? 'active' : 'inactive'} /></td><td className="px-4 py-4 text-xs font-bold text-[#718078]">{formatDate(user.created_at)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => setPasswordTarget({ type: 'user', id: user.id, name: user.full_name })} className="inline-flex items-center gap-1 rounded-lg bg-[#eef1eb] px-3 py-2 text-xs font-black"><KeyRound className="h-3.5 w-3.5" />Password</button><button disabled={saving === user.id} onClick={() => void mutateAccess({ target_type: 'user', target_id: user.id, action: 'status', is_active: !user.is_active }, `${user.full_name} was ${user.is_active ? 'disabled' : 'enabled'}.`)} className={`rounded-lg px-3 py-2 text-xs font-black ${user.is_active ? 'bg-red-50 text-red-700' : 'bg-[#e9f6cc] text-[#496126]'}`}>{user.is_active ? 'Disable' : 'Enable'}</button></div></td></tr>)}</tbody></table></div></DirectoryToolbar> : null}
-    {activeTab === 'staff' ? <DirectoryToolbar query={query} onQuery={setQuery} placeholder="Search staff by name, email, ID, or status"><div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2">{filteredStaff.map((staff) => <article key={staff.id} className="rounded-2xl border border-black/8 bg-[#f8faf6] p-4"><div className="flex items-start gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] font-black text-[#b8f43d]">{staff.full_name[0]}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{staff.full_name}</p><p className="mt-1 truncate text-xs text-[#718078]">{staff.employee_code} · {staff.email || 'No email'}</p></div><StatusPill value={staff.status} /></div><div className="mt-4 flex items-center justify-between gap-3"><p className="text-[10px] font-black uppercase tracking-wide text-[#718078]">{staff.profile_id ? 'Login linked' : 'No login account'}</p><div className="flex gap-2">{staff.profile_id ? <button onClick={() => setPasswordTarget({ type: 'staff', id: staff.id, name: staff.full_name })} className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-xs font-black ring-1 ring-black/10"><KeyRound className="h-3.5 w-3.5" />Password</button> : null}<select value={staff.status} disabled={saving === staff.id} onChange={(event) => void mutateAccess({ target_type: 'staff', target_id: staff.id, action: 'status', status: event.target.value }, `${staff.full_name}'s status was updated.`)} className="h-9 rounded-lg border border-black/10 bg-white px-2 text-xs font-black capitalize">{['active', 'inactive', 'suspended', 'revoked', 'expired', 'archived'].map((status) => <option key={status} value={status}>{status}</option>)}</select></div></div></article>)}</div></DirectoryToolbar> : null}
-    {passwordTarget ? <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"><form onSubmit={(event) => { event.preventDefault(); void mutateAccess({ target_type: passwordTarget.type, target_id: passwordTarget.id, action: 'password', password }, `Temporary password changed for ${passwordTarget.name}.`).then(() => { setPasswordTarget(null); setPassword('') }) }} className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-2xl"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] text-[#b8f43d]"><KeyRound className="h-5 w-5" /></span><h2 className="mt-5 text-xl font-black">Change temporary password</h2><p className="mt-2 text-sm leading-6 text-[#718078]">Set a temporary password for {passwordTarget.name}. The password value is never stored in the audit log.</p><input autoFocus type="password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 12 characters" className="mt-5 h-11 w-full rounded-xl border border-black/10 bg-[#f7f8f5] px-3 text-sm outline-none focus:border-[#78924e]" /><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => { setPasswordTarget(null); setPassword('') }} className="rounded-xl px-4 py-2.5 text-xs font-black text-[#657269]">Cancel</button><button disabled={saving === passwordTarget.id || password.length < 12} className="rounded-xl bg-[#152019] px-4 py-2.5 text-xs font-black text-white disabled:opacity-40">Confirm change</button></div></form></div> : null}
-  </div>
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "staff">(
+    "overview",
+  );
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState("");
+  const [message, setMessage] = useState("");
+  const [passwordTarget, setPasswordTarget] = useState<PasswordTarget>(null);
+  const [password, setPassword] = useState("");
+  const [entering, setEntering] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [invite, setInvite] = useState({
+    full_name: "",
+    email: "",
+    role: "manager",
+  });
+  const [editingLimits, setEditingLimits] = useState(false);
+  const [limitDraft, setLimitDraft] = useState({ users: "", staff: "" });
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/portal/organizations/${encodeURIComponent(id)}`,
+        { cache: "no-store" },
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Unable to load organization.");
+      setDetail(result);
+      setLimitDraft({
+        users: result.organization.custom_user_limit?.toString() || "",
+        staff: result.organization.custom_staff_limit?.toString() || "",
+      });
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load organization.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const mutateAccess = async (
+    payload: Record<string, unknown>,
+    success: string,
+  ) => {
+    setSaving(String(payload.target_id || "action"));
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/portal/organizations/${encodeURIComponent(id)}/access`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, confirmation: "CONFIRM" }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Unable to update access.");
+      setMessage(success);
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to update access.",
+      );
+    } finally {
+      setSaving("");
+    }
+  };
+  const enterWorkspace = async () => {
+    const reason = window.prompt(
+      `Reason for entering ${detail?.organization.name || "this organization"}?`,
+    );
+    if (!reason || reason.trim().length < 8) {
+      setError("Enter a reason of at least 8 characters.");
+      return;
+    }
+    setEntering(true);
+    setError("");
+    try {
+      const response = await fetch("/api/platform/organizations/enter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organization_id: id, reason }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Unable to enter workspace.");
+      router.push(result.redirect_to || "/dashboard");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to enter workspace.",
+      );
+    } finally {
+      setEntering(false);
+    }
+  };
+  const sendInvite = async (
+    payload: Record<string, unknown>,
+    success: string,
+  ) => {
+    setSaving("invite");
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/portal/organizations/${encodeURIComponent(id)}/access`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Unable to create invitation.");
+      setMessage(
+        result.email_status === "sent"
+          ? success
+          : `${success} Email delivery is ${result.email_status}; the invitation is still available.`,
+      );
+      setShowInvite(false);
+      setInvite({ full_name: "", email: "", role: "manager" });
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to create invitation.",
+      );
+    } finally {
+      setSaving("");
+    }
+  };
+  const saveLimits = async () => {
+    const users = limitDraft.users === "" ? null : Number(limitDraft.users);
+    const staff = limitDraft.staff === "" ? null : Number(limitDraft.staff);
+    if (
+      (users !== null && (!Number.isInteger(users) || users <= 0)) ||
+      (staff !== null && (!Number.isInteger(staff) || staff <= 0))
+    ) {
+      setError(
+        "Limits must be positive whole numbers, or blank to use the plan default.",
+      );
+      return;
+    }
+    setSaving("limits");
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/portal/organizations/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirmation: "CONFIRM",
+            custom_user_limit: users,
+            custom_staff_limit: staff,
+          }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Unable to update limits.");
+      setMessage("Organization capacity limits updated.");
+      setEditingLimits(false);
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to update limits.",
+      );
+    } finally {
+      setSaving("");
+    }
+  };
+  const exportCsv = (kind: "users" | "staff") => {
+    const rows =
+      kind === "users"
+        ? [
+            ["Name", "Email", "Phone", "Role", "Status", "Created"],
+            ...filteredUsers.map((user) => [
+              user.full_name,
+              user.email || "",
+              user.phone || "",
+              user.role,
+              user.is_active ? "active" : "inactive",
+              user.created_at,
+            ]),
+          ]
+        : [
+            [
+              "Name",
+              "Employee ID",
+              "Email",
+              "Phone",
+              "Type",
+              "Status",
+              "Login linked",
+              "Created",
+            ],
+            ...filteredStaff.map((staff) => [
+              staff.full_name,
+              staff.employee_code,
+              staff.email || "",
+              staff.phone || "",
+              staff.staff_type || "",
+              staff.status,
+              staff.profile_id ? "yes" : "no",
+              staff.created_at,
+            ]),
+          ];
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+          .join(","),
+      )
+      .join("\n");
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${organization.slug}-${kind}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+  const filteredUsers = useMemo(
+    () =>
+      (detail?.users || []).filter(
+        (user) =>
+          !query ||
+          [user.full_name, user.email, user.role].some((value) =>
+            value?.toLowerCase().includes(query.toLowerCase()),
+          ),
+      ),
+    [detail?.users, query],
+  );
+  const filteredStaff = useMemo(
+    () =>
+      (detail?.staff || []).filter(
+        (staff) =>
+          !query ||
+          [
+            staff.full_name,
+            staff.email,
+            staff.employee_code,
+            staff.status,
+          ].some((value) => value?.toLowerCase().includes(query.toLowerCase())),
+      ),
+    [detail?.staff, query],
+  );
+  if (loading) return <LoadingState />;
+  if (!detail)
+    return (
+      <EmptyState
+        title="Organization unavailable"
+        description={error || "This organization could not be found."}
+      />
+    );
+  const { organization, usage } = detail;
+  return (
+    <div className="space-y-6">
+      <Link
+        href="/portal/organizations"
+        className="inline-flex items-center gap-2 text-xs font-black text-[#60704e]"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        All organizations
+      </Link>
+      <PageHeader
+        eyebrow="Organization intelligence"
+        title={organization.name}
+        description={`/${organization.slug} · Complete operational record`}
+        action={
+          <div className="flex items-center gap-2">
+            <StatusPill value={organization.status} />
+            <button
+              type="button"
+              disabled={entering}
+              onClick={() => void enterWorkspace()}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#152019] px-4 py-3 text-xs font-black text-white disabled:opacity-50"
+            >
+              <DoorOpen className="h-4 w-4" />
+              {entering ? "Opening…" : "Enter workspace"}
+            </button>
+          </div>
+        }
+      />
+      {error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {error}
+        </p>
+      ) : null}
+      {message ? (
+        <p className="rounded-xl border border-[#a9cf5b] bg-[#e9f6cc] px-4 py-3 text-sm font-bold text-[#496126]">
+          {message}
+        </p>
+      ) : null}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat
+          icon={<Building2 />}
+          label="Lifecycle"
+          value={organization.lifecycle_stage || organization.status}
+        />
+        <Stat
+          icon={<CreditCard />}
+          label="Subscription"
+          value={detail.subscription?.status || "No subscription"}
+        />
+        <Stat
+          icon={<Users />}
+          label="People"
+          value={`${usage.usage.users + usage.usage.staff}`}
+        />
+        <Stat
+          icon={<HardDrive />}
+          label="Storage"
+          value={`${usage.usage.storageMb} MB`}
+        />
+      </section>
+      <nav
+        className="flex gap-2 overflow-x-auto rounded-2xl border border-black/10 bg-white p-2"
+        aria-label="Organization sections"
+      >
+        {(["overview", "users", "staff"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              setActiveTab(tab);
+              setQuery("");
+            }}
+            className={`min-w-28 rounded-xl px-4 py-2.5 text-xs font-black capitalize ${activeTab === tab ? "bg-[#152019] text-white" : "text-[#657269] hover:bg-[#f2f4ef]"}`}
+          >
+            {tab}
+            {tab === "users"
+              ? ` (${detail.users.length})`
+              : tab === "staff"
+                ? ` (${detail.staff.length})`
+                : ""}
+          </button>
+        ))}
+      </nav>
+      {activeTab !== "overview" ? (
+        <Panel
+          title="Directory actions"
+          description="Invite accounts, export records, and perform identity recovery from one place."
+        >
+          <div className="flex flex-wrap gap-2">
+            {activeTab === "users" ? (
+              <button
+                type="button"
+                onClick={() => setShowInvite((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#152019] px-4 py-2.5 text-xs font-black text-white"
+              >
+                <Plus className="h-4 w-4" />
+                Invite organization user
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => exportCsv(activeTab)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#eef1eb] px-4 py-2.5 text-xs font-black"
+            >
+              <Download className="h-4 w-4" />
+              Export {activeTab} CSV
+            </button>
+          </div>
+          {activeTab === "users" && showInvite ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void sendInvite(invite, `Invitation sent to ${invite.email}.`);
+              }}
+              className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_180px_auto]"
+            >
+              <input
+                required
+                value={invite.full_name}
+                onChange={(event) =>
+                  setInvite((value) => ({
+                    ...value,
+                    full_name: event.target.value,
+                  }))
+                }
+                placeholder="Full name"
+                aria-label="Invitee full name"
+                className="h-10 rounded-xl border border-black/10 bg-[#f7f8f5] px-3 text-sm"
+              />
+              <input
+                required
+                type="email"
+                value={invite.email}
+                onChange={(event) =>
+                  setInvite((value) => ({
+                    ...value,
+                    email: event.target.value,
+                  }))
+                }
+                placeholder="Email address"
+                aria-label="Invitee email"
+                className="h-10 rounded-xl border border-black/10 bg-[#f7f8f5] px-3 text-sm"
+              />
+              <select
+                value={invite.role}
+                onChange={(event) =>
+                  setInvite((value) => ({ ...value, role: event.target.value }))
+                }
+                aria-label="Invitee role"
+                className="h-10 rounded-xl border border-black/10 bg-white px-3 text-xs font-black"
+              >
+                {[
+                  "admin",
+                  "manager",
+                  "hr_manager",
+                  "hr",
+                  "operation_manager",
+                  "operation_team",
+                  "guard",
+                ].map((role) => (
+                  <option key={role} value={role}>
+                    {role.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+              <button
+                disabled={saving === "invite"}
+                className="rounded-xl bg-[#8aae3d] px-4 text-xs font-black text-[#152019] disabled:opacity-40"
+              >
+                Send invitation
+              </button>
+            </form>
+          ) : null}
+          {activeTab === "users" ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {filteredUsers.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  disabled={saving === user.id}
+                  onClick={() =>
+                    void mutateAccess(
+                      {
+                        target_type: "user",
+                        target_id: user.id,
+                        action: "mfa_reset",
+                      },
+                      `MFA was reset for ${user.full_name}.`,
+                    )
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800"
+                >
+                  <ShieldOff className="h-4 w-4" />
+                  Reset {user.full_name}&apos;s MFA
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {filteredStaff
+                .filter((staff) => !staff.profile_id)
+                .map((staff) => (
+                  <div
+                    key={staff.id}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f8f5] p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black">
+                        {staff.full_name}
+                      </p>
+                      <p className="truncate text-xs text-[#718078]">
+                        {staff.email || "Email required before login creation"}
+                      </p>
+                    </div>
+                    {staff.email ? (
+                      <button
+                        type="button"
+                        disabled={saving === "invite"}
+                        onClick={() =>
+                          void sendInvite(
+                            {
+                              kind: "staff_login",
+                              staff_id: staff.id,
+                              email: staff.email,
+                              full_name: staff.full_name,
+                            },
+                            `Login invitation sent to ${staff.email}.`,
+                          )
+                        }
+                        className="shrink-0 rounded-lg bg-[#152019] px-3 py-2 text-xs font-black text-white"
+                      >
+                        Create login
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+            </div>
+          )}
+        </Panel>
+      ) : null}
+      {activeTab === "overview" ? (
+        <section className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
+          <div className="space-y-5">
+            <Panel
+              title="Account and capacity"
+              description="Commercial ownership and current product utilization."
+              action={
+                <button
+                  type="button"
+                  onClick={() => setEditingLimits((value) => !value)}
+                  className="rounded-xl bg-[#eef1eb] px-3 py-2 text-xs font-black text-[#40513f]"
+                >
+                  {editingLimits ? "Cancel" : "Edit limits"}
+                </button>
+              }
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Info
+                  label="Account owner"
+                  value={detail.accountOwner?.full_name || "Not assigned"}
+                />
+                <Info
+                  label="Owner email"
+                  value={detail.accountOwner?.email || "Not recorded"}
+                />
+                <Info
+                  label="Billing contact"
+                  value={organization.billing_contact_email || "Not recorded"}
+                />
+                <Info
+                  label="Renewal date"
+                  value={formatDate(
+                    detail.subscription?.current_period_end || null,
+                  )}
+                />
+              </div>
+              {editingLimits ? (
+                <div className="mt-5 rounded-2xl border border-[#c9dca1] bg-[#f7faef] p-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <LimitField
+                      label="Custom user limit"
+                      value={limitDraft.users}
+                      placeholder={
+                        usage.limits.users?.toString() || "Unlimited"
+                      }
+                      onChange={(value) =>
+                        setLimitDraft((draft) => ({ ...draft, users: value }))
+                      }
+                    />
+                    <LimitField
+                      label="Custom staff limit"
+                      value={limitDraft.staff}
+                      placeholder={
+                        usage.limits.staff?.toString() || "Unlimited"
+                      }
+                      onChange={(value) =>
+                        setLimitDraft((draft) => ({ ...draft, staff: value }))
+                      }
+                    />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold text-[#718078]">
+                      Leave blank to use the {organization.plan} plan default.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={saving === "limits"}
+                      onClick={() => void saveLimits()}
+                      className="rounded-xl bg-[#152019] px-4 py-2.5 text-xs font-black text-white disabled:opacity-50"
+                    >
+                      {saving === "limits" ? "Saving…" : "Save limits"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <Capacity
+                  label="Users"
+                  value={usage.usage.users}
+                  limit={usage.limits.users}
+                />
+                <Capacity
+                  label="Staff"
+                  value={usage.usage.staff}
+                  limit={usage.limits.staff}
+                />
+                <Capacity
+                  label="Storage MB"
+                  value={usage.usage.storageMb}
+                  limit={usage.limits.storageMb}
+                />
+              </div>
+            </Panel>
+            <Panel
+              title="Recent activity"
+              description="Latest audited changes for this organization."
+            >
+              {detail.activity.length ? (
+                <div className="divide-y divide-black/5">
+                  {detail.activity.slice(0, 8).map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <FileText className="h-4 w-4 text-[#78924e]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black">
+                          {event.action_type.replaceAll("_", " ")}
+                        </p>
+                        <p className="text-xs text-[#718078]">
+                          {event.entity_type.replaceAll("_", " ")}
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-[#718078]">
+                        {formatDateTime(event.created_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No activity recorded"
+                  description="Audited activity will appear here."
+                />
+              )}
+            </Panel>
+          </div>
+          <div className="space-y-5">
+            <Panel
+              title="Security posture"
+              description={`${usage.usage.securityAlerts} recorded signals · ${usage.usage.devices} devices`}
+            >
+              <div className="space-y-3">
+                {detail.securityEvents.slice(0, 5).map((event) => (
+                  <div key={event.id} className="rounded-xl bg-[#f7f8f5] p-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-[#66814a]" />
+                      <p className="flex-1 text-sm font-black">
+                        {event.event_type.replaceAll("_", " ")}
+                      </p>
+                      <StatusPill
+                        value={event.reviewed_at ? "completed" : event.severity}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-[#718078]">
+                      {formatDateTime(event.created_at)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+            <Panel
+              title="Open support cases"
+              description="Customer requests attached to this account."
+            >
+              {detail.supportTickets.length ? (
+                <div className="space-y-3">
+                  {detail.supportTickets.slice(0, 6).map((ticket) => (
+                    <Link
+                      key={ticket.id}
+                      href={`/portal/support?ticket=${ticket.id}`}
+                      className="block rounded-xl border border-black/8 p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate text-sm font-black">
+                          {ticket.subject}
+                        </p>
+                        <StatusPill value={ticket.status} />
+                      </div>
+                      <p className="mt-1 text-xs text-[#718078]">
+                        #{ticket.ticket_number} · {ticket.priority} priority
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No support cases"
+                  description="This account has no recorded tickets."
+                />
+              )}
+            </Panel>
+          </div>
+        </section>
+      ) : null}
+      {activeTab === "users" ? (
+        <DirectoryToolbar
+          query={query}
+          onQuery={setQuery}
+          placeholder="Search users by name, email, or role"
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left">
+              <thead>
+                <tr className="border-b border-black/8 text-[10px] font-black uppercase tracking-[.12em] text-[#718078]">
+                  <th className="px-5 py-3">User</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Created</th>
+                  <th className="px-5 py-3 text-right">Access controls</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="border-b border-black/5 last:border-0"
+                  >
+                    <td className="px-5 py-4">
+                      <p className="text-sm font-black">{user.full_name}</p>
+                      <p className="mt-1 text-xs text-[#718078]">
+                        {user.email || "No email"}
+                        {user.phone ? ` · ${user.phone}` : ""}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <select
+                        value={user.role}
+                        disabled={saving === user.id}
+                        onChange={(event) =>
+                          void mutateAccess(
+                            {
+                              target_type: "user",
+                              target_id: user.id,
+                              action: "role",
+                              role: event.target.value,
+                            },
+                            `${user.full_name}'s role was updated.`,
+                          )
+                        }
+                        className="h-9 rounded-lg border border-black/10 bg-white px-2 text-xs font-black capitalize"
+                      >
+                        {[
+                          "admin",
+                          "manager",
+                          "hr_manager",
+                          "hr",
+                          "operation_manager",
+                          "operation_team",
+                          "guard",
+                        ].map((role) => (
+                          <option key={role} value={role}>
+                            {role.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-4">
+                      <StatusPill
+                        value={user.is_active ? "active" : "inactive"}
+                      />
+                    </td>
+                    <td className="px-4 py-4 text-xs font-bold text-[#718078]">
+                      {formatDate(user.created_at)}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() =>
+                            setPasswordTarget({
+                              type: "user",
+                              id: user.id,
+                              name: user.full_name,
+                            })
+                          }
+                          className="inline-flex items-center gap-1 rounded-lg bg-[#eef1eb] px-3 py-2 text-xs font-black"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                          Password
+                        </button>
+                        <button
+                          disabled={saving === user.id}
+                          onClick={() =>
+                            void mutateAccess(
+                              {
+                                target_type: "user",
+                                target_id: user.id,
+                                action: "status",
+                                is_active: !user.is_active,
+                              },
+                              `${user.full_name} was ${user.is_active ? "disabled" : "enabled"}.`,
+                            )
+                          }
+                          className={`rounded-lg px-3 py-2 text-xs font-black ${user.is_active ? "bg-red-50 text-red-700" : "bg-[#e9f6cc] text-[#496126]"}`}
+                        >
+                          {user.is_active ? "Disable" : "Enable"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DirectoryToolbar>
+      ) : null}
+      {activeTab === "staff" ? (
+        <DirectoryToolbar
+          query={query}
+          onQuery={setQuery}
+          placeholder="Search staff by name, email, ID, or status"
+        >
+          <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2">
+            {filteredStaff.map((staff) => (
+              <article
+                key={staff.id}
+                className="rounded-2xl border border-black/8 bg-[#f8faf6] p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] font-black text-[#b8f43d]">
+                    {staff.full_name[0]}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black">
+                      {staff.full_name}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-[#718078]">
+                      {staff.employee_code} · {staff.email || "No email"}
+                    </p>
+                  </div>
+                  <StatusPill value={staff.status} />
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-[#718078]">
+                    {staff.profile_id ? "Login linked" : "No login account"}
+                  </p>
+                  <div className="flex gap-2">
+                    {staff.profile_id ? (
+                      <button
+                        onClick={() =>
+                          setPasswordTarget({
+                            type: "staff",
+                            id: staff.id,
+                            name: staff.full_name,
+                          })
+                        }
+                        className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-xs font-black ring-1 ring-black/10"
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                        Password
+                      </button>
+                    ) : null}
+                    <select
+                      value={staff.status}
+                      disabled={saving === staff.id}
+                      onChange={(event) =>
+                        void mutateAccess(
+                          {
+                            target_type: "staff",
+                            target_id: staff.id,
+                            action: "status",
+                            status: event.target.value,
+                          },
+                          `${staff.full_name}'s status was updated.`,
+                        )
+                      }
+                      className="h-9 rounded-lg border border-black/10 bg-white px-2 text-xs font-black capitalize"
+                    >
+                      {[
+                        "active",
+                        "inactive",
+                        "suspended",
+                        "revoked",
+                        "expired",
+                        "archived",
+                      ].map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </DirectoryToolbar>
+      ) : null}
+      {passwordTarget ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void mutateAccess(
+                {
+                  target_type: passwordTarget.type,
+                  target_id: passwordTarget.id,
+                  action: "password",
+                  password,
+                },
+                `Temporary password changed for ${passwordTarget.name}.`,
+              ).then(() => {
+                setPasswordTarget(null);
+                setPassword("");
+              });
+            }}
+            className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-2xl"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#152019] text-[#b8f43d]">
+              <KeyRound className="h-5 w-5" />
+            </span>
+            <h2 className="mt-5 text-xl font-black">
+              Change temporary password
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#718078]">
+              Set a temporary password for {passwordTarget.name}. The password
+              value is never stored in the audit log.
+            </p>
+            <input
+              autoFocus
+              type="password"
+              minLength={12}
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Minimum 12 characters"
+              className="mt-5 h-11 w-full rounded-xl border border-black/10 bg-[#f7f8f5] px-3 text-sm outline-none focus:border-[#78924e]"
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordTarget(null);
+                  setPassword("");
+                }}
+                className="rounded-xl px-4 py-2.5 text-xs font-black text-[#657269]"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={saving === passwordTarget.id || password.length < 12}
+                className="rounded-xl bg-[#152019] px-4 py-2.5 text-xs font-black text-white disabled:opacity-40"
+              >
+                Confirm change
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
-function DirectoryToolbar({ query, onQuery, placeholder, children }: { query: string; onQuery: (value: string) => void; placeholder: string; children: React.ReactNode }) { return <section className="overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-[0_18px_55px_rgba(20,31,24,0.06)]"><div className="flex items-center gap-3 border-b border-black/10 p-4"><UserCog className="h-5 w-5 text-[#78924e]" /><label className="flex min-w-0 max-w-lg flex-1 items-center gap-2 rounded-xl border border-black/10 bg-[#f7f8f5] px-3"><Search className="h-4 w-4 text-[#718078]" /><input value={query} onChange={(event) => onQuery(event.target.value)} placeholder={placeholder} className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none" /></label></div>{children}</section> }
+function DirectoryToolbar({
+  query,
+  onQuery,
+  placeholder,
+  children,
+}: {
+  query: string;
+  onQuery: (value: string) => void;
+  placeholder: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-[0_18px_55px_rgba(20,31,24,0.06)]">
+      <div className="flex items-center gap-3 border-b border-black/10 p-4">
+        <UserCog className="h-5 w-5 text-[#78924e]" />
+        <label className="flex min-w-0 max-w-lg flex-1 items-center gap-2 rounded-xl border border-black/10 bg-[#f7f8f5] px-3">
+          <Search className="h-4 w-4 text-[#718078]" />
+          <input
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+            placeholder={placeholder}
+            className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+          />
+        </label>
+      </div>
+      {children}
+    </section>
+  );
+}
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <article className="rounded-[22px] border border-black/10 bg-white p-5"><div className="flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[.14em] text-[#718078]">{label}</p><span className="[&>svg]:h-4 [&>svg]:w-4 text-[#78924e]">{icon}</span></div><p className="mt-4 truncate text-xl font-black capitalize">{value.replaceAll('_', ' ')}</p></article> }
-function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-[#f7f8f5] p-3"><p className="text-[10px] font-black uppercase tracking-wide text-[#718078]">{label}</p><p className="mt-1 truncate text-sm font-black">{value}</p></div> }
-function Capacity({ label, value, limit }: { label: string; value: number; limit: number | null }) { const percent = limit ? Math.min(100, Math.round(value / limit * 100)) : 0; return <div><div className="flex justify-between text-xs font-black"><span>{label}</span><span>{value}{limit ? ` / ${limit}` : ''}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-black/8"><span className="block h-full rounded-full bg-[#8aae3d]" style={{ width: limit ? `${percent}%` : '8%' }} /></div></div> }
+function Stat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <article className="rounded-[22px] border border-black/10 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-black uppercase tracking-[.14em] text-[#718078]">
+          {label}
+        </p>
+        <span className="[&>svg]:h-4 [&>svg]:w-4 text-[#78924e]">{icon}</span>
+      </div>
+      <p className="mt-4 truncate text-xl font-black capitalize">
+        {value.replaceAll("_", " ")}
+      </p>
+    </article>
+  );
+}
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-[#f7f8f5] p-3">
+      <p className="text-[10px] font-black uppercase tracking-wide text-[#718078]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-black">{value}</p>
+    </div>
+  );
+}
+function LimitField({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label>
+      <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[.12em] text-[#60704e]">
+        {label}
+      </span>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        inputMode="numeric"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-xl border border-black/10 bg-white px-3 text-sm font-black outline-none focus:border-[#78924e] focus:ring-2 focus:ring-[#dcedb8]"
+      />
+    </label>
+  );
+}
+function Capacity({
+  label,
+  value,
+  limit,
+}: {
+  label: string;
+  value: number;
+  limit: number | null;
+}) {
+  const percent = limit ? Math.min(100, Math.round((value / limit) * 100)) : 0;
+  return (
+    <div>
+      <div className="flex justify-between text-xs font-black">
+        <span>{label}</span>
+        <span>
+          {value}
+          {limit ? ` / ${limit}` : ""}
+        </span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/8">
+        <span
+          className="block h-full rounded-full bg-[#8aae3d]"
+          style={{ width: limit ? `${percent}%` : "8%" }}
+        />
+      </div>
+    </div>
+  );
+}
