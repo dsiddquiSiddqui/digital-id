@@ -242,7 +242,7 @@ export default function MyIdPage() {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select(
-            'id, organization_id, auth_user_id, role, full_name, email, is_active, organizations:organizations(primary_color, accent_color, surface_color)'
+            'id, organization_id, auth_user_id, role, full_name, email, is_active, organizations:organizations!profiles_organization_id_fkey(primary_color, accent_color, surface_color)'
           )
           .eq('auth_user_id', user.id)
           .single()

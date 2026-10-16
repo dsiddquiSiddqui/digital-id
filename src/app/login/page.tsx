@@ -86,13 +86,17 @@ export default function LoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, auth_user_id, role, is_active, force_password_change, organization_id, organizations:organizations(status, require_2fa)')
+      .select('id, auth_user_id, role, is_active, force_password_change, organization_id, organizations:organizations!profiles_organization_id_fkey(status, require_2fa)')
       .eq('auth_user_id', user.id)
       .single<Profile>()
 
     if (profileError || !profile) {
       await supabase.auth.signOut()
-      setError('Access denied. No account profile was found.')
+      setError(
+        profileError
+          ? 'We could not load your account profile. Please try again or contact support.'
+          : 'Access denied. No account profile was found.'
+      )
       setLoading(false)
       return
     }

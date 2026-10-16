@@ -119,7 +119,7 @@ export default function OrganizationSettingsPage() {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(
-          'id, role, organization_id, organizations:organizations(id, name, slug, status, logo_url, favicon_url, background_image_url, support_email, support_phone, verification_title, theme_key, primary_color, accent_color, surface_color)'
+          'id, role, organization_id, organizations:organizations!profiles_organization_id_fkey(id, name, slug, status, logo_url, favicon_url, background_image_url, support_email, support_phone, verification_title, theme_key, primary_color, accent_color, surface_color)'
         )
         .eq('auth_user_id', user.id)
         .single<Profile>()

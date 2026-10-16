@@ -91,7 +91,7 @@ export default function DashboardPage() {
         const { data: profileData } = await supabase
           .from('profiles')
           .select(
-            'id, auth_user_id, organization_id, role, full_name, email, is_active, organizations:organizations(name, primary_color, accent_color)'
+            'id, auth_user_id, organization_id, role, full_name, email, is_active, organizations:organizations!profiles_organization_id_fkey(name, primary_color, accent_color)'
           )
           .eq('auth_user_id', user.id)
           .single()

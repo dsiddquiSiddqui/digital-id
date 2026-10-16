@@ -139,7 +139,7 @@ export async function proxy(request: NextRequest) {
     if (user) {
       const { data: profile } = await supabase
       .from('profiles')
-      .select('id, organization_id, organizations:organizations(ip_allowlist, require_2fa, mfa_enforcement_enabled, session_timeout_minutes, session_history_enabled)')
+      .select('id, organization_id, organizations:organizations!profiles_organization_id_fkey(ip_allowlist, require_2fa, mfa_enforcement_enabled, session_timeout_minutes, session_history_enabled)')
       .eq('auth_user_id', user.id)
       .maybeSingle()
 

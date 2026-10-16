@@ -111,7 +111,7 @@ export default function AdminLayout({
         const { data: profileData, error } = await supabase
           .from('profiles')
           .select(
-            '*, organizations:organizations(id, name, slug, logo_url, background_image_url, theme_key, primary_color, accent_color, surface_color, role_permissions)'
+            '*, organizations:organizations!profiles_organization_id_fkey(id, name, slug, logo_url, background_image_url, theme_key, primary_color, accent_color, surface_color, role_permissions)'
           )
           .eq('auth_user_id', user.id)
           .single()

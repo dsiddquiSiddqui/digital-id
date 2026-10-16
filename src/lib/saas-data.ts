@@ -212,7 +212,7 @@ export async function getCurrentTenant(): Promise<TenantContext | null> {
   const { data: profile, error } = await supabase
     .from('profiles')
     .select(
-      'id, organization_id, auth_user_id, role, full_name, email, phone, is_active, organizations:organizations(id, name, slug, status, plan, theme_key, logo_url, favicon_url, background_image_url, primary_color, accent_color, surface_color)'
+      'id, organization_id, auth_user_id, role, full_name, email, phone, is_active, organizations:organizations!profiles_organization_id_fkey(id, name, slug, status, plan, theme_key, logo_url, favicon_url, background_image_url, primary_color, accent_color, surface_color)'
     )
     .eq('auth_user_id', user.id)
     .single<TenantProfile>()
