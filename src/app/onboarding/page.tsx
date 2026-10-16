@@ -22,8 +22,8 @@ export default function OnboardingPage() {
           <aside className="relative isolate overflow-hidden bg-[#171915] px-6 py-7 text-white sm:px-9 sm:py-9 lg:flex lg:flex-col lg:justify-between lg:px-11 lg:py-10">
             <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
               <div className="absolute -right-24 top-28 h-72 w-72 rotate-45 border border-white/10" />
-              <div className="absolute -right-8 top-44 h-72 w-72 rotate-45 border border-[#c8ff4d]/30" />
-              <div className="absolute bottom-[-9rem] left-[-8rem] h-80 w-80 rounded-full bg-[#c8ff4d]/10 blur-3xl" />
+              <div className="absolute -right-8 top-44 h-72 w-72 rotate-45 border border-[#dcebc9]/25" />
+              <div className="absolute bottom-[-9rem] left-[-8rem] h-80 w-80 rounded-full bg-[#dcebc9]/10 blur-3xl" />
               <span className="absolute right-5 top-12 text-[13rem] font-black leading-none tracking-[-0.12em] text-white/[0.025] sm:text-[18rem] lg:right-2 lg:top-24 lg:text-[22rem]">
                 X
               </span>
@@ -35,8 +35,8 @@ export default function OnboardingPage() {
               </Link>
 
               <div className="mt-11 max-w-lg sm:mt-14 lg:mt-24">
-                <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#c8ff4d]">
-                  <span className="h-px w-8 bg-[#c8ff4d]" />
+                <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#dcebc9]">
+                  <span className="h-px w-8 bg-[#dcebc9]" />
                   Workspace launch
                 </p>
                 <h1 className="mt-5 max-w-md font-serif text-[2.85rem] font-semibold leading-[0.92] tracking-[-0.055em] sm:mt-6 sm:text-6xl lg:text-[4.6rem]">
@@ -53,7 +53,7 @@ export default function OnboardingPage() {
               <div className="hidden gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                 {trustPoints.map(({ icon: Icon, label, detail }) => (
                   <div key={label} className="bg-[#1c1e19]/95 p-4 sm:p-5">
-                    <Icon className="h-4 w-4 text-[#c8ff4d]" />
+                    <Icon className="h-4 w-4 text-[#dcebc9]" />
                     <p className="mt-4 text-xs font-black text-white">{label}</p>
                     <p className="mt-1 text-[11px] leading-5 text-white/40">{detail}</p>
                   </div>
@@ -62,7 +62,7 @@ export default function OnboardingPage() {
 
               <p className="mt-6 text-xs text-white/40">
                 Already have a workspace?{' '}
-                <Link href="/login" className="inline-flex items-center gap-1 font-bold text-white transition hover:text-[#c8ff4d]">
+                <Link href="/login" className="inline-flex items-center gap-1 font-bold text-white transition hover:text-[#dcebc9]">
                   Sign in <ArrowUpRight className="h-3.5 w-3.5" />
                 </Link>
               </p>

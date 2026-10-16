@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import {
   Eye,
   EyeOff,
@@ -150,15 +151,22 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef3f8] px-5 py-8 text-slate-950">
+    <main className="min-h-screen bg-[#f0eee8] px-3 py-3 text-[#171915] sm:px-5 sm:py-5 lg:px-7 lg:py-7">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center">
-        <div className="grid w-full overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] lg:grid-cols-[0.94fr_1.06fr]">
-          <section className="hidden bg-slate-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="grid w-full overflow-hidden rounded-[26px] border border-black/10 bg-[#f8f6f0] shadow-[0_35px_90px_rgba(27,29,24,0.13)] lg:grid-cols-[0.94fr_1.06fr]">
+          <section className="relative isolate hidden overflow-hidden bg-[#171915] p-10 text-white lg:flex lg:flex-col lg:justify-between">
+            <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+              <div className="absolute -right-24 top-24 h-72 w-72 rotate-45 border border-white/10" />
+              <div className="absolute -right-8 top-40 h-72 w-72 rotate-45 border border-[#dcebc9]/25" />
+              <div className="absolute bottom-[-9rem] left-[-8rem] h-80 w-80 rounded-full bg-[#dcebc9]/10 blur-3xl" />
+              <span className="absolute right-3 top-20 text-[22rem] font-black leading-none tracking-[-0.12em] text-white/[0.025]">X</span>
+            </div>
             <div>
               <div className="flex h-14 w-16 items-center justify-center rounded-2xl bg-white p-2">
                 <Image src="/digital-id-x-icon.png" alt="" width={165} height={134} priority className="h-auto w-full" />
               </div>
-              <p className="mt-8 text-xs font-black uppercase tracking-[0.2em] text-white/45">
+              <p className="mt-8 flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-[#dcebc9]">
+                <span className="h-px w-8 bg-[#dcebc9]" />
                 Smart workspace access
               </p>
               <h1 className="mt-4 max-w-sm text-4xl font-black leading-tight">
@@ -177,19 +185,19 @@ export default function LoginPage() {
             </div>
           </section>
 
-          <section className="bg-[#f8fafc] px-6 py-8 sm:px-10 sm:py-12">
+          <section className="bg-[#f8f6f0] px-6 py-8 sm:px-10 sm:py-12">
             <div className="mx-auto w-full max-w-md">
               <div className="mb-8">
                 <Image src="/digital-id-x-logo.png" alt="Digital ID X" width={800} height={134} priority className="mb-6 h-auto w-[210px]" />
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Secure account access</p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#73766d]">Secure account access</p>
+                <h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#171915]">
                   Welcome back
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
+                <p className="mt-2 text-sm leading-6 text-[#73766d]">
                   Use your work email. We will take you to the correct workspace.
                 </p>
                 {createdWorkspace ? (
-                  <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                  <p className="mt-4 rounded-xl border border-[#cadbb9] bg-[#edf5e5] px-4 py-3 text-sm font-semibold text-[#496629]">
                     Workspace created for {createdWorkspace}. Sign in with the
                     owner account to continue.
                   </p>
@@ -208,11 +216,11 @@ export default function LoginPage() {
                 />
 
                 <div>
-                  <label htmlFor="login-password" className="mb-2 block text-sm font-semibold text-slate-700">
+                  <label htmlFor="login-password" className="mb-2 block text-[11px] font-black uppercase tracking-[0.09em] text-[#5e6159]">
                     Password
                   </label>
-                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-slate-950">
-                    <LockKeyhole className="h-5 w-5 text-slate-400" />
+                  <div className="flex min-h-12 items-center rounded-xl border border-[#d5d2ca] bg-white px-4 text-[#8a8d83] transition focus-within:border-[#171915] focus-within:ring-2 focus-within:ring-[#dcebc9]">
+                    <LockKeyhole className="h-5 w-5" />
                     <input
                       id="login-password"
                       name="password"
@@ -221,13 +229,14 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter password"
-                      className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
+                      className="w-full bg-transparent px-3 py-3.5 font-semibold text-[#171915] outline-none placeholder:font-medium placeholder:text-[#aaa99f]"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="cursor-pointer text-slate-500 transition hover:text-slate-800"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      className="cursor-pointer text-[#777a71] transition hover:text-[#171915]"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
@@ -243,18 +252,18 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="group flex min-h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-[#171915] px-4 py-3.5 text-sm font-black text-white transition hover:bg-[#2b2e27] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? 'Finding your workspace…' : 'Continue securely'}
-                  {!loading ? <ArrowRight className="h-4 w-4" /> : null}
+                  {!loading ? <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#dcebc9] text-[#171915] transition group-hover:translate-x-0.5"><ArrowRight className="h-4 w-4" /></span> : null}
                 </button>
               </form>
 
-              <p className="mt-6 text-center text-sm text-slate-500">
+              <p className="mt-6 text-center text-sm text-[#73766d]">
                 New organization?{' '}
-                <a href="/signup" className="font-bold text-slate-950 hover:underline">
+                <Link href="/signup" className="font-black text-[#171915] underline-offset-4 hover:underline">
                   Create workspace
-                </a>
+                </Link>
               </p>
             </div>
           </section>
@@ -283,10 +292,10 @@ function LoginField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-sm font-semibold text-slate-700">
+      <label htmlFor={id} className="mb-2 block text-[11px] font-black uppercase tracking-[0.09em] text-[#5e6159]">
         {label}
       </label>
-      <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-slate-950">
+      <div className="flex min-h-12 items-center rounded-xl border border-[#d5d2ca] bg-white px-4 text-[#8a8d83] transition focus-within:border-[#171915] focus-within:ring-2 focus-within:ring-[#dcebc9]">
         {icon}
         <input
           id={id}
@@ -296,7 +305,7 @@ function LoginField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
+          className="w-full bg-transparent px-3 py-3.5 font-semibold text-[#171915] outline-none placeholder:font-medium placeholder:text-[#aaa99f]"
           required
         />
       </div>
@@ -306,7 +315,7 @@ function LoginField({
 
 function MiniPill({ text }: { text: string }) {
   return (
-    <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur-sm">
+    <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-bold text-white/75 backdrop-blur-sm">
       {text}
     </div>
   )

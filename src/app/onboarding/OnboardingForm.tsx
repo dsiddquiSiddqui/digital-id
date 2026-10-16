@@ -149,7 +149,7 @@ export function OnboardingForm() {
             <li key={item.number} className="min-w-0">
               <div className={`h-1 rounded-full transition ${item.number <= step ? 'bg-[#171915]' : 'bg-[#d8d5cd]'}`} />
               <div className="mt-2 flex items-center gap-2">
-                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${active ? 'bg-[#c8ff4d] text-[#171915]' : complete ? 'bg-[#171915] text-white' : 'border border-[#c9c6bd] text-[#85887e]'}`}>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${active ? 'bg-[#dcebc9] text-[#171915]' : complete ? 'bg-[#171915] text-white' : 'border border-[#c9c6bd] text-[#85887e]'}`}>
                   {complete ? <Check className="h-3 w-3" /> : item.number}
                 </span>
                 <span className={`truncate text-[10px] font-black uppercase tracking-[0.08em] ${active ? 'text-[#171915]' : 'text-[#8a8d83]'}`}>
@@ -214,7 +214,7 @@ export function OnboardingForm() {
               ) : (
                 <>
                   Continue
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#c8ff4d] text-[#171915] transition group-hover:translate-x-0.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#dcebc9] text-[#171915] transition group-hover:translate-x-0.5">
                     <ArrowRight className="h-4 w-4" />
                   </span>
                 </>
@@ -244,7 +244,7 @@ export function OnboardingForm() {
                 <label htmlFor="signup-team-size" className="mb-2 block text-[11px] font-black uppercase tracking-[0.09em] text-[#5e6159]">
                   Team size
                 </label>
-                <div className="flex min-h-12 items-center gap-3 rounded-xl border border-[#d5d2ca] bg-white px-4 text-[#8a8d83] transition focus-within:border-[#171915] focus-within:ring-2 focus-within:ring-[#c8ff4d]/70">
+                <div className="flex min-h-12 items-center gap-3 rounded-xl border border-[#d5d2ca] bg-white px-4 text-[#8a8d83] transition focus-within:border-[#171915] focus-within:ring-2 focus-within:ring-[#dcebc9]">
                   <UsersRound className="h-4 w-4" />
                   <select
                     id="signup-team-size"
@@ -292,7 +292,7 @@ export function OnboardingForm() {
           >
             <div className="overflow-hidden rounded-2xl border border-[#d8d5cd] bg-white">
               <div className="flex items-center gap-4 border-b border-[#e2dfd7] p-5">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#171915] text-[#c8ff4d]">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#171915] text-[#dcebc9]">
                   <Building2 className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
@@ -326,7 +326,7 @@ export function OnboardingForm() {
               >
                 {pending ? 'Creating workspace…' : 'Launch Digital ID X'}
                 {!pending ? (
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#c8ff4d] text-[#171915] transition group-hover:translate-x-0.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#dcebc9] text-[#171915] transition group-hover:translate-x-0.5">
                     <ArrowRight className="h-4 w-4" />
                   </span>
                 ) : null}
@@ -398,7 +398,7 @@ function Field({
         <span>{label}</span>
         {hint ? <span className="font-semibold normal-case tracking-normal text-[#96988f]">{hint}</span> : null}
       </label>
-      <div className="flex min-h-12 items-center gap-3 rounded-xl border border-[#d5d2ca] bg-white px-4 text-[#8a8d83] transition focus-within:border-[#171915] focus-within:ring-2 focus-within:ring-[#c8ff4d]/70">
+      <div className="flex min-h-12 items-center gap-3 rounded-xl border border-[#d5d2ca] bg-white px-4 text-[#8a8d83] transition focus-within:border-[#171915] focus-within:ring-2 focus-within:ring-[#dcebc9]">
         {icon}
         <input
           id={id}
@@ -447,7 +447,7 @@ function StepNavigation({
         ) : (
           <>
             Continue
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#c8ff4d] text-[#171915] transition group-hover:translate-x-0.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#dcebc9] text-[#171915] transition group-hover:translate-x-0.5">
               <ArrowRight className="h-4 w-4" />
             </span>
           </>
