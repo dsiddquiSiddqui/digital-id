@@ -58,7 +58,7 @@ export async function GET(
       adminSupabase
         .from("organizations")
         .select(
-          "id, name, slug, status, plan, custom_user_limit, custom_staff_limit, created_at, updated_at, owner_profile_id, customer_success_profile_id, lifecycle_stage, trial_started_at, trial_ends_at, cancellation_scheduled_at, cancelled_at, cancellation_reason, billing_contact_email, technical_contact_email, data_protection_contact_email, customer_lifetime_value, last_customer_contact_at, next_follow_up_at, churn_risk_reason",
+          "id, name, slug, status, plan, custom_user_limit, custom_staff_limit, storage_quota_mb, created_at, updated_at, owner_profile_id, customer_success_profile_id, lifecycle_stage, trial_started_at, trial_ends_at, cancellation_scheduled_at, cancelled_at, cancellation_reason, billing_contact_email, technical_contact_email, data_protection_contact_email, customer_lifetime_value, last_customer_contact_at, next_follow_up_at, churn_risk_reason",
         )
         .eq("id", id)
         .single(),
@@ -306,23 +306,21 @@ export async function POST(
         .single();
       if (taskError)
         return NextResponse.json({ error: taskError.message }, { status: 400 });
-      await adminSupabase
-        .from("audit_logs")
-        .insert({
-          organization_id: id,
-          actor_profile_id: access.id,
-          action_type: "portal_support_task_created",
-          entity_type: "platform_support_task",
-          entity_id: task.id,
-          metadata: {
-            title,
-            priority,
-            due_at: dueAt,
-            actor_role: access.role,
-            module: "Platform Portal",
-            page: "/portal",
-          },
-        });
+      await adminSupabase.from("audit_logs").insert({
+        organization_id: id,
+        actor_profile_id: access.id,
+        action_type: "portal_support_task_created",
+        entity_type: "platform_support_task",
+        entity_id: task.id,
+        metadata: {
+          title,
+          priority,
+          due_at: dueAt,
+          actor_role: access.role,
+          module: "Platform Portal",
+          page: "/portal",
+        },
+      });
       return NextResponse.json({ task });
     }
 
@@ -432,12 +430,25 @@ export async function PATCH(
         update[field] = body[field];
       }
     }
+    if (body.storage_quota_mb !== undefined) {
+      if (
+        typeof body.storage_quota_mb !== "number" ||
+        !Number.isInteger(body.storage_quota_mb) ||
+        body.storage_quota_mb <= 0
+      ) {
+        return NextResponse.json(
+          { error: "Storage allowance must be a positive whole number of MB." },
+          { status: 400 },
+        );
+      }
+      update.storage_quota_mb = body.storage_quota_mb;
+    }
 
     const adminSupabase = createAdminClient();
     const { data: previous } = await adminSupabase
       .from("organizations")
       .select(
-        "id, owner_profile_id, lifecycle_stage, custom_user_limit, custom_staff_limit",
+        "id, owner_profile_id, lifecycle_stage, custom_user_limit, custom_staff_limit, storage_quota_mb",
       )
       .eq("id", id)
       .maybeSingle();
@@ -517,22 +528,20 @@ export async function PATCH(
       if (transferError)
         console.error("Owner transfer history error:", transferError);
     }
-    await adminSupabase
-      .from("audit_logs")
-      .insert({
-        organization_id: id,
-        actor_profile_id: access.id,
-        action_type: "portal_customer_lifecycle_updated",
-        entity_type: "organization",
-        entity_id: id,
-        metadata: {
-          previous,
-          changes: update,
-          actor_role: access.role,
-          module: "Platform Portal",
-          page: "/portal",
-        },
-      });
+    await adminSupabase.from("audit_logs").insert({
+      organization_id: id,
+      actor_profile_id: access.id,
+      action_type: "portal_customer_lifecycle_updated",
+      entity_type: "organization",
+      entity_id: id,
+      metadata: {
+        previous,
+        changes: update,
+        actor_role: access.role,
+        module: "Platform Portal",
+        page: "/portal",
+      },
+    });
     return NextResponse.json({ organization });
   } catch (error) {
     console.error("Portal lifecycle update error:", error);

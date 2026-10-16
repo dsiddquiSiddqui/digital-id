@@ -60,6 +60,7 @@ type Detail = {
     plan: string;
     custom_user_limit: number | null;
     custom_staff_limit: number | null;
+    storage_quota_mb: number;
     lifecycle_stage: string;
     trial_ends_at: string | null;
     billing_contact_email: string | null;
@@ -134,7 +135,11 @@ export default function OrganizationDetailPage() {
     role: "manager",
   });
   const [editingLimits, setEditingLimits] = useState(false);
-  const [limitDraft, setLimitDraft] = useState({ users: "", staff: "" });
+  const [limitDraft, setLimitDraft] = useState({
+    users: "",
+    staff: "",
+    storage: "",
+  });
   const load = useCallback(async () => {
     setError("");
     try {
@@ -149,6 +154,7 @@ export default function OrganizationDetailPage() {
       setLimitDraft({
         users: result.organization.custom_user_limit?.toString() || "",
         staff: result.organization.custom_staff_limit?.toString() || "",
+        storage: result.organization.storage_quota_mb?.toString() || "1024",
       });
     } catch (caught) {
       setError(
@@ -260,12 +266,15 @@ export default function OrganizationDetailPage() {
   const saveLimits = async () => {
     const users = limitDraft.users === "" ? null : Number(limitDraft.users);
     const staff = limitDraft.staff === "" ? null : Number(limitDraft.staff);
+    const storage = Number(limitDraft.storage);
     if (
       (users !== null && (!Number.isInteger(users) || users <= 0)) ||
-      (staff !== null && (!Number.isInteger(staff) || staff <= 0))
+      (staff !== null && (!Number.isInteger(staff) || staff <= 0)) ||
+      !Number.isInteger(storage) ||
+      storage <= 0
     ) {
       setError(
-        "Limits must be positive whole numbers, or blank to use the plan default.",
+        "User and staff limits must be positive whole numbers or blank; storage must be a positive whole number of MB.",
       );
       return;
     }
@@ -282,6 +291,7 @@ export default function OrganizationDetailPage() {
             confirmation: "CONFIRM",
             custom_user_limit: users,
             custom_staff_limit: staff,
+            storage_quota_mb: storage,
           }),
         },
       );
@@ -662,7 +672,7 @@ export default function OrganizationDetailPage() {
               </div>
               {editingLimits ? (
                 <div className="mt-5 rounded-2xl border border-[#c9dca1] bg-[#f7faef] p-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-3">
                     <LimitField
                       label="Custom user limit"
                       value={limitDraft.users}
@@ -681,6 +691,14 @@ export default function OrganizationDetailPage() {
                       }
                       onChange={(value) =>
                         setLimitDraft((draft) => ({ ...draft, staff: value }))
+                      }
+                    />
+                    <LimitField
+                      label="Storage allowance (MB)"
+                      value={limitDraft.storage}
+                      placeholder="1024"
+                      onChange={(value) =>
+                        setLimitDraft((draft) => ({ ...draft, storage: value }))
                       }
                     />
                   </div>
